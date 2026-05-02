@@ -161,37 +161,66 @@ def _parse_yaml_checksum_file(
 
 
 def _parse_all_yaml_checksums(content: str) -> dict[str, str]:
-    """Parse all filename-to-hash mappings from YAML checksum format.
-
-    Args:
-        content: The YAML checksum file content.
-
-    Returns:
-        Dictionary mapping filenames to hash values.
-
-    """
+    """Parse all filename-to-hash mappings from YAML checksum format."""
     if not _YAML_AVAILABLE or not yaml:
         return {}
-
-    hashes: dict[str, str] = {}
 
     try:
         data = yaml.safe_load(content)
         if not isinstance(data, dict):
             return {}
+    except yaml.YAMLError:
+        logger.debug("Failed to parse YAML for all checksums")
+        return {}
 
-        for filename, hash_data in data.items():
-            if isinstance(hash_data, dict):
+    hashes: dict[str, str] = {}
+
+    files = data.get("files")
+
+    # electron-builder format: files is a list of {url/name, sha512, size}
+    if isinstance(files, list):
+        for entry in files:
+            if not isinstance(entry, dict):
+                continue
+            filename = entry.get("url") or entry.get("name")
+            if not filename:
+                continue
+            result = _extract_hash_from_dict(entry)
+            if result:
+                hash_value, _ = result
+                hashes[filename] = hash_value
+
+    # Generic format: files is a dict of {filename: hash_str_or_dict}
+    elif isinstance(files, dict):
+        for filename, hash_data in files.items():
+            if isinstance(hash_data, str):
+                hashes[filename] = _normalize_hash_value(hash_data)
+            elif isinstance(hash_data, dict):
                 result = _extract_hash_from_dict(hash_data)
                 if result:
                     hash_value, _ = result
                     hashes[filename] = hash_value
-            elif isinstance(hash_data, str):
-                hashes[filename] = _normalize_hash_value(hash_data)
 
-    except yaml.YAMLError:
-        logger.debug("Failed to parse YAML for all checksums")
-        return {}
+    # Capture root-level entry (electron-builder also has path/sha512 at root)
+    root_path = data.get("path")
+    if root_path:
+        result = _extract_hash_from_dict(data)
+        if result:
+            hash_value, _ = result
+            hashes[root_path] = hash_value
+
+    # Fallback: flat {filename: hash} with no "files" key
+    if not hashes:
+        for key, value in data.items():
+            if key in ("version", "path", "releaseDate", "releaseNotes"):
+                continue
+            if isinstance(value, str):
+                hashes[key] = _normalize_hash_value(value)
+            elif isinstance(value, dict):
+                result = _extract_hash_from_dict(value)
+                if result:
+                    hash_value, _ = result
+                    hashes[key] = hash_value
 
     return hashes
 

@@ -162,6 +162,24 @@ def789abc123 other.bin
     assert hash_value == "abc123def456"
 
 
+def test_parse_traditional_hash_only_sha512_checksum_file() -> None:
+    """Test parsing checksum files that contain only a SHA512 hash."""
+    hash_value = parse_checksum_file(
+        LEGCORD_EXPECTED_HEX, "Joplin-3.5.13.AppImage", "sha512"
+    )
+
+    assert hash_value == LEGCORD_EXPECTED_HEX
+
+
+def test_parse_traditional_hash_only_rejects_wrong_hash_type() -> None:
+    """Test hash-only checksums must match the expected algorithm length."""
+    hash_value = parse_checksum_file(
+        LEGCORD_EXPECTED_HEX, "Joplin-3.5.13.AppImage", "sha256"
+    )
+
+    assert hash_value is None
+
+
 def test_parse_checksum_file_auto_detect_yaml() -> None:
     hash_value = parse_checksum_file(
         LEGCORD_YAML_CONTENT,
@@ -191,8 +209,17 @@ def test_detect_hash_type_from_filename() -> None:
     assert detect_hash_type_from_checksum_filename("checksums.sha1") == "sha1"
     assert detect_hash_type_from_checksum_filename("hashes.md5") == "md5"
     assert (
-        detect_hash_type_from_checksum_filename("latest-linux.yml") == "sha256"
+        detect_hash_type_from_checksum_filename("latest-linux.yml") == "sha512"
     )
+
+
+def test_detect_hash_type_from_hyphenated_filename() -> None:
+    assert detect_hash_type_from_checksum_filename("SHA-256SUMS") == "sha256"
+    assert detect_hash_type_from_checksum_filename("SHA-512SUMS") == "sha512"
+    assert (
+        detect_hash_type_from_checksum_filename("SHA-256SUMS.txt") == "sha256"
+    )
+    assert detect_hash_type_from_checksum_filename("checksums.sha-1") == "sha1"
 
 
 class TestParseAllChecksums:

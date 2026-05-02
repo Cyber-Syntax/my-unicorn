@@ -17,6 +17,7 @@ import pytest
 
 from tests.e2e.runner import E2ERunner
 from tests.e2e.sandbox import SandboxEnvironment
+from tests.e2e.warnings import warn_on_partial_verification
 
 
 @pytest.mark.e2e
@@ -158,6 +159,34 @@ class TestFullFlow:
                 assert "version" in config.get("state", {}), (
                     f"{app_name} config missing state.version field"
                 )
+
+    def test_partial_verification_warnings_joplin_legcord(
+        self,
+        sandbox_env: SandboxEnvironment,
+        e2e_runner: E2ERunner,
+    ) -> None:
+        """Warn about partial verification for joplin and legcord if seen.
+
+        These apps have historically produced partial verification when one
+        verification method passes and another fails. That may be caused by an
+        external release metadata/checksum issue, so installation should still
+        succeed and pytest should emit a warning when partial verification is
+        detected.
+
+        If both apps verify cleanly, this test should pass without warnings.
+        Because downloads run concurrently, output order is not guaranteed.
+        """
+        with sandbox_env:
+            result = e2e_runner.install("joplin", "legcord")
+
+            assert result.returncode == 0, f"Install failed: {result.stderr}"
+
+            cli_log = e2e_runner.read_log()
+            diagnostic_output = f"{result.stdout}\n{result.stderr}\n{cli_log}"
+            warn_on_partial_verification(
+                diagnostic_output,
+                "install",
+            )
 
     def test_updates_multiple_apps(
         self, sandbox_env: SandboxEnvironment, e2e_runner: E2ERunner

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from my_unicorn.constants import YAML_DEFAULT_HASH, HashType
 from my_unicorn.core.verification.checksum_parser.bsd_parser import (
     BSDChecksumParser,
     _looks_like_bsd,
@@ -23,7 +24,6 @@ from my_unicorn.logger import get_logger
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from my_unicorn.constants import HashType
     from my_unicorn.core.verification.checksum_parser.base import (
         ChecksumEntry,
         ChecksumParser,
@@ -100,7 +100,7 @@ def detect_hash_type_from_checksum_filename(
             return hash_type
 
     if filename_lower.endswith((".yml", ".yaml")):
-        return "sha256"
+        return YAML_DEFAULT_HASH
 
     return None
 
