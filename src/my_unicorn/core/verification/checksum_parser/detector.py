@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from my_unicorn.constants import YAML_DEFAULT_HASH, HashType
 from my_unicorn.core.verification.checksum_parser.bsd_parser import (
     BSDChecksumParser,
     _looks_like_bsd,
@@ -23,7 +24,6 @@ from my_unicorn.logger import get_logger
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from my_unicorn.constants import HashType
     from my_unicorn.core.verification.checksum_parser.base import (
         ChecksumEntry,
         ChecksumParser,
@@ -88,9 +88,9 @@ def detect_hash_type_from_checksum_filename(
     filename_lower = filename.lower()
 
     hash_patterns: dict[HashType, Iterable[str]] = {
-        "sha512": ["sha512", "sha-512"],
-        "sha256": ["sha256", "sha-256"],
-        "sha1": ["sha1", "sha-1"],
+        "sha512": ["sha512"],
+        "sha256": ["sha256"],
+        "sha1": ["sha1"],
         "md5": ["md5"],
     }
 
@@ -100,7 +100,7 @@ def detect_hash_type_from_checksum_filename(
             return hash_type
 
     if filename_lower.endswith((".yml", ".yaml")):
-        return "sha256"
+        return YAML_DEFAULT_HASH
 
     return None
 

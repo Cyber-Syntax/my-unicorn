@@ -19,6 +19,9 @@ _HASH_LENGTH_MAP: dict[int, HashType] = {
     64: "sha256",
     128: "sha512",
 }
+_HASH_TYPE_LENGTH_MAP: dict[HashType, int] = {
+    hash_type: length for length, hash_type in _HASH_LENGTH_MAP.items()
+}
 
 
 def _parse_sha256sums_line(line: str) -> tuple[str, str] | None:
@@ -63,19 +66,49 @@ def _generate_variants(name: str) -> set[str]:
     return {variant for variant in variants if variant}
 
 
+def _parse_hash_only_content(content: str, hash_type: HashType) -> str | None:
+    """Parse checksum files that contain a single raw hash only.
+
+    This is used for formats like `.sha512` files that sometimes
+    contain only a hash without filename mapping.
+
+    Rules:
+    - Must contain exactly one non-empty, non-comment line
+    - Must be a valid hex string
+    - Must match the expected hash length for the detected hash type
+    """
+    lines = [
+        line.strip()
+        for line in content.strip().split("\n")
+        if line.strip() and not line.strip().startswith("#")
+    ]
+
+    if len(lines) != 1:
+        return None
+
+    candidate = lines[0]
+
+    if not all(c in "0123456789abcdefABCDEF" for c in candidate):
+        return None
+
+    expected_length = _HASH_TYPE_LENGTH_MAP[hash_type]
+    if len(candidate) != expected_length:
+        logger.debug(
+            "   Hash-only candidate length %d does not match %s length %d",
+            len(candidate),
+            hash_type,
+            expected_length,
+        )
+        return None
+
+    return candidate
+
+
 def _parse_traditional_checksum_file(
     content: str, filename: str, hash_type: HashType
 ) -> str | None:
-    """Parse a traditional checksum file (e.g., SHA256SUMS).
+    """Parse a traditional checksum file (e.g., SHA256SUMS)."""
 
-    Args:
-        content: The file content.
-        filename: The filename to find the hash for.
-        hash_type: The expected hash type.
-
-    Returns:
-        The hash value as string or None if not found.
-    """
     logger.debug("   Parsing as traditional checksum file format")
     logger.debug("   Looking for: %s", filename)
     logger.debug("   Hash type: %s", hash_type)
@@ -85,6 +118,16 @@ def _parse_traditional_checksum_file(
 
     target_variants = _generate_variants(filename)
 
+    # Hash-only fallback for .sha256/.sha512 style files. The checksum
+    # filename is not available here, so rely on the already-detected hash
+    # type passed by the caller and validate the raw hash length strictly.
+    hash_only = _parse_hash_only_content(content, hash_type)
+    if hash_only:
+        logger.debug("   ✅ Hash-only checksum detected (fallback mode)")
+        logger.debug("   Hash: %s", hash_only)
+        return hash_only
+
+    # Standard filename-based parsing
     for line_num, raw_line in enumerate(lines, 1):
         line = raw_line.strip()
         if not line or line.startswith("#"):
@@ -107,6 +150,7 @@ def _parse_traditional_checksum_file(
             file_in_checksum,
         )
 
+        # direct match
         if file_in_checksum == filename or file_in_checksum.endswith(
             f"/{filename}"
         ):
@@ -114,6 +158,7 @@ def _parse_traditional_checksum_file(
             logger.debug("   Hash: %s", hash_value)
             return hash_value
 
+        # relaxed variant match
         file_variants = _generate_variants(file_in_checksum)
         if target_variants.intersection(file_variants):
             logger.debug(
