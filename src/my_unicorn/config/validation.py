@@ -4,6 +4,7 @@ This module centralizes validation logic for application configurations,
 particularly GitHub identifiers and other security-critical fields.
 """
 
+from collections.abc import Mapping
 from typing import Any
 
 from my_unicorn.utils.validation import validate_github_identifier
@@ -13,14 +14,14 @@ class ConfigurationValidator:
     """Validates application configuration data."""
 
     @staticmethod
-    def validate_app_config(config: dict[str, Any]) -> None:
+    def validate_app_config(config: Mapping[str, Any]) -> None:
         """Validate app configuration structure and values.
 
         Currently validates GitHub identifiers for security.
         Additional validation can be added as needed.
 
         Args:
-            config: Application configuration dictionary
+            config: Application configuration mapping
 
         Raises:
             ValueError: If configuration contains invalid values

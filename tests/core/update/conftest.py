@@ -14,7 +14,7 @@ import aiohttp
 import pytest
 
 from my_unicorn.core.api import Asset, Release
-from my_unicorn.core.update.info import UpdateInfo
+from my_unicorn.core.update import UpdateInfo
 
 # =============================================================================
 # Mock External Dependencies

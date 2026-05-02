@@ -1,0 +1,28 @@
+{
+    "config_version": "2.0.0",
+    "metadata": {
+        "description": "Pear is extension for music player.",
+        "display_name": "pear-desktop",
+        "name": "pear-desktop"
+    },
+    "source": {
+        "owner": "pear-devs",
+        "prerelease": false,
+        "repo": "pear-desktop",
+        "type": "github"
+    },
+    "appimage": {
+        "naming": {
+            "architectures": ["amd64", "x86_64"],
+            "target_name": "pear-desktop",
+            "template": ""
+        }
+    },
+    "verification": {
+        "method": "digest"
+    },
+    "icon": {
+        "filename": "pear-desktop.png",
+        "method": "extraction"
+    }
+}

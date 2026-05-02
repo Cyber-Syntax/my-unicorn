@@ -62,7 +62,7 @@ def select_best_appimage_asset(
         >>> asset = select_best_appimage_asset(
         ...     release,
         ...     catalog_entry=catalog_data,
-        ...     installation_source="url",
+        ...     installation_source="catalog",
         ...     raise_on_not_found=False,
         ... )
 
@@ -77,9 +77,7 @@ def select_best_appimage_asset(
     # Extract preferred suffixes from catalog if not explicitly provided
     suffixes = preferred_suffixes
     if suffixes is None and catalog_entry:
-        appimage_config = catalog_entry.get("appimage")
-        if isinstance(appimage_config, dict):
-            suffixes = appimage_config.get("preferred_suffixes")
+        suffixes = _get_catalog_preferred_suffixes(catalog_entry)
 
     # Select best AppImage using AssetSelector
     asset = AssetSelector.select_appimage_for_platform(
@@ -94,6 +92,31 @@ def select_best_appimage_asset(
         raise InstallationError(msg)
 
     return asset
+
+
+def _get_catalog_preferred_suffixes(
+    catalog_entry: dict[str, Any],
+) -> list[str] | None:
+    """Extract AppImage selection preferences from a catalog entry."""
+    appimage_config = catalog_entry.get("appimage")
+    if not isinstance(appimage_config, dict):
+        return None
+
+    preferred_suffixes = appimage_config.get("preferred_suffixes")
+    if isinstance(preferred_suffixes, list):
+        return [
+            suffix for suffix in preferred_suffixes if isinstance(suffix, str)
+        ]
+
+    naming_config = appimage_config.get("naming")
+    if not isinstance(naming_config, dict):
+        return None
+
+    architectures = naming_config.get("architectures")
+    if not isinstance(architectures, list):
+        return None
+
+    return [arch for arch in architectures if isinstance(arch, str)]
 
 
 async def verify_appimage_download(  # noqa: PLR0913

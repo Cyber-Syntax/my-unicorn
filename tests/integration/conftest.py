@@ -11,7 +11,7 @@ import pytest
 from my_unicorn.config import ConfigManager
 from my_unicorn.core.api import Asset, Release
 from my_unicorn.core.protocols.progress import NullProgressReporter
-from my_unicorn.core.update.manager import UpdateManager
+from my_unicorn.core.update import UpdateManager
 
 if TYPE_CHECKING:
     from pathlib import Path

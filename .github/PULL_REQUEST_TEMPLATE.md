@@ -17,8 +17,8 @@
 
 ## Checklist
 
-- [ ] I have included relevant changes to the documentation
-- [ ] I have run `uv run pytest` and `uv run pytest tests/e2e/` to ensure that my changes do not break existing tests
-- [ ] I have added tests for my changes (if applicable)
-- [ ] Existing tests still pass
-- [ ] My commit messages follow the git conventional commits (`<type>[optional scope]: <description>`)
+- If you changed python module:
+    - [ ] Run all fast tests: `uv run pytest -m 'not slow'`
+    - [ ] Run e2e tests: `uv run pytest tests/e2e/` (WARNING: This tests would use real api connection, make sure you setup your token. Also, this would take time according to your internet speed.)
+- [ ] Add your test (if you can)
+- [ ] Add/update docs

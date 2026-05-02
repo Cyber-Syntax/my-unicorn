@@ -1,0 +1,28 @@
+{
+    "config_version": "2.0.0",
+    "metadata": {
+        "description": "Open source music streaming app! Available for both desktop & mobile!",
+        "display_name": "spotube",
+        "name": "spotube"
+    },
+    "appimage": {
+        "naming": {
+            "architectures": ["amd64", "x86_64"],
+            "target_name": "spotube",
+            "template": ""
+        }
+    },
+    "source": {
+        "owner": "krtirtho",
+        "prerelease": false,
+        "repo": "spotube",
+        "type": "github"
+    },
+    "verification": {
+        "method": "digest"
+    },
+    "icon": {
+        "filename": "spotube.png",
+        "method": "extraction"
+    }
+}

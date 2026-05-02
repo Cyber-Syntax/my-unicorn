@@ -8,7 +8,7 @@ from argparse import Namespace
 
 from my_unicorn.cli.container import ServiceContainer
 from my_unicorn.core.progress.progress import ProgressDisplay
-from my_unicorn.core.update.display_update import (
+from my_unicorn.core.update import (
     display_check_results,
     display_invalid_apps,
     display_update_error,

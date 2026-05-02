@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import aiohttp
 import pytest
 
-from my_unicorn.core.update.manager import UpdateManager
+from my_unicorn.core.update import UpdateManager
 
 
 class TestCheckSingleUpdateEdgeCases:
@@ -25,11 +25,11 @@ class TestCheckSingleUpdateEdgeCases:
 
         """
         with (
-            patch("my_unicorn.core.update.manager.ConfigManager"),
-            patch("my_unicorn.core.update.manager.GitHubAuthManager"),
-            patch("my_unicorn.core.update.manager.FileOperations"),
-            patch("my_unicorn.core.update.manager.BackupService"),
-            patch("my_unicorn.core.update.manager.ReleaseCacheManager"),
+            patch("my_unicorn.core.update.ConfigManager"),
+            patch("my_unicorn.core.update.GitHubAuthManager"),
+            patch("my_unicorn.core.update.FileOperations"),
+            patch("my_unicorn.core.update.BackupService"),
+            patch("my_unicorn.core.update.ReleaseCacheManager"),
         ):
             # Create a minimal config manager mock
             mock_config = MagicMock()
@@ -44,7 +44,7 @@ class TestCheckSingleUpdateEdgeCases:
                 },
             }
             with patch(
-                "my_unicorn.core.update.manager.ConfigManager"
+                "my_unicorn.core.update.ConfigManager"
             ) as mock_config_cls:
                 mock_config_cls.return_value = mock_config
                 return UpdateManager()
@@ -74,7 +74,7 @@ class TestCheckSingleUpdateEdgeCases:
                 "Unexpected failure in context"
             )
 
-            with patch("my_unicorn.core.update.manager.logger") as mock_logger:
+            with patch("my_unicorn.core.update.logger") as mock_logger:
                 # Call check_single_update
                 result = await update_manager.check_single_update(
                     "test-app",
@@ -114,7 +114,7 @@ class TestCheckSingleUpdateEdgeCases:
             # Configure to return empty list (no apps installed)
             mock_list_apps.return_value = []
 
-            with patch("my_unicorn.core.update.manager.logger") as mock_logger:
+            with patch("my_unicorn.core.update.logger") as mock_logger:
                 # Call check_updates with None (uses installed apps)
                 result = await update_manager.check_updates(
                     app_names=None, refresh_cache=False
@@ -172,9 +172,7 @@ class TestCheckSingleUpdateEdgeCases:
                 )
                 mock_fetch.side_effect = error_401
 
-                with patch(
-                    "my_unicorn.core.update.manager.logger"
-                ) as mock_logger:
+                with patch("my_unicorn.core.update.logger") as mock_logger:
                     # Call check_single_update
                     result = await update_manager.check_single_update(
                         "test-app",
@@ -233,9 +231,7 @@ class TestCheckSingleUpdateEdgeCases:
                 )
                 mock_fetch.side_effect = error_403
 
-                with patch(
-                    "my_unicorn.core.update.manager.logger"
-                ) as mock_logger:
+                with patch("my_unicorn.core.update.logger") as mock_logger:
                     # Call check_single_update
                     result = await update_manager.check_single_update(
                         "test-app",

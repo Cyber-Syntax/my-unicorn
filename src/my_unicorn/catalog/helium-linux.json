@@ -1,0 +1,28 @@
+{
+    "config_version": "2.0.0",
+    "metadata": {
+        "description": "The Chromium-based web browser made for people, with love. Privacy-first with unbiased ad-blocking. No bloat and no noise.",
+        "display_name": "helium-linux",
+        "name": "helium-linux"
+    },
+    "source": {
+        "owner": "imputnet",
+        "prerelease": false,
+        "repo": "helium-linux",
+        "type": "github"
+    },
+    "appimage": {
+        "naming": {
+            "architectures": ["amd64", "x86_64"],
+            "target_name": "helium-linux",
+            "template": ""
+        }
+    },
+    "verification": {
+        "method": "digest"
+    },
+    "icon": {
+        "filename": "helium-linux.png",
+        "method": "extraction"
+    }
+}

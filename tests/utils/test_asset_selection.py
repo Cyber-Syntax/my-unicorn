@@ -87,6 +87,26 @@ class TestSelectBestAppimageAsset:
         )
         assert result == asset1
 
+    def test_architectures_from_catalog_v2_naming(self) -> None:
+        """Test extraction of catalog v2 architecture preferences."""
+        asset1 = create_mock_asset("app.AppImage")
+        asset2 = create_mock_asset("app-x86_64.AppImage")
+        release = create_mock_release(assets=[asset1, asset2])
+
+        catalog_entry = {
+            "appimage": {
+                "naming": {
+                    "architectures": ["x86_64"],
+                },
+            }
+        }
+
+        result = select_best_appimage_asset(
+            release,
+            catalog_entry=catalog_entry,
+        )
+        assert result == asset2
+
     def test_explicit_suffixes_override_catalog(self) -> None:
         """Test that explicit suffixes take precedence over catalog."""
         asset1 = create_mock_asset("app-x86_64.AppImage")

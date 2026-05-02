@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Added new appimage supports; spotube, helium-linux, muffon, pear-desktop, simpmusic.
+
+### Changed
+
+- Consolidated install modules to one module.
+- Consolidated update modules to one module.
+- Update and install modules use logger instead of print statements for better logging and debugging.
+
 ## [2.5.2-alpha] - 2026-04-30
 
 ### Added
@@ -14,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Wrong hash type detection on .yml/.yaml checksum files
+
 
 ## [2.5.1-alpha] - 2026-04-30
 

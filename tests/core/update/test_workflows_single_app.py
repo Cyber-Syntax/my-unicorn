@@ -11,8 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from my_unicorn.core.api import Release
-from my_unicorn.core.update.info import UpdateInfo
-from my_unicorn.core.update.workflows import update_single_app
+from my_unicorn.core.update import UpdateInfo, update_single_app
 from my_unicorn.exceptions import UpdateError, VerificationError
 
 
@@ -120,7 +119,7 @@ class TestUpdateSingleApp:
         mock_post_processor.progress_reporter = MagicMock()
 
         with patch(
-            "my_unicorn.core.update.workflows.DownloadService"
+            "my_unicorn.core.update.DownloadService"
         ) as mock_download_class:
             mock_download_instance = AsyncMock()
             mock_download_instance.download_appimage.return_value = Path(
@@ -128,9 +127,7 @@ class TestUpdateSingleApp:
             )
             mock_download_class.return_value = mock_download_instance
 
-            with patch(
-                "my_unicorn.core.update.workflows.Path.exists"
-            ) as mock_exists:
+            with patch("my_unicorn.core.update.Path.exists") as mock_exists:
                 mock_exists.return_value = True
 
                 success, error = await update_single_app(
@@ -197,7 +194,7 @@ class TestUpdateSingleApp:
         mock_post_processor.progress_reporter = MagicMock()
 
         with patch(
-            "my_unicorn.core.update.workflows.DownloadService"
+            "my_unicorn.core.update.DownloadService"
         ) as mock_download_class:
             mock_download_instance = AsyncMock()
             mock_download_instance.download_appimage.return_value = None
@@ -269,7 +266,7 @@ class TestUpdateSingleApp:
         )
 
         with patch(
-            "my_unicorn.core.update.workflows.DownloadService"
+            "my_unicorn.core.update.DownloadService"
         ) as mock_download_class:
             mock_download_instance = AsyncMock()
             mock_download_instance.download_appimage.return_value = Path(
@@ -343,7 +340,7 @@ class TestUpdateSingleApp:
         )
 
         with patch(
-            "my_unicorn.core.update.workflows.DownloadService"
+            "my_unicorn.core.update.DownloadService"
         ) as mock_download_class:
             mock_download_instance = AsyncMock()
             mock_download_instance.download_appimage.return_value = Path(

@@ -7,7 +7,7 @@ for creating UpdateManager instances with proper dependency injection.
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from my_unicorn.core.update.manager import UpdateManager
+from my_unicorn.core.update import UpdateManager
 
 
 class TestUpdateManagerFactory:
@@ -28,13 +28,11 @@ class TestUpdateManagerFactory:
         The test also verifies that the instance has all expected attributes.
         """
         with (
-            patch(
-                "my_unicorn.core.update.manager.ConfigManager"
-            ) as mock_config_cls,
-            patch("my_unicorn.core.update.manager.GitHubAuthManager"),
-            patch("my_unicorn.core.update.manager.FileOperations"),
-            patch("my_unicorn.core.update.manager.BackupService"),
-            patch("my_unicorn.core.update.manager.ReleaseCacheManager"),
+            patch("my_unicorn.core.update.ConfigManager") as mock_config_cls,
+            patch("my_unicorn.core.update.GitHubAuthManager"),
+            patch("my_unicorn.core.update.FileOperations"),
+            patch("my_unicorn.core.update.BackupService"),
+            patch("my_unicorn.core.update.ReleaseCacheManager"),
         ):
             mock_config_instance = MagicMock()
             mock_config_cls.return_value = mock_config_instance
@@ -91,10 +89,10 @@ class TestUpdateManagerFactory:
         }
 
         with (
-            patch("my_unicorn.core.update.manager.GitHubAuthManager"),
-            patch("my_unicorn.core.update.manager.FileOperations"),
-            patch("my_unicorn.core.update.manager.BackupService"),
-            patch("my_unicorn.core.update.manager.ReleaseCacheManager"),
+            patch("my_unicorn.core.update.GitHubAuthManager"),
+            patch("my_unicorn.core.update.FileOperations"),
+            patch("my_unicorn.core.update.BackupService"),
+            patch("my_unicorn.core.update.ReleaseCacheManager"),
         ):
             # Create instance using factory method with custom config
             manager = UpdateManager.create_default(config_manager=mock_config)
@@ -126,10 +124,10 @@ class TestUpdateManagerFactory:
         mock_progress = MagicMock()
 
         with (
-            patch("my_unicorn.core.update.manager.GitHubAuthManager"),
-            patch("my_unicorn.core.update.manager.FileOperations"),
-            patch("my_unicorn.core.update.manager.BackupService"),
-            patch("my_unicorn.core.update.manager.ReleaseCacheManager"),
+            patch("my_unicorn.core.update.GitHubAuthManager"),
+            patch("my_unicorn.core.update.FileOperations"),
+            patch("my_unicorn.core.update.BackupService"),
+            patch("my_unicorn.core.update.ReleaseCacheManager"),
         ):
             # Create instance with custom progress reporter
             manager = UpdateManager.create_default(
