@@ -176,7 +176,7 @@ Previously, CLI commands directly instantiated services with complex dependency 
 from my_unicorn.core.http_session import create_http_session
 from my_unicorn.core.auth import GitHubAuthManager
 from my_unicorn.core.download import DownloadService
-from my_unicorn.core.verification import VerificationService
+from my_unicorn.core.verify import VerificationService
 from my_unicorn.core.install.install import InstallHandler
 
 class InstallCommandHandler:
@@ -523,7 +523,7 @@ async def _download_with_executor(self, url: str, path: Path) -> Path:
 For large files (>100MB), hash computation runs in a thread pool:
 
 ```python
-from my_unicorn.core.verification.verifier import Verifier, LARGE_FILE_THRESHOLD
+from my_unicorn.core.verify import Verifier, LARGE_FILE_THRESHOLD
 
 class Verifier:
     LARGE_FILE_THRESHOLD = 100 * 1024 * 1024  # 100MB

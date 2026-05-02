@@ -458,7 +458,7 @@ xdg-open htmlcov/index.html  # Linux
 uv run pytest --cov=my_unicorn --cov-report=term
 
 # Coverage for specific module
-uv run pytest --cov=my_unicorn.core.verification tests/core/verification/
+uv run pytest --cov=my_unicorn.core.verify tests/core/verification/
 ```
 
 ## Advanced Testing Topics
