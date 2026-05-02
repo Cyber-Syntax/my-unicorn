@@ -42,7 +42,7 @@ jobs:
       - name: Validate semantic version
         if: steps.changelog.outputs.is_unreleased != 'true'
         run: |
-          VERSION=${{ steps.changelog.outputs.version }}
+          VERSION="${{ steps.changelog.outputs.version }}"
           VERSION=${VERSION#v}
 
           if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?(\+[a-zA-Z0-9.]+)?$ ]]; then
