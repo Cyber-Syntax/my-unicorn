@@ -29,6 +29,12 @@ uv run pytest tests/test_install.py::test_install_success
 uv run pytest -v -s
 ```
 
+## Learning test specific names
+
+- Example for e2e tests: `pytest --collect-only -q tests/e2e`
+- Example for core: `pytest --collect-only -q tests/core/`
+- Example how to run one test: `uv run pytest tests/e2e/test_full_flow.py::TestFullFlow::test_partial_verification_warnings_joplin_legcord`
+
 ## Test Organization
 
 ### Directory Structure
@@ -72,11 +78,11 @@ Tests are organized with pytest markers:
 
 Fixtures follow a hierarchical organization:
 
-| Fixture Scope | Location | Purpose |
-|---------------|----------|---------|
-| **Global fixtures** | `tests/conftest.py` | Shared across all tests (e.g., `enable_log_propagation`) |
-| **Module-group fixtures** | `tests/<group>/conftest.py` | Shared across submodules (e.g., `tests/core/conftest.py`) |
-| **Module-specific fixtures** | `tests/<module>/conftest.py` | Used only by tests in that module |
+| Fixture Scope                | Location                     | Purpose                                                   |
+| ---------------------------- | ---------------------------- | --------------------------------------------------------- |
+| **Global fixtures**          | `tests/conftest.py`          | Shared across all tests (e.g., `enable_log_propagation`)  |
+| **Module-group fixtures**    | `tests/<group>/conftest.py`  | Shared across submodules (e.g., `tests/core/conftest.py`) |
+| **Module-specific fixtures** | `tests/<module>/conftest.py` | Used only by tests in that module                         |
 
 Pytest automatically discovers fixtures from parent directories, so child tests can use parent fixtures without imports.
 
@@ -201,7 +207,7 @@ def test_with_caplog(caplog):
     """Use caplog for asserting log messages in tests."""
     # caplog captures console output
     my_function_that_logs()
-    
+
     # Assert specific log messages were emitted
     assert "Expected message" in caplog.text
     assert any(record.levelname == "ERROR" for record in caplog.records)
@@ -220,10 +226,10 @@ async def test_install_workflow(caplog, tmp_path):
     """Test installation with both caplog and file logs."""
     # caplog captures console logs for assertions
     result = await install_workflow.execute()
-    
+
     # Assert using caplog
     assert "Installing" in caplog.text
-    
+
     # If test fails, check file logs for full context:
     # tail -f /tmp/pytest-of-$USER-logs/my-unicorn.log
 ```
@@ -277,10 +283,10 @@ For deeper investigation, you can temporarily increase log verbosity:
 def test_with_debug_logging(caplog):
     """Test with DEBUG level logging."""
     caplog.set_level(logging.DEBUG)
-    
+
     # Now all DEBUG messages will be captured
     my_complex_function()
-    
+
     # Check debug logs
     assert "Detailed debug info" in caplog.text
 ```
@@ -308,7 +314,7 @@ def test_file_operations(tmp_path):
     """Always use tmp_path for temporary files."""
     test_file = tmp_path / "test.txt"
     test_file.write_text("content")
-    
+
     # Cleanup is automatic - pytest removes tmp_path after test
     assert test_file.exists()
 ```
@@ -319,7 +325,7 @@ def test_file_operations(tmp_path):
 def test_logging_behavior(caplog):
     """Use caplog to assert log messages."""
     my_function()
-    
+
     assert "Expected message" in caplog.text
     assert caplog.records[0].levelname == "INFO"
 ```
@@ -346,10 +352,10 @@ def test_example():
     # Arrange - Set up test data and mocks
     mock_data = {"key": "value"}
     expected_result = "expected"
-    
+
     # Act - Execute the function under test
     result = my_function(mock_data)
-    
+
     # Assert - Verify the outcome
     assert result == expected_result
 ```
@@ -373,9 +379,9 @@ from unittest.mock import AsyncMock, patch
 async def test_with_mocked_http(mock_session):
     """Mock external HTTP calls."""
     mock_session.get = AsyncMock(return_value=fake_response)
-    
+
     result = await fetch_data()
-    
+
     assert result == expected_data
     mock_session.get.assert_called_once()
 ```
