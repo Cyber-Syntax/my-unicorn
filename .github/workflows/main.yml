@@ -1,106 +1,124 @@
-name: Create Release from CHANGELOG
+name: Publish Release from Tag and CHANGELOG
 
 on:
-    push:
-        branches: [main]
-        paths:
-            - "CHANGELOG.md" # Only trigger when CHANGELOG.md is updated
+  push:
+    tags:
+      - "v*"
 
 concurrency:
-    group: release-${{ github.ref }}
-    cancel-in-progress: false # Don't cancel running releases
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
-    release:
-        runs-on: ubuntu-latest
-        permissions:
-            contents: write
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
 
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          fetch-depth: 1
 
-            - name: Validate CHANGELOG format
-              run: |
-                  if [[ ! -f "CHANGELOG.md" ]]; then
-                    echo "::error::CHANGELOG.md not found"
-                    exit 1
-                  fi
-                  
-                  if ! grep -q "^## \[" CHANGELOG.md && ! grep -q "^## v" CHANGELOG.md; then
-                    echo "::error::CHANGELOG.md does not contain valid version headers"
-                    echo "::error::Expected format: '## [X.Y.Z]' or '## vX.Y.Z'"
-                    exit 1
-                  fi
+      - name: Validate CHANGELOG format
+        run: |
+          if [[ ! -f "CHANGELOG.md" ]]; then
+            echo "::error::CHANGELOG.md not found"
+            exit 1
+          fi
 
-            - name: Extract latest version and notes
-              id: changelog
-              run: ./scripts/extract_changelog.sh
+          if ! grep -q "^## \[" CHANGELOG.md && ! grep -q "^## v" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md does not contain valid version headers"
+            echo "::error::Expected format: '## [X.Y.Z]' or '## vX.Y.Z'"
+            exit 1
+          fi
 
-            - name: Validate semantic version
-              if: steps.changelog.outputs.is_unreleased != 'true'
-              run: |
-                  VERSION=${{ steps.changelog.outputs.version }}
-                  # Remove 'v' prefix if present
-                  VERSION=${VERSION#v}
-                  
-                  # Validate semantic versioning format
-                  if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?(\+[a-zA-Z0-9.]+)?$ ]]; then
-                    echo "::error::Version '$VERSION' does not follow semantic versioning"
-                    echo "::error::Expected format: MAJOR.MINOR.PATCH[-PRERELEASE][+BUILD]"
-                    exit 1
-                  fi
-                  
-                  echo "::notice::Version $VERSION is valid semantic version"
+      - name: Extract latest version and notes
+        id: changelog
+        run: ./scripts/extract_changelog.sh
 
-            - name: Check for existing release
-              if: steps.changelog.outputs.is_unreleased != 'true'
-              id: check_release
-              run: |
-                  VERSION=${{ steps.changelog.outputs.version }}
-                  TAG="v$VERSION"
-                  if gh release view "$TAG" &>/dev/null; then
-                    echo "::notice::Release already exists: $TAG"
-                    echo "exists=true" >> $GITHUB_OUTPUT
-                  else
-                    echo "::notice::No existing release found for: $TAG"
-                    echo "exists=false" >> $GITHUB_OUTPUT
-                  fi
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Validate semantic version
+        if: steps.changelog.outputs.is_unreleased != 'true'
+        run: |
+          VERSION=${{ steps.changelog.outputs.version }}
+          VERSION=${VERSION#v}
 
-            - name: Create GitHub Release
-              if: steps.changelog.outputs.is_unreleased != 'true' && steps.check_release.outputs.exists == 'false'
-              uses: softprops/action-gh-release@v2.5.0
-              with:
-                  tag_name: v${{ steps.changelog.outputs.version }}
-                  name: "Release v${{ steps.changelog.outputs.version }}"
-                  body: ${{ steps.changelog.outputs.notes }}
-                  draft: false
-                  prerelease: ${{ contains(steps.changelog.outputs.version, '-') }}
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?(\+[a-zA-Z0-9.]+)?$ ]]; then
+            echo "::error::Version '$VERSION' does not follow semantic versioning"
+            echo "::error::Expected format: MAJOR.MINOR.PATCH[-PRERELEASE][+BUILD]"
+            exit 1
+          fi
 
-            - name: Verify Release Created
-              if: steps.changelog.outputs.is_unreleased != 'true' && steps.check_release.outputs.exists == 'false'
-              run: |
-                  TAG="v${{ steps.changelog.outputs.version }}"
-                  # Wait a moment for release to be fully created
-                  sleep 5
-                  
-                  # Verify release exists
-                  if gh release view "$TAG" &>/dev/null; then
-                    RELEASE_URL=$(gh release view "$TAG" --json url --jq '.url')
-                    echo "::notice::Release successfully created: $RELEASE_URL"
-                  else
-                    echo "::error::Release verification failed for $TAG"
-                    exit 1
-                  fi
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          echo "::notice::Version $VERSION is valid semantic version"
 
-            - name: Notify on Failure
-              if: failure()
-              run: |
-                  echo "::error::Release workflow failed"
-                  echo "::error::Please check CHANGELOG.md format and workflow logs"
+      - name: Validate tag matches changelog version
+        if: steps.changelog.outputs.is_unreleased != 'true'
+        run: |
+          TAG_NAME="${GITHUB_REF_NAME}"
+          TAG_VERSION="${TAG_NAME#v}"
+          CHANGELOG_VERSION="${{ steps.changelog.outputs.version }}"
+          CHANGELOG_VERSION="${CHANGELOG_VERSION#v}"
+
+          if [[ "$TAG_VERSION" != "$CHANGELOG_VERSION" ]]; then
+            echo "::error::Tag '$TAG_NAME' does not match CHANGELOG version '$CHANGELOG_VERSION'"
+            echo "::error::Update CHANGELOG.md or push the matching release tag"
+            exit 1
+          fi
+
+          echo "::notice::Tag '$TAG_NAME' matches CHANGELOG version '$CHANGELOG_VERSION'"
+
+      - name: Check for existing release
+        if: steps.changelog.outputs.is_unreleased != 'true'
+        id: check_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="${GITHUB_REF_NAME}"
+          if gh release view "$TAG_NAME" &>/dev/null; then
+            echo "::notice::Release already exists: $TAG_NAME"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::No existing release found for: $TAG_NAME"
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release
+        if: steps.changelog.outputs.is_unreleased != 'true' && steps.check_release.outputs.exists == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_NOTES: ${{ steps.changelog.outputs.notes }}
+        run: |
+          TAG_NAME="${GITHUB_REF_NAME}"
+          NOTES_FILE="$(mktemp)"
+
+          printf '%s\n' "$RELEASE_NOTES" > "$NOTES_FILE"
+
+          gh release create "$TAG_NAME" \
+            --title "Release $TAG_NAME" \
+            --notes-file "$NOTES_FILE" \
+            --verify-tag
+
+          rm -f "$NOTES_FILE"
+
+      - name: Verify Release Created
+        if: steps.changelog.outputs.is_unreleased != 'true' && steps.check_release.outputs.exists == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="${GITHUB_REF_NAME}"
+
+          if gh release view "$TAG_NAME" &>/dev/null; then
+            RELEASE_URL=$(gh release view "$TAG_NAME" --json url --jq '.url')
+            echo "::notice::Release successfully created: $RELEASE_URL"
+          else
+            echo "::error::Release verification failed for $TAG_NAME"
+            exit 1
+          fi
+
+      - name: Notify on Failure
+        if: failure()
+        run: |
+          echo "::error::Release workflow failed"
+          echo "::error::Please check CHANGELOG.md format and workflow logs"
