@@ -10,7 +10,7 @@ cleanup() { :; }
 
 handle_signal() {
   printf '[ERROR] Signal received: %s\n' "${1:-UNKNOWN}" >&2
-  return 1
+  exit 1
 }
 
 trap 'handle_signal INT' INT
@@ -51,8 +51,6 @@ find_yaml_file() {
   }
 
   log_data "YAML file" "${file}"
-
-  # ONLY raw output for capture
   printf '%s\n' "${file}"
 }
 
@@ -63,7 +61,7 @@ extract_appimage() {
   value=$(sed -n 's/^path:[[:space:]]*\(.*\.AppImage\)$/\1/p' "$yaml" | head -n 1)
 
   [[ -n "${value// /}" ]] || {
-    log_error "Failed to parse AppImage path"
+    log_error "Failed to parse AppImage"
     return 1
   }
 
@@ -75,9 +73,7 @@ extract_sha512_base64() {
   local yaml="$1"
   local value
 
-  value=$(awk '
-        /^path:.*AppImage$/ {getline; if ($1=="sha512:") print $2}
-    ' "$yaml")
+  value=$(awk '/^path:.*AppImage$/ {getline; if ($1=="sha512:") print $2}' "$yaml")
 
   [[ -n "${value// /}" ]] || {
     log_error "Failed to extract base64 sha512"
@@ -99,7 +95,7 @@ base64_to_hex() {
     return 1
   }
 
-  log_data "HEX expected" "${hex}"
+  log_data "Expected HEX" "${hex}"
   printf '%s\n' "${hex}"
 }
 
@@ -114,7 +110,7 @@ sha512_file() {
     return 1
   }
 
-  log_data "HEX actual" "${hash}"
+  log_data "Actual HEX" "${hash}"
   printf '%s\n' "${hash}"
 }
 
