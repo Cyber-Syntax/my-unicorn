@@ -88,9 +88,9 @@ def detect_hash_type_from_checksum_filename(
     filename_lower = filename.lower()
 
     hash_patterns: dict[HashType, Iterable[str]] = {
-        "sha512": ["sha512"],
-        "sha256": ["sha256"],
-        "sha1": ["sha1"],
+        "sha512": ["sha512", "sha-512"],
+        "sha256": ["sha256", "sha-256"],
+        "sha1": ["sha1", "sha-1"],
         "md5": ["md5"],
     }
 
