@@ -6,7 +6,7 @@
 # - Copies project files into XDG user data directory
 # - Creates/updates Python virtual environment
 # - Installs wrapper script and ensures PATH configuration
-# - Sets up shell autocomplete (bash/zsh)
+# - Sets up shell autocomplete (bash/zsh/fish)
 #
 # Usage:
 #   ./install.sh -i|--install   # Install or reinstall (includes autocomplete)
@@ -102,6 +102,7 @@ install_with_uv_tool() {
   uv tool install git+https://github.com/Cyber-Syntax/my-unicorn --force
   check_local_bin_in_path
   setup_autocomplete_from_src "$src_dir"
+  setup_fish_completions
   copy_update_script
 
   echo "✅ Installation complete using uv tool."
@@ -118,11 +119,32 @@ install_with_uv_editable() {
   uv tool install --editable . --force
   check_local_bin_in_path
   setup_autocomplete_from_src "$src_dir"
+  setup_fish_completions
   copy_update_script
 
   echo "✅ Editable installation complete using uv tool."
   echo "Changes to source code will be reflected immediately."
   echo "Run 'my-unicorn --help' to get started."
+}
+
+# Set up fish shell completions
+setup_fish_completions() {
+  local fish_dir="$HOME/.config/fish/completions"
+  local fish_src="$INSTALL_DIR/completions/my-unicorn.fish"
+
+  # Fallback to source directory if installed version not available
+  if [[ ! -f "$fish_src" ]]; then
+    fish_src="$(script_dir)/completions/my-unicorn.fish"
+  fi
+
+  if [[ -f "$fish_src" ]]; then
+    if command -v fish &>/dev/null; then
+      echo "Setting up fish completions..."
+      mkdir -p "$fish_dir"
+      cp "$fish_src" "$fish_dir/"
+      echo "Fish completions installed to $fish_dir/my-unicorn.fish"
+    fi
+  fi
 }
 
 # Set up shell autocomplete by delegating to autocomplete.bash
@@ -178,8 +200,8 @@ install_autocomplete() {
   src_dir="$(script_dir)"
   mkdir -p "$INSTALL_DIR"
 
-  # Copy autocomplete folder and scripts
-  for item in autocomplete scripts; do
+  # Copy autocomplete folder, completions folder, and scripts
+  for item in autocomplete completions scripts; do
     local src_path="$src_dir/$item"
     local dst_path="$INSTALL_DIR/$item"
     if [ -e "$src_path" ]; then
@@ -193,7 +215,8 @@ install_autocomplete() {
   done
 
   if setup_autocomplete; then
-    echo "✅ Autocomplete installation complete!"
+    setup_fish_completions
+    echo "Autocomplete installation complete!"
     echo ""
     echo "Please restart your shell or source your shell's rc file to enable autocompletion."
     echo "Test completion by typing: my-unicorn <TAB>"

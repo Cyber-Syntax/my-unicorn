@@ -74,7 +74,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 #### Method 1: Using install.sh (recommended)**
 >
 > [!NOTE]
-> This method also setup autocomplete for bash/zsh shells automatically.
+> This method also setup autocomplete for bash/zsh/fish shells automatically.
 
 ```bash
 cd ~/Downloads
@@ -169,6 +169,37 @@ Changes to the source code will be reflected immediately without reinstalling.
     ```bash
     my-unicorn --help # to see the command options
     ```
+
+## Shell Completions
+
+### Bash / Zsh
+
+> [!NOTE]
+> Completions are automatically configured when using `install.sh`.
+
+To manually enable:
+
+```bash
+# Bash
+sudo cp autocomplete/bash_autocomplete /etc/bash_completion.d/my-unicorn
+
+# Zsh
+sudo cp autocomplete/zsh_autocomplete /usr/local/share/zsh/site-functions/_my-unicorn
+```
+
+### Fish shell
+
+> [!NOTE]
+> Completions are automatically configured when using `install.sh`.
+
+To manually enable:
+
+```fish
+mkdir -p ~/.config/fish/completions
+cp completions/my-unicorn.fish ~/.config/fish/completions/
+```
+
+Restart your shell or run `source ~/.config/fish/completions/my-unicorn.fish` to enable.
 
 ## For using uncompatible apps (installing with URL)
 
