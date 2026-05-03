@@ -105,6 +105,8 @@ fi
 # -----------------------------------------------------------------------------
 
 usage() {
+    local exit_code
+    exit_code="${1:-0}"
     cat <<EOF
 Usage: $(basename "$0") [OPTIONS]
 
@@ -118,7 +120,7 @@ Examples:
   $(basename "$0") --force
   $(basename "$0") --dry-run
 EOF
-    exit 0
+    exit "$exit_code"
 }
 
 # -----------------------------------------------------------------------------
@@ -137,11 +139,11 @@ parse_args() {
                 shift
                 ;;
             -h|--help)
-                usage
+                usage 0
                 ;;
             *)
                 printf '❌ Unknown argument: %s\n' "$1" >&2
-                usage
+                usage 1
                 ;;
         esac
     done

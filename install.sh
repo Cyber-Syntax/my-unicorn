@@ -539,6 +539,10 @@ EOF
 # -----------------------------------------------------------------------------
 
 usage() {
+  local exit_code
+  # Default to exit code 0 for normal usage
+  # If an error code is provided, use 1 to indicate failure
+  exit_code="${1:-0}"
   cat <<EOF
 Usage: ./install.sh [OPTIONS]
 
@@ -554,7 +558,7 @@ Examples:
   ./install.sh -e
   ./install.sh -u
 EOF
-  exit 0
+  exit "$exit_code"
 }
 
 # -----------------------------------------------------------------------------
@@ -585,7 +589,7 @@ main() {
   #
   if [[ "$arg_count" -gt 2 ]]; then
     print_error "Too many arguments provided."
-    usage
+    usage 1
   fi
 
   case "$mode" in
@@ -595,27 +599,27 @@ main() {
   -e | --editable)
     if [[ "$arg_count" -gt 1 ]]; then
       print_error "Editable mode does not accept additional arguments."
-      usage
+      usage 1
     fi
     install_with_uv_editable
     ;;
   -u | --uninstall)
     if [[ "$arg_count" -gt 1 ]]; then
       print_error "Uninstall mode does not accept additional arguments."
-      usage
+      usage 1
     fi
     uninstall_my_unicorn
     ;;
   -h | --help | "")
     if [[ "$arg_count" -gt 1 ]]; then
       print_error "Help does not accept additional arguments."
-      usage
+      usage 1
     fi
-    usage
+    usage 0
     ;;
   *)
     print_error "Unknown option: $mode"
-    usage
+    usage 1
     ;;
   esac
 }
