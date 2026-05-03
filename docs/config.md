@@ -235,7 +235,7 @@ The `verification` object in state tracks all verification attempts:
     {
       "type": "digest",           // digest, checksum_file, or skip
       "status": "passed",         // passed, failed, skipped
-      "algorithm": "SHA256",      // SHA1, SHA256, SHA512, MD5
+      "algorithm": "SHA256",      // SHA256, SHA512
       "expected": "sha256:...",   // Expected hash with prefix
       "computed": "...",          // Computed hash (no prefix)
       "source": "github_api",     // github_api, checksum_file, or skip
