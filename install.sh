@@ -1,254 +1,627 @@
 #!/usr/bin/env bash
 #
 # install.sh
-# ------------------------------------------------
+# -----------------------------------------------------------------------------
 # User-level installer for "my-unicorn"
-# - Copies project files into XDG user data directory
-# - Creates/updates Python virtual environment
-# - Installs wrapper script and ensures PATH configuration
-# - Sets up shell autocomplete (bash/zsh)
 #
-# Usage:
-#   ./install.sh -i|--install   # Install or reinstall (includes autocomplete)
-#   ./install.sh -e|--editable  # Install in editable mode (for development)
-#   ./install.sh --autocomplete # Install shell completion only
+# This installer is responsible for:
+#   - Installing the CLI using `uv tool install`
+#   - Supporting version-specific installs using Git tags (example: v2.3.0)
+#   - Installing editable mode for local development contributors
+#   - Setting up shell autocomplete for bash/zsh
+#   - Copying the update helper script into ~/.local/bin
+#   - Checking PATH configuration for proper CLI access
 #
-# Exit immediately if:
-# - a command exits with a non-zero status (`-e`)
-# - an unset variable is used (`-u`)
-# - a pipeline fails anywhere (`-o pipefail`)
-set -euo pipefail
+# Supported modes:
+#
+#   ./install.sh -i | --install [version]
+#       Standard installation using uv tool install
+#
+#   ./install.sh -e | --editable
+#       Editable install using local source code for development
+#  
+#   ./install.sh -u | --uninstall
+#       Uninstall my-unicorn from user system
+#
+#   ./install.sh -h | --help
+#       Show usage information
+#
+#
+# Examples:
+#
+#   ./install.sh -i
+#       Install latest version from GitHub
+#
+#   ./install.sh -i 2.3.0
+#       Install tagged version v2.3.0
+#
+#   ./install.sh -i v2.3.0-alpha
+#       Install tagged pre-release version directly
+#
+#   ./install.sh -e
+#       Install editable mode for contributors
+#
+# Safety flags:
+#
+#   -e  Exit immediately if a command fails
+#   -u  Exit if an unset variable is used
+#   -o pipefail
+#       Fail a pipeline if any command inside it fails
+#
 
-# -- Configuration -----------------------------------------------------------
+# NOTE:
+# Using a single strict mode declaration to avoid redundancy.
+set -Eeuo pipefail
 
-# Where user-specific data should be stored
+# -----------------------------------------------------------------------------
+# Global configuration
+# -----------------------------------------------------------------------------
+
+
+# Official GitHub repository used for installation
+GITHUB_GIT_URL="git+https://github.com/Cyber-Syntax/my-unicorn"
+readonly GITHUB_GIT_URL
+
+# CLI executable name shown to users
+CLI_NAME="my-unicorn"
+readonly CLI_NAME
+
+# Standard XDG user data location
 XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+readonly XDG_DATA_HOME
 
-# Final install location of our project
+# Local install location for autocomplete assets and support files
 INSTALL_DIR="$XDG_DATA_HOME/my-unicorn"
+readonly INSTALL_DIR
 
-# -- Helper functions --------------------------------------------------------
+# User-local executable directory
+LOCAL_BIN_DIR="$HOME/.local/bin"
+readonly LOCAL_BIN_DIR
 
-# Log messages to stderr
-log() {
-  printf '%s\n' "$*" >&2
+# Update helper destination path
+UPDATE_SCRIPT_PATH="$LOCAL_BIN_DIR/my-unicorn-update"
+readonly UPDATE_SCRIPT_PATH
+
+# -----------------------------------------------------------------------------
+# Logging helpers
+# -----------------------------------------------------------------------------
+
+# Print normal informational messages to stdout
+print_info() {
+  local message
+  message="$1"
+
+  printf '%s\n' "$message"
 }
 
-# Get absolute directory path of currently running script (resolves symlinks)
+# Print errors to stderr so failures are visible and script-safe
+print_error() {
+  local message
+  message="$1"
+
+  printf '❌ %s\n' "$message" >&2
+}
+
+# -----------------------------------------------------------------------------
+# Utility helpers
+# -----------------------------------------------------------------------------
+
+# Return the absolute path of the current script directory.
+#
+# This helps us reliably locate project files such as:
+#   scripts/autocomplete.bash
+#   scripts/update.bash
+#
+# even when the installer is executed from another directory.
 script_dir() {
-  local src="${BASH_SOURCE[0]}"
-  while [ -h "$src" ]; do
-    src="$(readlink "$src")"
-  done
-  dirname "$src"
-}
-
-# Check if $HOME/.local/bin is in PATH and inform user if not
-check_local_bin_in_path() {
-  # Check if ~/.local/bin is already in PATH
-  if [[ ":$PATH:" == *":$HOME/.local/bin:"* ]]; then
-    echo "✅ $HOME/.local/bin is already in your PATH"
-    return 0
-  fi
-  
-  # Not in current PATH - inform the user
-  cat <<EOF
-
-⚠️  IMPORTANT: ~/.local/bin is not in your PATH
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-To use 'my-unicorn' from anywhere, please add the following line to
-your shell configuration file (~/.bashrc, ~/.zshrc, ~/.zshenv, etc.):
-
-    export PATH="\$HOME/.local/bin:\$PATH"
-
-Then restart your shell or run:
-    source ~/.bashrc  (for bash)
-    source ~/.zshrc   (for zsh)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-EOF
-  return 1
-}
-
-# Check if UV is available and exit if not
-check_uv_required() {
-  if ! command -v uv >/dev/null 2>&1; then
-    echo "❌ UV is not installed. Please install UV first:"
-    echo "   curl -LsSf https://astral.sh/uv/install.sh | sh"
-    echo " or you can use your package manager like 'brew install uv' or 'apt install uv'."
-    exit 1
-  fi
-}
-
-# Setup autocomplete from source directory
-setup_autocomplete_from_src() {
-  local src_dir="$1"
-  local autocomplete_helper="$src_dir/scripts/autocomplete.bash"
-  if [[ -x "$autocomplete_helper" ]]; then
-    echo "🔁 Setting up autocomplete..."
-    bash "$autocomplete_helper"
-  else
-    echo "⚠️  Warning: Autocomplete helper not found at $autocomplete_helper"
-  fi
-}
-
-# Install using uv tool (recommended for production)
-install_with_uv_tool() {
-  echo "🚀 Installing my-unicorn using 'uv tool install'..."
   local src_dir
-  src_dir="$(script_dir)"
 
-  cd "$src_dir"
-  uv tool install git+https://github.com/Cyber-Syntax/my-unicorn --force
-  check_local_bin_in_path
-  setup_autocomplete_from_src "$src_dir"
-  copy_update_script
-
-  echo "✅ Installation complete using uv tool."
-  echo "Run 'my-unicorn --help' to get started."
-}
-
-# Install using uv tool in editable mode (for development)
-install_with_uv_editable() {
-  echo "🔧 Installing my-unicorn in editable mode using 'uv tool install --editable'..."
-  local src_dir
-  src_dir="$(script_dir)"
-
-  cd "$src_dir"
-  uv tool install --editable . --force
-  check_local_bin_in_path
-  setup_autocomplete_from_src "$src_dir"
-  copy_update_script
-
-  echo "✅ Editable installation complete using uv tool."
-  echo "Changes to source code will be reflected immediately."
-  echo "Run 'my-unicorn --help' to get started."
-}
-
-# Set up shell autocomplete by delegating to autocomplete.bash
-setup_autocomplete() {
-  local helper="$INSTALL_DIR/scripts/autocomplete.bash"
-
-  # Fallback to source directory if installed version not available
-  if [[ ! -x "$helper" ]]; then
-    local src_helper
-    src_helper="$(script_dir)/scripts/autocomplete.bash"
-    [[ -x "$src_helper" ]] && helper="$src_helper"
+  if ! src_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; then
+    print_error "Unable to determine script directory."
+    return 1
   fi
 
-  if [[ -x "$helper" ]]; then
-    echo "🔁 Setting up autocomplete..."
-    bash "$helper"
-  # If helper is available in the source tree, attempt to install via uv to
-  # populate the install directory (legacy non-uv installers removed).
-  elif [[ -x "$(script_dir)/scripts/autocomplete.bash" ]]; then
-    echo "🔁 Installing my-unicorn via 'uv' to get the new autocomplete folder..."
-    install_with_uv_tool
-  else
-    echo "❌ Autocomplete helper script not found or not executable"
+  if [[ -z "${src_dir// /}" ]]; then
+    print_error "Resolved script directory is empty."
+    return 1
+  fi
+
+  printf '%s\n' "$src_dir"
+}
+
+# Ensure a required command exists before continuing.
+#
+# Example:
+#   check_dependency uv
+#
+# This prevents confusing failures later in the install flow.
+check_dependency() {
+  local command_name
+  command_name="$1"
+
+  if ! command -v "$command_name" >/dev/null 2>&1; then
+    print_error "Required command not found: $command_name"
     return 1
   fi
 }
 
-# Copy update script to shared location for UV installs
+# Normalize a version string into a Git tag.
+#
+# Examples:
+#
+#   2.3.0          -> v2.3.0
+#   v2.3.0         -> v2.3.0
+#   2.3.0-alpha    -> v2.3.0-alpha
+#
+# This matches the same logic used by the Python self-update module.
+normalize_version_tag() {
+  local version
+  version="$1"
+
+  if [[ -z "${version// /}" ]]; then
+    print_error "Version value cannot be empty."
+    return 1
+  fi
+
+  version="${version//[$'\r\n\t']/}"
+  version="${version#"${version%%[![:space:]]*}"}"
+  version="${version%"${version##*[![:space:]]}"}"
+
+  if [[ -z "${version// /}" ]]; then
+    print_error "Version value is invalid after sanitization."
+    return 1
+  fi
+
+  if [[ "$version" =~ ^v ]]; then
+    printf '%s\n' "$version"
+    return
+  fi
+
+  printf 'v%s\n' "$version"
+}
+
+# -----------------------------------------------------------------------------
+# PATH validation
+# -----------------------------------------------------------------------------
+
+# Check whether ~/.local/bin exists in PATH.
+#
+# uv installs CLI tools there for most user-level installs.
+# If it is missing, users may install successfully but still be unable
+# to run `my-unicorn`.
+check_local_bin_in_path() {
+  if [[ ":$PATH:" == *":$LOCAL_BIN_DIR:"* ]]; then
+    print_info "✅ $LOCAL_BIN_DIR is already in your PATH"
+    return 0
+  fi
+
+  cat <<EOF
+
+⚠️  IMPORTANT: $LOCAL_BIN_DIR is not in your PATH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+To use '${CLI_NAME}' from anywhere, add this line to your shell config:
+
+    export PATH="\$HOME/.local/bin:\$PATH"
+
+Example shell configs:
+    ~/.bashrc
+    ~/.zshrc
+    ~/.zshenv
+
+Then restart your terminal or run:
+
+    source ~/.bashrc
+    source ~/.zshrc
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+EOF
+
+  return 1
+}
+
+# -----------------------------------------------------------------------------
+# Autocomplete setup
+# -----------------------------------------------------------------------------
+
+# Execute autocomplete installer from the source repository.
+#
+# This delegates the shell-specific logic to:
+#   scripts/autocomplete.bash
+setup_autocomplete_from_src() {
+  local src_dir
+  local autocomplete_helper
+
+  src_dir="$1"
+  autocomplete_helper="$src_dir/scripts/autocomplete.bash"
+
+  if [[ -x "$autocomplete_helper" ]]; then
+    print_info "🔁 Setting up autocomplete..."
+
+    if ! bash "$autocomplete_helper"; then
+      print_error "Autocomplete setup failed."
+      return 1
+    fi
+
+    return 0
+  fi
+
+  print_info "⚠️  Warning: Autocomplete helper not found at $autocomplete_helper"
+}
+
+# -----------------------------------------------------------------------------
+# Update helper installation
+# -----------------------------------------------------------------------------
+
+# Copy update helper script into ~/.local/bin so users can run:
+#
+#   my-unicorn-update
+#
+# This keeps updates easy and discoverable.
 copy_update_script() {
   local src_dir
-  src_dir="$(script_dir)"
-  local src_path="$src_dir/scripts/update.bash"
-  local dst_path="$HOME/.local/bin/my-unicorn-update"
-  if [ -f "$src_path" ]; then
-    mkdir -p "$HOME/.local/bin"
-    cp "$src_path" "$dst_path"
-    chmod +x "$dst_path"
-    echo "✅ Update script copied to $dst_path"
-  else
-    echo "⚠️  Warning: Update script not found at $src_path, skipping copy."
+  local src_path
+
+  if ! src_dir="$(script_dir)"; then
+    return 1
   fi
+
+  src_path="$src_dir/scripts/update.bash"
+
+  if [[ ! -f "$src_path" ]]; then
+    print_info "⚠️  Warning: Update script not found at $src_path, skipping copy."
+    return 0
+  fi
+
+  mkdir -p "$LOCAL_BIN_DIR"
+
+  if ! cp "$src_path" "$UPDATE_SCRIPT_PATH"; then
+    print_error "Failed to copy update script."
+    return 1
+  fi
+
+  if ! chmod +x "$UPDATE_SCRIPT_PATH"; then
+    print_error "Failed to make update script executable."
+    return 1
+  fi
+
+  print_info "✅ Update script copied to $UPDATE_SCRIPT_PATH"
 }
 
-# Standalone autocomplete installation
-install_autocomplete() {
-  echo "my-unicorn Autocomplete Installation"
-  echo "========================================"
-  # Always copy fresh autocomplete files from source. Legacy venv-based
-  # installer was removed; ensure install dir exists and copy files from
-  # this repository so autocomplete can be installed independently.
-  echo "📁 Updating autocomplete files..."
+# -----------------------------------------------------------------------------
+# Installation methods
+# -----------------------------------------------------------------------------
+
+find_latest_prerelease_tag() {
+  local latest_tag
+  local repo_url
+  local tag_list
+
+  repo_url="https://github.com/Cyber-Syntax/my-unicorn.git"
+
+  if ! check_dependency "git"; then
+    return 1
+  fi
+
+  # Fetch remote tags without cloning the repository.
+  # We sort using version-aware sorting and keep the newest tag.
+  #
+  # Examples expected:
+  #   v2.5.2-alpha
+  #   v2.5.2-beta
+  #   v2.5.2
+  #
+  # This ensures:
+  #
+  #   ./install.sh -i
+  #
+  # installs the latest tagged release instead of the latest main branch commit.
+  if ! tag_list="$(
+    git ls-remote --tags --refs "$repo_url" 2>/dev/null |
+      awk '{print $2}' |
+      sed 's#refs/tags/##' |
+      grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9]+)*$' |
+      sort -V
+  )"; then
+    print_error "Failed to fetch remote tags from GitHub."
+    return 1
+  fi
+
+  if [[ -z "${tag_list// /}" ]]; then
+    print_error "No valid release tags were found."
+    return 1
+  fi
+
+  if ! latest_tag="$(printf '%s\n' "$tag_list" | tail -n 1)"; then
+    print_error "Failed to determine latest release tag."
+    return 1
+  fi
+
+  if [[ -z "${latest_tag// /}" ]]; then
+    print_error "Resolved latest tag is empty."
+    return 1
+  fi
+
+  printf '%s\n' "$latest_tag"
+}
+
+install_with_uv_tool() {
+  local requested_version
+  local version_tag
+  local install_target
   local src_dir
-  src_dir="$(script_dir)"
-  mkdir -p "$INSTALL_DIR"
 
-  # Copy autocomplete folder and scripts
-  for item in autocomplete scripts; do
-    local src_path="$src_dir/$item"
-    local dst_path="$INSTALL_DIR/$item"
-    if [ -e "$src_path" ]; then
-      if [ -d "$src_path" ]; then
-        rm -rf "$dst_path"
-        cp -r "$src_path" "$dst_path"
-      else
-        cp "$src_path" "$dst_path"
-      fi
-    fi
-  done
+  requested_version="${1:-}"
 
-  if setup_autocomplete; then
-    echo "✅ Autocomplete installation complete!"
-    echo ""
-    echo "Please restart your shell or source your shell's rc file to enable autocompletion."
-    echo "Test completion by typing: my-unicorn <TAB>"
-  else
-    echo "❌ Autocomplete setup failed"
-    exit 1
+  if ! check_dependency "uv"; then
+    return 1
   fi
+
+  if ! src_dir="$(script_dir)"; then
+    return 1
+  fi
+
+  # Behavior:
+  #
+  # ./install.sh -i
+  #   -> installs latest prerelease/release tag from GitHub
+  #
+  # ./install.sh -i 2.5.2-alpha
+  #   -> installs exact requested tag
+  #
+  # ./install.sh -i v2.5.2-alpha
+  #   -> installs exact requested tag
+  #
+  # This prevents accidental installs from main branch HEAD.
+
+  if [[ -n "${requested_version// /}" ]]; then
+    if ! version_tag="$(normalize_version_tag "$requested_version")"; then
+      return 1
+    fi
+
+    print_info "🔖 Requested version detected: ${version_tag}"
+  else
+    print_info "🔍 No version provided. Resolving latest prerelease tag..."
+
+    if ! version_tag="$(find_latest_prerelease_tag)"; then
+      print_error "Unable to determine latest prerelease tag."
+      return 1
+    fi
+
+    print_info "🔖 Latest prerelease tag resolved: ${version_tag}"
+  fi
+
+  install_target="${GITHUB_GIT_URL}@${version_tag}"
+
+  print_info "🚀 Installing ${CLI_NAME} version ${version_tag} using 'uv tool install'..."
+
+  if ! cd "$src_dir"; then
+    print_error "Failed to change directory to: $src_dir"
+    return 1
+  fi
+
+  if ! uv tool install "$install_target" --force; then
+    print_error "uv tool install failed for target: $install_target"
+    return 1
+  fi
+
+  check_local_bin_in_path
+  setup_autocomplete_from_src "$src_dir"
+  copy_update_script
+
+  print_info "✅ Installation complete using uv tool."
+  print_info "Run '${CLI_NAME} --help' to get started."
 }
 
-# Usage function
-usage() {
+# Editable installation for local development.
+#
+# This is intended for contributors working on the source code.
+# Changes made locally are immediately reflected without reinstalling.
+install_with_uv_editable() {
+  local src_dir
+
+  if ! check_dependency "uv"; then
+    return 1
+  fi
+
+  if ! src_dir="$(script_dir)"; then
+    return 1
+  fi
+
+  print_info "🔧 Installing ${CLI_NAME} in editable mode..."
+
+  if ! cd "$src_dir"; then
+    print_error "Failed to change directory to: $src_dir"
+    return 1
+  fi
+
+  if ! uv tool install --editable . --force; then
+    print_error "Editable installation failed."
+    return 1
+  fi
+
+  check_local_bin_in_path
+  setup_autocomplete_from_src "$src_dir"
+  copy_update_script
+
+  print_info "✅ Editable installation complete."
+  print_info "Changes to source code will be reflected immediately."
+}
+
+# -----------------------------------------------------------------------------
+# Uninstall support
+# -----------------------------------------------------------------------------
+
+# Remove everything installed by my-unicorn at user level.
+#
+# This includes:
+#   - uv tool installation
+#   - local update script
+#   - autocomplete install directory (optional cleanup)
+#
+# Safe behavior:
+#   - Only affects user-local files
+#   - Requires explicit confirmation
+#   - Never modifies system files
+uninstall_my_unicorn() {
+  local src_dir
+  local confirm
+
+  if ! src_dir="$(script_dir)"; then
+    return 1
+  fi
+
+  print_info "🧹 Uninstalling ${CLI_NAME}..."
+
+  printf "Are you sure you want to uninstall %s? (y/N): " "$CLI_NAME"
+  read -r confirm
+
+  if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+    print_info "❎ Uninstall cancelled."
+    return 0
+  fi
+
+  # 1. Remove uv tool install
+  if check_dependency "uv"; then
+    if uv tool list 2>/dev/null | grep -q "$CLI_NAME"; then
+      if ! uv tool uninstall "$CLI_NAME"; then
+        print_error "Failed to uninstall via uv tool."
+        return 1
+      fi
+      print_info "🗑️  Removed uv tool installation"
+    else
+      print_info "ℹ️  uv tool installation not found"
+    fi
+  fi
+
+  # 2. Remove update script
+  if [[ -f "$UPDATE_SCRIPT_PATH" ]]; then
+    if ! rm -f "$UPDATE_SCRIPT_PATH"; then
+      print_error "Failed to remove update script."
+      return 1
+    fi
+    print_info "🗑️  Removed update script: $UPDATE_SCRIPT_PATH"
+  fi
+
+  # 3. Remove install directory (autocomplete + assets)
+  if [[ -d "$INSTALL_DIR" ]]; then
+    if ! rm -rf "$INSTALL_DIR"; then
+      print_error "Failed to remove install directory: $INSTALL_DIR"
+      return 1
+    fi
+    print_info "🗑️  Removed install directory: $INSTALL_DIR"
+  fi
+
   cat <<EOF
-Usage: $(basename "$0") [OPTIONS]
+
+⚠️  MANUAL CLEANUP (OPTIONAL)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+If you manually added completion config, remove from:
+
+  ~/.bashrc
+  ~/.zshrc
+
+Directories (if still present):
+
+  ~/.config/bash/completions/
+  ~/.config/zsh/completions/
+
+Then restart your shell.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+EOF
+
+  print_info "✅ Uninstall complete."
+}
+
+# -----------------------------------------------------------------------------
+# Usage
+# -----------------------------------------------------------------------------
+
+usage() {
+  local exit_code
+  # Default to exit code 0 for normal usage
+  # If an error code is provided, use 1 to indicate failure
+  exit_code="${1:-0}"
+  cat <<EOF
+Usage: ./install.sh [OPTIONS]
 
 Options:
-  -i, --install       Install using 'uv tool install' (recommended for production)
-  -e, --editable      Install using 'uv tool install --editable' (development)
-  --autocomplete      Install shell completion only
+  -i, --install [version]   Install using uv tool (default: latest prerelease tag)
+  -e, --editable            Install in editable mode (development)
+  -u, --uninstall           Remove my-unicorn from user system
+  -h, --help                Show this help message
 
 Examples:
-  $(basename "$0") -i              # Install as isolated tool (recommended)
-  $(basename "$0") -e              # Install in editable mode (contributors)
-  $(basename "$0") --autocomplete  # Install completion for current shell
+  ./install.sh -i
+  ./install.sh -i 2.5.2-alpha
+  ./install.sh -e
+  ./install.sh -u
 EOF
-  exit 1
+  exit "$exit_code"
 }
 
-# -- Entry point -------------------------------------------------------------
-install=false
-editable=false
-autocomplete=false
+# -----------------------------------------------------------------------------
+# Main
+# -----------------------------------------------------------------------------
 
-while getopts "ie-:" opt; do
-  case $opt in
-    i) install=true ;;
-    e) editable=true ;;
-    -)
-      case "${OPTARG}" in
-        install) install=true ;;
-        editable) editable=true ;;
-        autocomplete) autocomplete=true ;;
-        *) usage ;;
-      esac ;;
-    *) usage ;;
+main() {
+  local mode
+  local version
+  local arg_count
+
+  mode="${1:-}"
+  version="${2:-}"
+  arg_count="$#"
+
+  # Strict argument validation
+  #
+  # Allowed patterns:
+  #   install:     ./install.sh -i [version]
+  #   editable:    ./install.sh -e
+  #   uninstall:   ./install.sh -u
+  #   help:        ./install.sh -h
+  #
+  # Reject any malformed invocation such as:
+  #   ./install.sh -e extra
+  #   ./install.sh -u something wrong
+  #   ./install.sh -i v1 v2 v3
+  #
+  if [[ "$arg_count" -gt 2 ]]; then
+    print_error "Too many arguments provided."
+    usage 1
+  fi
+
+  case "$mode" in
+  -i | --install)
+    install_with_uv_tool "$version"
+    ;;
+  -e | --editable)
+    if [[ "$arg_count" -gt 1 ]]; then
+      print_error "Editable mode does not accept additional arguments."
+      usage 1
+    fi
+    install_with_uv_editable
+    ;;
+  -u | --uninstall)
+    if [[ "$arg_count" -gt 1 ]]; then
+      print_error "Uninstall mode does not accept additional arguments."
+      usage 1
+    fi
+    uninstall_my_unicorn
+    ;;
+  -h | --help | "")
+    if [[ "$arg_count" -gt 1 ]]; then
+      print_error "Help does not accept additional arguments."
+      usage 1
+    fi
+    usage 0
+    ;;
+  *)
+    print_error "Unknown option: $mode"
+    usage 1
+    ;;
   esac
-done
+}
 
-if $install; then
-  check_uv_required
-  install_with_uv_tool
-elif $editable; then
-  check_uv_required
-  install_with_uv_editable
-elif $autocomplete; then
-  install_autocomplete
-else
-  usage
-fi
+main "$@"

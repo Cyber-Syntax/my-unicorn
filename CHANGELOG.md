@@ -10,12 +10,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added new appimage supports; spotube, helium-linux, muffon, pear-desktop, simpmusic.
+- Install script (install.sh) improvements:
+    - Improved argument parsing and error handling for better user experience.
+    - Added support for uninstalling my-unicorn via `./install.sh -u` or `./install.sh --uninstall` command.
+    - Added support for installing my-unicorn via tag base install via `./install.sh -i`, `./install.sh --install` or specific tag install via `./install.sh -i <tag>` or `./install.sh --install <tag>` command.
+        - Example: `./install.sh -i 2.5.0-alpha` or `./install.sh --install 2.5.0-alpha` to install specific tag version.
+- autocomplete.bash script improvements:
+    - Added error handling for unknown arguments and missing arguments.
+    - Improved argument parsing logic for better user experience.
 
 ### Changed
 
 - Consolidated install modules to one module.
 - Consolidated update modules to one module.
 - Update and install modules use logger instead of print statements for better logging and debugging.
+
+### Fixed
+
+- Fixed autocomplete.bash script wrong dry-run implementation.
 
 ## [2.5.2-alpha] - 2026-04-30
 
@@ -26,7 +38,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Wrong hash type detection on .yml/.yaml checksum files
-
 
 ## [2.5.1-alpha] - 2026-04-30
 
