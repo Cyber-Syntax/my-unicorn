@@ -18,26 +18,44 @@ I was started writing a script to learn Python, but this became my loved project
 
 If you'd like to contribute, please feel free to open a pull request or start a discussion. Thank you for your interest!
 
-### Options for contributing
+### **Release logic:**
 
-In case you want to contribute, but you wouldn't know how, here are some suggestions:
+- Releases will be created in **release/vX.Y.Z-alpha** branches but some releases maybe create directly on **hotfix/** branches if it's urgent fix for a specific issue without creating a new branch for it.
+- Github Actions will automatically create a new release when a new tag is pushed to the repository. The tag should follow the format `vX.Y.Z-alpha` for pre-release versions (e.g., `v2.3.0-alpha`), and `vX.Y.Z` for stable releases (e.g., `v2.3.0`).
+- Version bump and changelog update must happen in:
+    - the branch where the release tag is created (hotfix/ or release/)
+- Versioning follows semantic versioning principles, with the addition of an "alpha" suffix to indicate pre-release versions. For example:
+    - `v2.3.0-alpha`: Pre-release version indicating that it's still in development.
+    - `v2.3.0-beta`: Pre-release version indicating that it's feature-complete but may still have bugs.
+    - `v2.3.0-rc`: Release candidate indicating that it's almost ready for production but may still have minor issues.
+    - `v2.3.0`: Stable release indicating that it's ready for production use.
 
-1. **Spread the word:** More users means more people testing and contributing to the app which in turn means better stability and possibly more and better features. You can vote for Super Productivity on [Slant](https://www.slant.co/topics/14021/viewpoints/7/~productivity-tools-for-linux~super-productivity), [Product Hunt](https://www.producthunt.com/posts/super-productivity), [Softpedia](https://www.softpedia.com/get/Office-tools/Diary-Organizers-Calendar/Super-Productivity.shtml) or on [AlternativeTo](https://alternativeto.net/software/super-productivity/), you can [tweet about it](https://twitter.com/intent/tweet?text=I%20like%20Super%20Productivity%20%20https%3A%2F%2Fsuper-productivity.com), share it on [LinkedIn](http://www.linkedin.com/shareArticle?mini=true&url=https://super-productivity.com&title=I%20like%20Super%20Productivity&), [reddit](http://www.reddit.com/submit?url=https%3A%2F%2Fsuper-productivity.com&title=I%20like%20Super%20Productivity) or any of your favorite social media platforms. Every little bit helps!
+### **Branch Logic:**
+>
+> [!NOTE]
+> Most PR going to main, but if you want to hotfix a specific issue for a specific release, you can create a hotfix branch from the latest tagged release and merge it back to main after the fix is applied. I could also create a hotfix branch for urgent fixes and release new tag from it if needed.
 
-2. **Provide a Pull Request:** Here is a list of [the most popular community requests](https://github.com/super-productivity/super-productivity/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc) and here some info on **[how to run the development build](https://github.com/super-productivity/super-productivity/wiki/2.11-Run-the-Development-Server)** (wiki). Please make sure that you're following the commit message format documented in [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md#commit-message-format) and to also include the issue number in your commit message, if you're fixing a particular issue (e.g.: `feat: add nice feature #31`).
-
-3. **[Answer questions](https://github.com/super-productivity/super-productivity/discussions)**: You know the answer to another user's problem? Share your knowledge!
-
-4. **[Provide your opinion](https://github.com/super-productivity/super-productivity/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22community+feedback+wanted%22):** Some community suggestions are controversial. Your input might be helpful even if it is just an up- or down-vote.
-
-5. **[Provide a more refined UI spec for existing feature requests](https://github.com/super-productivity/super-productivity/issues?q=is%3Aissue+is%3Aopen+label%3A%22needs+concept+and%2For+ui+spec%22)**
-
-6. **[Report bugs](https://github.com/super-productivity/super-productivity/issues/new)**
-
-7. **[Make a feature or improvement request](https://github.com/super-productivity/super-productivity/issues/new)**: Something can be done better? Something essential missing? Let us know!
-
-8. **[Translations](docs/TRANSLATING.md)**: You don't have to be programmer to help. See our [translation guide](docs/TRANSLATING.md) for details on how to contribute translations.
-
-9. **[Sponsor the project](https://github.com/sponsors/johannesjo)**
-
-:hearts: :hearts::hearts: :hearts::hearts: :hearts::hearts: :hearts::hearts: :hearts::hearts:
+- **main**:
+    - Primary development branch.
+    - All new features, bug fixes, and improvements should be merged into main.
+    - Contains only complete, working changes, no partial implementations or unfinished work.
+    - Requires review and approval for pull requests.
+- **docs/**: Documentation files. Contributions to improve docs are welcome.
+- **feat/**: Feature branches for new features or major changes. These should be merged into main when ready.
+- **refactor/**: Refactoring branches for code improvements that do not add new features. These should also be merged into main when ready.
+- **fix/**:
+    - Created from main
+    - For bug fixes that are not urgent enough to require a hotfix branch
+    - Must be merged back into main
+- **hotfix/**:
+    - Created from latest tagged release
+    - No new features allowed
+    - Must be merged back into main and release branch(if applicable)
+    - Only for critical fixes that cannot wait for the next release branch to be created.
+    - Branch push new tag via `git tag vX.Y.Z` and `git push origin vX.Y.Z` to trigger release creation for github actions
+- **release/**:
+    - Created from main
+    - No new features allowed
+    - Only bug fixes, version bumps, and release prep
+    - Must be merged back into main after release
+    - Branch push new tag via `git tag vX.Y.Z-alpha` and `git push origin vX.Y.Z-alpha` to trigger release creation for github actions
