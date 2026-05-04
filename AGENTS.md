@@ -42,21 +42,21 @@ src/my_unicorn/
 │   ├── schemas/            # JSON schema validation
 │   └── migration/          # Config migration logic (v1→v2)
 ├── core/                   # Core functionality
-│   ├── backup/             # Backup management for appimages
-│   ├── desktop_entry/      # Desktop file generation
-│   ├── github/             # GitHub API client
-│   ├── install/            # Installation logic and workflows
 │   ├── progress/           # Progress bar management
 │   ├── protocols/          # Protocols and interfaces
 │   ├── services/           # Business services (install, update, remove)
 │   ├── verification/       # Hash verification (SHA256/SHA512)
 │   ├── update/             # Update logic and workflows
+│   ├── api.py              # GitHub API client
 │   ├── auth.py             # Authentication handling
+│   ├── backup.py           # Backup management for appimages
 │   ├── cache.py            # Release cache management
 │   ├── catalog.py          # Catalog loading and filtering
+│   ├── desktop_entry.py    # Desktop file generation
 │   ├── download.py         # File download logic
 │   ├── file_ops.py         # File operations (copy, move, delete)
 │   ├── http_session.py     # HTTP session management
+│   ├── install.py          # Installation logic and workflows
 │   ├── icon.py             # Icon extraction
 │   ├── post_download.py    # Post-download helpers for install/update workflows
 │   ├── remove.py           # Remove logic for appimage, config, desktop entry...
@@ -186,7 +186,7 @@ logger.debug("Token: %s", token)  # Security risk!
 
 ### File Organization
 
-CRITICAL: Keep files between 800-1100 lines for maintainability. If a file exceeds 1100 lines, refactor by splitting into focused modules.
+CRITICAL: Keep files between 800-1500 lines for maintainability. If a file exceeds 1500 lines, refactor by splitting into focused modules.
 
 ```bash
 # Check file line counts
@@ -204,11 +204,11 @@ uv run pytest tests/test_lines.py -v
 
 Test fixtures follow a hierarchical organization principle:
 
-| Fixture Scope | Location | Purpose |
-|---------------|----------|---------|
-| **Module-specific fixtures** | `tests/<module>/conftest.py` | Fixtures used only by tests in that module (e.g., `tests/core/install/conftest.py`) |
-| **Module-group fixtures** | `tests/<group>/conftest.py` | Fixtures shared across submodules (e.g., `tests/core/conftest.py` for all core tests) |
-| **Global fixtures** | `tests/conftest.py` | Fixtures shared across all test modules (e.g., `enable_log_propagation`) |
+| Fixture Scope                | Location                     | Purpose                                                                               |
+| ---------------------------- | ---------------------------- | ------------------------------------------------------------------------------------- |
+| **Module-specific fixtures** | `tests/<module>/conftest.py` | Fixtures used only by tests in that module (e.g., `tests/core/install/conftest.py`)   |
+| **Module-group fixtures**    | `tests/<group>/conftest.py`  | Fixtures shared across submodules (e.g., `tests/core/conftest.py` for all core tests) |
+| **Global fixtures**          | `tests/conftest.py`          | Fixtures shared across all test modules (e.g., `enable_log_propagation`)              |
 
 **Example Structure:**
 
@@ -274,11 +274,11 @@ def test_hash_verification_failure():
 ### Running Tests
 
 ```bash
+# Don't run all tests (include slow e2e tests)
+uv run pytest
+
 # Run fast tests only (excludes slow logger integration tests)
 uv run pytest -m "not slow"
-
-# Run all tests (including slow tests)
-uv run pytest
 
 # Run tests with coverage
 uv run pytest --cov=my_unicorn --cov-report=html
@@ -367,7 +367,7 @@ cat ~/.config/my-unicorn/settings.conf
 
 ### GitHub API Interaction
 
-- All GitHub API calls go through `core/github/`
+- All GitHub API calls go through `core/api.py`
 - Release data is cached in `core/cache.py` to reduce API calls
 - Cache invalidation happens on update commands
 - Asset filtering removes non-Linux assets to reduce cache size
@@ -384,5 +384,3 @@ cat ~/.config/my-unicorn/settings.conf
 - Always bump VERSION constants in `constants.py` when changing config schema
     - `GLOBAL_CONFIG_VERSION` - Currently "1.1.0"
     - `APP_CONFIG_VERSION` - Currently "2.0.0"
-
-
