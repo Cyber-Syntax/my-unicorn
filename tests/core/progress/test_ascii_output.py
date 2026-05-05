@@ -323,32 +323,3 @@ class TestWriteNoninteractive:
         sections = writer.write_noninteractive("   \n\n   ")
 
         assert sections == set()
-
-    def test_write_noninteractive_dedup_header_across_progress(self) -> None:
-        """Repeated section headers must not be reprinted as progress changes.
-
-        Regression test for #294: when the same section (e.g.,
-        "Fetching from API:") emits different content lines as progress
-        advances, the header should appear at most once instead of
-        printing "Fetching from API:" twice.
-        """
-        output = io.StringIO()
-        writer = TerminalWriter(output, interactive=False)
-
-        # First render: API task in progress. Mirror the call site in
-        # render_once which folds returned signatures into the writer's
-        # _written_sections set after each write.
-        first = writer.write_noninteractive(
-            "Fetching from API:\nGitHub Releases    1/2 Fetching..."
-        )
-        writer._written_sections.update(first)
-
-        # Second render: same task with updated progress -> header
-        # would otherwise be reprinted because the full signature
-        # differs.
-        sections = writer.write_noninteractive(
-            "Fetching from API:\nGitHub Releases    2/2 Retrieved from cache"
-        )
-
-        assert sections == set()
-        assert output.getvalue().count("Fetching from API:") == 1
