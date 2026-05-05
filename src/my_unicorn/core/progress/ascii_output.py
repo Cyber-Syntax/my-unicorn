@@ -73,6 +73,11 @@ class TerminalWriter:
     ) -> tuple[list[str], set[str]]:
         """Parse output and find sections not in known_sections.
 
+        Sections are deduplicated by both full content and header line
+        (the first non-empty line). Header-line dedup prevents repeated
+        headers like "Fetching from API:" from being printed for every
+        progress update in non-interactive mode (issue #294).
+
         Args:
             output: Output string containing sections separated by blank lines
             known_sections: Set of section signatures already written
@@ -81,15 +86,26 @@ class TerminalWriter:
             Tuple of (new_sections_list, new_signatures_set)
 
         """
+        known_headers = {
+            sig.split("\n", 1)[0] for sig in known_sections if sig
+        }
+
         sections = output.split("\n\n")
         new_sections: list[str] = []
         new_signatures: set[str] = set()
 
         for section in sections:
             section_sig = section.strip()
-            if section_sig and section_sig not in known_sections:
-                new_sections.append(section)
-                new_signatures.add(section_sig)
+            if not section_sig or section_sig in known_sections:
+                continue
+
+            header = section_sig.split("\n", 1)[0]
+            if header in known_headers:
+                continue
+
+            new_sections.append(section)
+            new_signatures.add(section_sig)
+            known_headers.add(header)
 
         return new_sections, new_signatures
 
