@@ -151,6 +151,7 @@ class UpdateApplicationService:
                 force=force,
                 update_infos=update_infos,
                 api_task_id=api_task_id,
+                refresh_cache=refresh_cache,
             )
 
         # Process results
