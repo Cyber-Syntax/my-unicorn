@@ -422,29 +422,38 @@ class TestChecksumFileHashPreservation:
     @pytest.mark.asyncio
     async def test_mismatch_preserves_expected_and_computed_sha256(
         self,
-        verifier: Verifier,
         app_file: Path,
     ) -> None:
         """Traditional checksum file with wrong hash stores both sides.
 
-        Scenario: SHA256SUMS.txt says the hash is WRONG_SHA256, but the
-        real file hashes to CORRECT_SHA256.  Both values must appear in the
-        returned MethodResult so we can immediately compare them.
+        Scenario: a real-world SHA256SUMS.txt contains an expected hash for
+        a file name (here: QOwnNotes). Our on-disk file has different content,
+        so verification must fail while still preserving BOTH:
+          - result.hash (expected, from checksum file)
+          - result.computed_hash (computed, from local file)
         """
-        # Arrange — use a real-world SHA256SUMS fixture and append our file.
-        base_fixture = _read_checksum_fixture("qownnotes_SHA256SUMS.txt")
-        checksum_content = (
-            f"{base_fixture}\n{WRONG_SHA256}  {APPIMAGE_FILENAME}\n"
+        qownnotes_filename = "QOwnNotes-24.1.5-x86_64.AppImage"
+        expected_sha256_from_fixture = (
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         )
+
+        # Arrange — use a real-world SHA256SUMS fixture directly.
+        checksum_content = _read_checksum_fixture("qownnotes_SHA256SUMS.txt")
         download_svc = _make_mock_download_service(checksum_content)
         checksum_file = _make_checksum_file_info(format_type="traditional")
+
+        # Create an on-disk file with the *same* name as in the fixture but
+        # with content that does NOT match the fixture's expected hash.
+        qownnotes_file = app_file.with_name(qownnotes_filename)
+        qownnotes_file.write_bytes(FILE_CONTENT)
+        verifier = Verifier(qownnotes_file)
 
         # Act
         result = await verify_checksum_file(
             verifier=verifier,
             checksum_file=checksum_file,
-            target_filename=APPIMAGE_FILENAME,
-            app_name="MyApp",
+            target_filename=qownnotes_filename,
+            app_name="qownnotes",
             download_service=download_svc,
         )
 
@@ -453,7 +462,7 @@ class TestChecksumFileHashPreservation:
         assert result.passed is False
 
         # The expected hash (from checksum file) must be stored.
-        assert result.hash == WRONG_SHA256, (
+        assert result.hash == expected_sha256_from_fixture, (
             "result.hash should hold the *expected* hash from the checksum "
             f"file, got: {result.hash!r}"
         )
@@ -470,27 +479,29 @@ class TestChecksumFileHashPreservation:
     @pytest.mark.asyncio
     async def test_mismatch_preserves_url_for_traceability(
         self,
-        verifier: Verifier,
+        app_file: Path,
     ) -> None:
         """URL of the failing checksum file is stored in the result.
 
         WHY: When investigating a failure it is crucial to know *which*
         checksum file was downloaded so developers can open it manually.
         """
-        base_fixture = _read_checksum_fixture("qownnotes_SHA256SUMS.txt")
-        checksum_content = (
-            f"{base_fixture}\n{WRONG_SHA256}  {APPIMAGE_FILENAME}\n"
-        )
+        qownnotes_filename = "QOwnNotes-24.1.5-x86_64.AppImage"
+        checksum_content = _read_checksum_fixture("qownnotes_SHA256SUMS.txt")
         download_svc = _make_mock_download_service(checksum_content)
         checksum_file = _make_checksum_file_info(
             format_type="traditional", url=FAKE_CHECKSUM_URL
         )
 
+        qownnotes_file = app_file.with_name(qownnotes_filename)
+        qownnotes_file.write_bytes(FILE_CONTENT)
+        verifier = Verifier(qownnotes_file)
+
         result = await verify_checksum_file(
             verifier=verifier,
             checksum_file=checksum_file,
-            target_filename=APPIMAGE_FILENAME,
-            app_name="MyApp",
+            target_filename=qownnotes_filename,
+            app_name="qownnotes",
             download_service=download_svc,
         )
 
