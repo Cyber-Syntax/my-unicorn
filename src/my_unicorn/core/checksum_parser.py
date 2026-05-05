@@ -35,8 +35,6 @@ logger = get_logger(__name__)
 
 
 _HASH_LENGTH_MAP: dict[int, HashType] = {
-    32: "md5",
-    40: "sha1",
     64: "sha256",
     128: "sha512",
 }
@@ -265,7 +263,7 @@ def detect_hash_type_from_checksum_filename(
         ):
             return hash_type
 
-    if filename_lower.endswith((".yml", ".yaml")):
+    if filename_lower.endswith(YAML_CHECKSUM_EXTENSIONS):
         return YAML_DEFAULT_HASH
 
     return None
@@ -839,10 +837,8 @@ def _extract_hash_from_dict(data: dict) -> tuple[str, HashType] | None:
         # Validate hash type
         validated_hash: HashType
         if isinstance(first_key, str) and first_key in (
-            "sha1",
             "sha256",
             "sha512",
-            "md5",
         ):
             validated_hash = first_key  # type: ignore[assignment]
         else:
