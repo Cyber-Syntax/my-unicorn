@@ -49,6 +49,7 @@ async def verify_digest(
         MethodResult or None if failed
 
     """
+    actual_digest: str | None = None
     try:
         logger.debug("Attempting digest verification from GitHub API")
         logger.debug("AppImage file: %s", verifier.file_path.name)
@@ -76,6 +77,7 @@ async def verify_digest(
         return MethodResult(
             passed=False,
             hash=digest,
+            computed_hash=actual_digest,
             details=str(e),
         )
 
@@ -224,8 +226,11 @@ async def verify_checksum_file(
         logger.error("Hash mismatch detected")
         return MethodResult(
             passed=False,
-            hash=f"{hash_type}:{computed_hash}",
+            hash=expected_hash,
+            computed_hash=computed_hash,
             details=f"Hash mismatch (expected: {expected_hash})",
+            url=checksum_file.url,
+            hash_type=hash_type,
         )
 
     except Exception as e:

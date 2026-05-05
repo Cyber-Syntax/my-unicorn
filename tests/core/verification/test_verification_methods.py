@@ -68,6 +68,9 @@ class TestVerifyDigest:
         assert result is not None
         assert result.passed is False
         assert "Hash mismatch" in result.details
+        # Issue #245: computed hash must be saved even when verification
+        # fails, so users can compare it against the expected digest.
+        assert result.computed_hash == "wrong_hash"
 
         # Case 2: Unsupported algorithm
         mock_verifier.verify_digest.side_effect = Exception(
@@ -266,6 +269,9 @@ class TestVerifyChecksumFile:
         assert result is not None
         assert result.passed is False
         assert "mismatch" in result.details.lower()
+        # Issue #245: computed hash must be saved on failure so users
+        # can compare against the expected value.
+        assert result.computed_hash == "different_wrong_hash"
 
         # Case 2: File not found in checksum file
         mock_verifier.parse_checksum_file.return_value = None
