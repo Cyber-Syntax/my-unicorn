@@ -1078,7 +1078,7 @@ from my_unicorn.config.catalog import CatalogService
 # File Operations
 from my_unicorn.core.file_ops import FileOperations
 from my_unicorn.core.download import DownloadService
-from my_unicorn.core.verification import VerificationService
+from my_unicorn.core.verify import VerificationService
 from my_unicorn.core.icon import AppImageIconExtractor
 
 # GitHub Integration

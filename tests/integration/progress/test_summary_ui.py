@@ -7,35 +7,63 @@ icons, and version change display.
 
 from __future__ import annotations
 
-import io
-from contextlib import redirect_stdout
-from typing import Any
+import logging
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
+import my_unicorn.core.update as update_module
 from my_unicorn.core.install import print_install_summary
-from my_unicorn.core.update import UpdateInfo, display_update_results
+from my_unicorn.core.update import UpdateInfo
+from my_unicorn.logger import flush_all_handlers
 
 from .test_ui_helpers import parse_output_sections
 from .test_ui_normalization import normalize_output_for_comparison
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
-def _capture_print_output(func: callable, *args: Any, **kwargs: Any) -> str:
-    """Capture stdout from a function call.
+
+def _display_update_results(results: dict[str, object]) -> None:
+    callable_update = cast(
+        "Callable[[dict[str, object]], None]",
+        update_module.display_update_results,
+    )
+    callable_update(results)
+
+
+def _capture_log_output(
+    func: object,
+    *args: object,
+    caplog: pytest.LogCaptureFixture,
+    **kwargs: object,
+) -> str:
+    """Capture log output from a function using caplog.
 
     Args:
-        func: Function to capture output from
-        *args: Positional arguments to pass to function
-        **kwargs: Keyword arguments to pass to function
-
+        func: Function to execute and capture logs from
+        *args: Positional arguments for the function
+        caplog: pytest fixture for capturing log records
+        **kwargs: Keyword arguments for the function
     Returns:
-        Captured stdout output
-
+        Captured log output as a string
     """
-    f = io.StringIO()
-    with redirect_stdout(f):
-        func(*args, **kwargs)
-    return f.getvalue()
+    callable_func = cast("Callable[..., None]", func)
+
+    caplog.clear()
+    caplog.set_level(logging.DEBUG, logger="my_unicorn")
+
+    _ = callable_func(*args, **kwargs)
+    flush_all_handlers()
+
+    messages = [
+        record.getMessage()
+        for record in caplog.records
+        if record.name.startswith(
+            ("my_unicorn.core.install", "my_unicorn.core.update")
+        )
+    ]
+    return "\n".join(messages)
 
 
 def _extract_summary_section(output: str, header: str) -> str:
@@ -66,7 +94,9 @@ def _extract_summary_section(output: str, header: str) -> str:
 class TestInstallSummaryUI:
     """Test suite for installation summary UI display."""
 
-    def test_install_summary_success_ui(self) -> None:
+    def test_install_summary_success_ui(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Verify 'Successfully installed X app(s)' format matches fixture.
 
         Test that single successful installation produces correct summary
@@ -83,7 +113,9 @@ class TestInstallSummaryUI:
         ]
 
         # Act
-        output = _capture_print_output(print_install_summary, results)
+        output = _capture_log_output(
+            print_install_summary, results, caplog=caplog
+        )
 
         # Assert
         assert "📦 Installation Summary:" in output
@@ -93,7 +125,9 @@ class TestInstallSummaryUI:
         assert "26.2.4" in output
         assert "🎉 Successfully installed 1 app(s)" in output
 
-    def test_install_summary_with_warnings_ui(self) -> None:
+    def test_install_summary_with_warnings_ui(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Verify warning count display in summary.
 
         Test that apps with warnings show warning indicator and count
@@ -113,7 +147,9 @@ class TestInstallSummaryUI:
         ]
 
         # Act
-        output = _capture_print_output(print_install_summary, results)
+        output = _capture_log_output(
+            print_install_summary, results, caplog=caplog
+        )
 
         # Assert
         assert "📦 Installation Summary:" in output
@@ -125,7 +161,9 @@ class TestInstallSummaryUI:
         assert "🎉 Successfully installed 1 app(s)" in output
         assert "⚠️  1 app(s) installed with warnings" in output
 
-    def test_install_summary_alignment_ui(self) -> None:
+    def test_install_summary_alignment_ui(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Verify app names align with status icons.
 
         Test that multiple apps are aligned properly with consistent
@@ -148,7 +186,9 @@ class TestInstallSummaryUI:
         ]
 
         # Act
-        output = _capture_print_output(print_install_summary, results)
+        output = _capture_log_output(
+            print_install_summary, results, caplog=caplog
+        )
         lines = output.split("\n")
 
         # Assert
@@ -166,7 +206,9 @@ class TestInstallSummaryUI:
             # Icon should be within column width
             assert len(line.split("✅")[0]) < 30
 
-    def test_batch_install_summary_ui(self) -> None:
+    def test_batch_install_summary_ui(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Verify multiple apps with mixed states display correctly.
 
         Test batch installation with successful and already-installed apps.
@@ -188,7 +230,9 @@ class TestInstallSummaryUI:
         ]
 
         # Act
-        output = _capture_print_output(print_install_summary, results)
+        output = _capture_log_output(
+            print_install_summary, results, caplog=caplog
+        )
 
         # Assert
         assert "📦 Installation Summary:" in output
@@ -201,7 +245,9 @@ class TestInstallSummaryUI:
         if len(success_split) > 1:
             assert "⚠️" not in success_split[0]
 
-    def test_install_all_already_installed(self) -> None:
+    def test_install_all_already_installed(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Verify format when all apps are already installed.
 
         Test that 'already installed' scenario uses different header
@@ -218,7 +264,9 @@ class TestInstallSummaryUI:
         ]
 
         # Act
-        output = _capture_print_output(print_install_summary, results)
+        output = _capture_log_output(
+            print_install_summary, results, caplog=caplog
+        )
 
         # Assert
         assert "✅ All 1 specified app(s) are already installed:" in output
@@ -231,7 +279,9 @@ class TestInstallSummaryUI:
 class TestUpdateSummaryUI:
     """Test suite for update summary UI display."""
 
-    def test_update_summary_version_change_ui(self) -> None:
+    def test_update_summary_version_change_ui(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Verify 'X.Y.Z → A.B.C' version change format matches fixture.
 
         Test that update summary shows correct version change format
@@ -255,7 +305,9 @@ class TestUpdateSummaryUI:
         }
 
         # Act
-        output = _capture_print_output(display_update_results, results)
+        output = _capture_log_output(
+            _display_update_results, results, caplog=caplog
+        )
 
         # Assert
         assert "📦 Update Summary:" in output
@@ -265,7 +317,9 @@ class TestUpdateSummaryUI:
         assert "26.2.1 → 26.2.4" in output
         assert "🎉 Successfully updated 1 app(s)" in output
 
-    def test_update_summary_already_updated_ui(self) -> None:
+    def test_update_summary_already_updated_ui(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Verify 'Already up to date' format with version display.
 
         Test that apps already at latest version show info icon and
@@ -289,7 +343,9 @@ class TestUpdateSummaryUI:
         }
 
         # Act
-        output = _capture_print_output(display_update_results, results)
+        output = _capture_log_output(
+            _display_update_results, results, caplog=caplog
+        )
 
         # Assert
         assert "📦 Update Summary:" in output
@@ -299,7 +355,9 @@ class TestUpdateSummaryUI:
         assert "0.11.1" in output
         assert "ℹ️  1 app(s) already up to date" in output  # noqa: RUF001
 
-    def test_batch_update_summary_ui(self) -> None:
+    def test_batch_update_summary_ui(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Verify multiple apps with version changes display correctly.
 
         Test batch update with multiple apps showing version changes.
@@ -329,7 +387,9 @@ class TestUpdateSummaryUI:
         }
 
         # Act
-        output = _capture_print_output(display_update_results, results)
+        output = _capture_log_output(
+            _display_update_results, results, caplog=caplog
+        )
 
         # Assert
         assert "📦 Update Summary:" in output
@@ -340,7 +400,9 @@ class TestUpdateSummaryUI:
         assert "0.11.0 → 0.11.1" in output
         assert "🎉 Successfully updated 2 app(s)" in output
 
-    def test_update_summary_mixed_states_ui(self) -> None:
+    def test_update_summary_mixed_states_ui(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Verify summary with updated, up-to-date, and failed apps.
 
         Test that all app states are displayed with appropriate icons
@@ -378,7 +440,9 @@ class TestUpdateSummaryUI:
         }
 
         # Act
-        output = _capture_print_output(display_update_results, results)
+        output = _capture_log_output(
+            _display_update_results, results, caplog=caplog
+        )
 
         # Assert
         assert "📦 Update Summary:" in output

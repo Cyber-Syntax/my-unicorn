@@ -15,9 +15,11 @@ from pathlib import Path
 
 import pytest
 
-from my_unicorn.core.verification.checksum_parser import find_checksum_entry
+from my_unicorn.core.checksum_parser import find_checksum_entry
 
-FIXTURES_DIR = Path(__file__).parent.parent / "fixtures" / "checksums"
+CHECKSUM_FIXTURES_DIR = (
+    Path(__file__).resolve().parents[1] / "fixtures" / "checksums"
+)
 
 
 @pytest.mark.integration
@@ -25,7 +27,7 @@ class TestRealWorldChecksumFiles:
     """Test parsing of real-world checksum files from GitHub."""
 
     # TODO: use this helper in all tests to verify hex validity and length
-    def assert_hex_hash(entry, algorithm, length):
+    def assert_hex_hash(self, entry, algorithm, length):
         assert entry is not None
         assert entry.algorithm == algorithm
         assert len(entry.hash_value) == length
@@ -37,7 +39,9 @@ class TestRealWorldChecksumFiles:
         Heroic Games Launcher uses hex-encoded SHA512 hashes in YAML format.
         The hash should be returned unchanged (only lowercased).
         """
-        content = (FIXTURES_DIR / "heroic_latest-linux.yml").read_text()
+        content = (
+            CHECKSUM_FIXTURES_DIR / "heroic_latest-linux.yml"
+        ).read_text()
         entry = find_checksum_entry(
             content, "Heroic-2.15.2.AppImage", "sha512"
         )
@@ -59,9 +63,11 @@ class TestRealWorldChecksumFiles:
         Legcord uses base64-encoded SHA512 hashes in YAML format.
         The hash should be converted from base64 to hex.
         """
-        content = (FIXTURES_DIR / "legcord_latest-linux.yml").read_text()
+        content = (
+            CHECKSUM_FIXTURES_DIR / "legcord_latest-linux.yml"
+        ).read_text()
         entry = find_checksum_entry(
-            content, "Legcord-1.0.5.AppImage", "sha512"
+            content, "Legcord-1.1.5-linux-x86_64.AppImage", "sha512"
         )
 
         # Base64 input converts to hex
@@ -82,7 +88,9 @@ class TestRealWorldChecksumFiles:
 
         QOwnNotes uses the traditional "hash  filename" format.
         """
-        content = (FIXTURES_DIR / "qownnotes_SHA256SUMS.txt").read_text()
+        content = (
+            CHECKSUM_FIXTURES_DIR / "qownnotes_SHA256SUMS.txt"
+        ).read_text()
         entry = find_checksum_entry(
             content, "QOwnNotes-24.1.5-x86_64.AppImage", "sha256"
         )
@@ -101,7 +109,7 @@ class TestRealWorldChecksumFiles:
 
         SiYuan uses the traditional "hash  filename" format.
         """
-        content = (FIXTURES_DIR / "siyuan_SHA256SUMS.txt").read_text()
+        content = (CHECKSUM_FIXTURES_DIR / "siyuan_SHA256SUMS.txt").read_text()
         entry = find_checksum_entry(
             content, "siyuan-3.5.4-linux.AppImage", "sha256"
         )
@@ -121,7 +129,7 @@ class TestRealWorldChecksumFiles:
         Super Productivity uses base64-encoded SHA512 hashes in YAML format.
         """
         content = (
-            FIXTURES_DIR / "superproductivity_latest-linux.yml"
+            CHECKSUM_FIXTURES_DIR / "superproductivity_latest-linux.yml"
         ).read_text()
         entry = find_checksum_entry(
             content, "superProductivity-x86_64.AppImage", "sha512"
@@ -143,7 +151,7 @@ class TestRealWorldChecksumFiles:
         characters are also valid base64. The system MUST detect this as hex
         and NOT attempt base64 decoding, which would corrupt the hash.
         """
-        content = (FIXTURES_DIR / "dangerous_hex.yml").read_text()
+        content = (CHECKSUM_FIXTURES_DIR / "dangerous_hex.yml").read_text()
         entry = find_checksum_entry(
             content, "dangerous-app-1.0.0.AppImage", "sha512"
         )
@@ -172,7 +180,7 @@ class TestRealWorldChecksumFiles:
             ),
             (
                 "legcord_latest-linux.yml",
-                "Legcord-1.0.5.AppImage",
+                "Legcord-1.1.5-linux-x86_64.AppImage",
                 "sha512",
                 128,
             ),
@@ -234,7 +242,7 @@ class TestRealWorldChecksumFiles:
         Verifies that all 10 fixture files parse correctly and produce
         the expected hash length.
         """
-        content = (FIXTURES_DIR / fixture_file).read_text()
+        content = (CHECKSUM_FIXTURES_DIR / fixture_file).read_text()
         entry = find_checksum_entry(content, filename, algo)
 
         assert entry is not None, f"Failed to parse {fixture_file}"
@@ -249,7 +257,11 @@ class TestRealWorldChecksumFiles:
         """
         test_cases = [
             ("heroic_latest-linux.yml", "Heroic-2.15.2.AppImage", "sha512"),
-            ("legcord_latest-linux.yml", "Legcord-1.0.5.AppImage", "sha512"),
+            (
+                "legcord_latest-linux.yml",
+                "Legcord-1.1.5-linux-x86_64.AppImage",
+                "sha512",
+            ),
             (
                 "qownnotes_SHA256SUMS.txt",
                 "QOwnNotes-24.1.5-x86_64.AppImage",
@@ -289,7 +301,7 @@ class TestRealWorldChecksumFiles:
         ]
 
         for fixture_file, filename, algo in test_cases:
-            content = (FIXTURES_DIR / fixture_file).read_text()
+            content = (CHECKSUM_FIXTURES_DIR / fixture_file).read_text()
             entry = find_checksum_entry(content, filename, algo)
 
             assert entry is not None, f"Failed to parse {fixture_file}"

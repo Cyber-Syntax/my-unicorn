@@ -4,7 +4,7 @@
 
 | File | LOC | Limit | Overage | Priority | Reason for Bloat |
 |------|-----|-------|---------|----------|------------------|
-| [verification/service.py](../../src/my_unicorn/core/verification/service.py) | **1,376** | 500 | **+876 (2.8x)** | 🔴 **CRITICAL** | Dual verification methods, result handling, extensive error handling, logging |
+| [verification/service.py](../../src/my_unicorn/core/verify.py) | **1,376** | 500 | **+876 (2.8x)** | 🔴 **CRITICAL** | Dual verification methods, result handling, extensive error handling, logging |
 | [workflows/update.py](../../src/my_unicorn/core/workflows/update.py) | **1,042** | 500 | **+542 (2.1x)** | 🔴 **CRITICAL** | Update checking, version comparison, backup orchestration, error handling |
 | [backup.py](../../src/my_unicorn/core/backup.py) | **937** | 500 | **+437 (1.9x)** | 🟡 **HIGH** | Backup creation, restoration, metadata management, cleanup |
 | [desktop_entry.py](../../src/my_unicorn/core/desktop_entry.py) | **667** | 500 | **+167 (1.3x)** | 🟢 **MEDIUM** | Desktop file generation, template rendering, validation |

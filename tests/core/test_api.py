@@ -710,7 +710,6 @@ class TestAssetSelectorChecksumFiltering:
             "Joplin-3.4.12.AppImage.sha512"
         )
         assert AssetSelector.is_relevant_checksum("app.AppImage.sha256")
-        assert AssetSelector.is_relevant_checksum("app.AppImage.md5sum")
 
     def test_is_relevant_checksum_accepts_standalone_checksum_files(self):
         """Test that standalone checksum files are accepted."""
@@ -719,7 +718,6 @@ class TestAssetSelectorChecksumFiltering:
         assert AssetSelector.is_relevant_checksum("SHA256SUMS")
         assert AssetSelector.is_relevant_checksum("latest-linux.yml")
         assert AssetSelector.is_relevant_checksum("checksums.txt")
-        assert AssetSelector.is_relevant_checksum("MD5SUMS")
 
     def test_is_relevant_checksum_rejects_windows_checksums(self):
         """Test that checksums for Windows files are rejected."""

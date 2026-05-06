@@ -21,10 +21,7 @@
         },
         "metadata": {
             "type": "object",
-            "required": [
-                "name",
-                "display_name"
-            ],
+            "required": ["name", "display_name"],
             "additionalProperties": false,
             "properties": {
                 "name": {
@@ -45,19 +42,12 @@
         },
         "source": {
             "type": "object",
-            "required": [
-                "type",
-                "owner",
-                "repo",
-                "prerelease"
-            ],
+            "required": ["type", "owner", "repo", "prerelease"],
             "additionalProperties": false,
             "properties": {
                 "type": {
                     "type": "string",
-                    "enum": [
-                        "github"
-                    ],
+                    "enum": ["github"],
                     "description": "Source type (currently only github supported)"
                 },
                 "owner": {
@@ -78,17 +68,12 @@
         },
         "appimage": {
             "type": "object",
-            "required": [
-                "naming"
-            ],
+            "required": ["naming"],
             "additionalProperties": false,
             "properties": {
                 "naming": {
                     "type": "object",
-                    "required": [
-                        "target_name",
-                        "architectures"
-                    ],
+                    "required": ["target_name", "architectures"],
                     "additionalProperties": false,
                     "properties": {
                         "template": {
@@ -122,26 +107,17 @@
         },
         "verification": {
             "type": "object",
-            "required": [
-                "method"
-            ],
+            "required": ["method"],
             "additionalProperties": false,
             "properties": {
                 "method": {
                     "type": "string",
-                    "enum": [
-                        "digest",
-                        "checksum_file",
-                        "skip"
-                    ],
+                    "enum": ["digest", "checksum_file", "skip"],
                     "description": "Verification method to use"
                 },
                 "checksum_file": {
                     "type": "object",
-                    "required": [
-                        "filename",
-                        "algorithm"
-                    ],
+                    "required": ["filename", "algorithm"],
                     "additionalProperties": false,
                     "properties": {
                         "filename": {
@@ -151,12 +127,7 @@
                         },
                         "algorithm": {
                             "type": "string",
-                            "enum": [
-                                "sha256",
-                                "sha512",
-                                "sha1",
-                                "md5"
-                            ],
+                            "enum": ["sha256", "sha512"],
                             "description": "Hash algorithm used in checksum file"
                         }
                     },
@@ -171,24 +142,17 @@
                 }
             },
             "then": {
-                "required": [
-                    "checksum_file"
-                ]
+                "required": ["checksum_file"]
             }
         },
         "icon": {
             "type": "object",
-            "required": [
-                "method",
-                "filename"
-            ],
+            "required": ["method", "filename"],
             "additionalProperties": false,
             "properties": {
                 "method": {
                     "type": "string",
-                    "enum": [
-                        "extraction"
-                    ],
+                    "enum": ["extraction"],
                     "description": "How to obtain the icon (extraction from AppImage only)"
                 },
                 "filename": {

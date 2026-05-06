@@ -16,7 +16,7 @@ from typing import Any
 from unittest.mock import MagicMock
 
 from my_unicorn.core.api import Asset
-from my_unicorn.core.verification.detection import (
+from my_unicorn.core.verify import (
     auto_detect_checksum_files,
     check_digest_availability,
     detect_available_methods,

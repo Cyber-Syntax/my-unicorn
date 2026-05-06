@@ -1,0 +1,16 @@
+# SiYuan - Traditional Hexadecimal SHA256
+# Standard checksum format: hash  filename
+9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08  siyuan-3.0.12-linux-amd64.AppImage
+d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592  siyuan-3.0.12-linux-arm64.AppImage
+36f98a39476a944a6b3c3cdeb2cc00baebdf3a4754f99600afe9de6d3552fb18 siyuan-3.5.4-linux-arm64.AppImage
+7738cf290b2a2a6c3d6542b13bed07c3a3e3b42d586ae50b8b1de27ecbbb5cf1 siyuan-3.5.4-linux-arm64.deb
+edd6c060caab9c45446b64a8272d99d9ca1334e7860e3643690853260697f377 siyuan-3.5.4-linux-arm64.tar.gz
+72987a45605886b81c99cd28f48c294228cb6bf67000f223cf9051ed7f5e6281 siyuan-3.5.4-linux.AppImage
+39151c6be86ef318b999d10094797555c868a489532ff9d35937a27511738a91 siyuan-3.5.4-linux.deb
+1e730222bc9bb9e3cd92ba79ed1b96cf552ff2f854904c05ac87a73c207f1cb7 siyuan-3.5.4-linux.tar.gz
+24ba9166f558cf8a2a53478dd0f2dd058fbbb61807e8b8d85bc69af2ed1587a7 siyuan-3.5.4-mac-arm64.dmg
+615d2ff29f49cbc18dbf05adf0a7154da5eb090948f35f09983d0ad7351c8164 siyuan-3.5.4-mac.dmg
+0abbfb8a6b5c3b592dcb3a91b9cdbfbc85df1d6cf36f0e09a64168ad1b07c308 siyuan-3.5.4-win-arm64.exe
+3e3503d6cfa49cbe7c8902f8c4ac061f51032c24a88fa06f3a21142304865ec7 siyuan-3.5.4-win.exe
+c5a753ff17a4e2f9b99bb585c2fc7a92dd173df2dd4efd217ad3ab78a6ff62ef siyuan-3.5.4.apk
+

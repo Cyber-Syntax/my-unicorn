@@ -6,36 +6,20 @@ memory-bank/
 backups
 plan
 plans
+examples
 
-# ignore appimages
-*.AppImage*
-*.appimage
-# ignore flowchart
-*xopp*
 # ignore vscode
 .vscode
-# ignore
-*sha512*
-*SHA*
-# test
-# *test*.py
-*None*
-
-.pylintrc
 
 # syncthing conflict files
 *.sync-conflict-*
 
 # logs
 *.log*
-logs/*
 
 # ruff
 .ruff_cache
 *.vim
-
-# other
-examples
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

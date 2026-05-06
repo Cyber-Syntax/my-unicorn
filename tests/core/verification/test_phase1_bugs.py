@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from my_unicorn.core.api import Asset
-from my_unicorn.core.verification.service import VerificationService
+from my_unicorn.core.verify import VerificationService
 
 
 class TestSkipVerificationBug:

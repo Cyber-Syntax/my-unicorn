@@ -49,7 +49,6 @@ class TestIsChecksumFile:
         """Test specific checksum extensions."""
         assert is_checksum_file("file.sha256sum")
         assert is_checksum_file("file.sha512sum")
-        assert is_checksum_file("file.md5sum")
 
     def test_appimage_with_checksum_extension(self) -> None:
         """Test AppImage with checksum extension."""
@@ -147,11 +146,9 @@ class TestEdgeCases:
         """Test various checksum file pattern formats."""
         test_files = [
             "latest-mac.yml",
-            "checksums.md5",
             "file.sum",
             "file.hash",
             "file.DIGEST",
-            "MD5SUMS.txt",
         ]
         for filename in test_files:
             assert is_checksum_file(filename), f"Failed for {filename}"

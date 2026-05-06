@@ -48,7 +48,7 @@ from my_unicorn.core.remove import RemoveService
 from my_unicorn.core.services.install_service import InstallApplicationService
 from my_unicorn.core.services.update_service import UpdateApplicationService
 from my_unicorn.core.update import UpdateManager
-from my_unicorn.core.verification import VerificationService
+from my_unicorn.core.verify import VerificationService
 from my_unicorn.logger import get_logger
 
 if TYPE_CHECKING:

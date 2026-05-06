@@ -260,14 +260,12 @@ APPIMAGE_SUFFIX: Final[str] = ".AppImage"
 
 # Supported hash algorithms across verification code
 SUPPORTED_HASH_ALGORITHMS: Final[tuple[str, ...]] = (
-    "sha1",
     "sha256",
     "sha512",
-    "md5",
 )
 
 # Type alias for supported hash types used across verification modules
-HashType = Literal["sha1", "sha256", "sha512", "md5"]
+HashType = Literal["sha256", "sha512"]
 
 # Default hash algorithm when none is specified/detected
 DEFAULT_HASH_TYPE: Final[HashType] = "sha256"
@@ -279,9 +277,23 @@ YAML_DEFAULT_HASH: Final[HashType] = "sha512"
 HASH_PREFERENCE_ORDER: Final[tuple[HashType, ...]] = (
     "sha512",
     "sha256",
-    "sha1",
-    "md5",
 )
+
+# Per-file checksum suffixes — directly appended to the asset filename,
+# e.g. "MyApp.AppImage.sha256". Derived from SUPPORTED_HASH_ALGORITHMS so
+# adding a new algorithm here automatically propagates everywhere.
+CHECKSUM_FILE_SUFFIXES: Final[tuple[str, ...]] = (
+    ".sha256",
+    ".sha512",
+    ".sha256sum",
+    ".sha512sum",
+)
+
+# Extensions that identify a YAML-format checksum file (electron-builder).
+YAML_CHECKSUM_EXTENSIONS: Final[tuple[str, ...]] = (".yml", ".yaml")
+
+# Extensions that identify a DIGEST-format checksum file.
+DIGEST_FILE_SUFFIXES: Final[tuple[str, ...]] = (".digest", ".DIGEST")
 
 # =============================================================================
 # Installation and Update Constants

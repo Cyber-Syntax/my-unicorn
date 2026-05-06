@@ -82,7 +82,7 @@ def _cleanup_logging() -> None:
 
 
 # Register cleanup handler
-atexit.register(_cleanup_logging)
+_ = atexit.register(_cleanup_logging)
 
 
 def setup_logging(
