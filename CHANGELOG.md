@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - autocomplete.bash script improvements:
     - Added error handling for unknown arguments and missing arguments.
     - Improved argument parsing logic for better user experience.
+- Added support to keep hash checksum of downloaded appimage in app state config even if verification fails. (by @SAY-5 #245 in #313)
+- Added support to keep github api digest of downloaded appimage in app state config even if verification fails.
 
 ### Changed
 
@@ -28,6 +30,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed autocomplete.bash script wrong dry-run implementation.
+- Fixed refresh cache flag updates the caches by requesting from the API again, but the GitHub releases section seems not to update itself (#259 by @SAY-5 in #315)
+
+### Removed
+
+- sha1, md5 checksum support removed #269
 
 ## [2.5.2-alpha] - 2026-04-30
 

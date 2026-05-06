@@ -35,6 +35,14 @@ uv run pytest -v -s
 - Example for core: `pytest --collect-only -q tests/core/`
 - Example how to run one test: `uv run pytest tests/e2e/test_full_flow.py::TestFullFlow::test_partial_verification_warnings_joplin_legcord`
 
+## Debugging a specific test with detailed logs
+
+Example:
+
+```bash
+uv run pytest -vv -s -o log_cli=true --log-cli-level=DEBUG tests/integration/test_verify_hash.py::TestChecksumFileHashPreservation::test_mismatch_preserves_expected_and_computed_sha256
+```
+
 ## Test Organization
 
 ### Directory Structure
