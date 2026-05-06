@@ -1,10 +1,19 @@
+import logging
+
+import pytest
+
 from my_unicorn.core.install import (
     display_no_targets_error,
     print_install_summary,
 )
 
 
-def test_display_no_targets_error(caplog):
+@pytest.fixture(autouse=True)
+def _caplog_setup(caplog):
+    caplog.set_level(logging.INFO, logger="my_unicorn")
+
+
+def test_display_no_targets_error():
     """Test display_no_targets_error shows error and help message."""
     from unittest.mock import patch
 
@@ -18,6 +27,7 @@ def test_display_no_targets_error(caplog):
 
 
 def test_print_install_summary_all_already_installed(caplog):
+
     results = [
         {
             "target": "app1",
@@ -33,6 +43,7 @@ def test_print_install_summary_all_already_installed(caplog):
 
 
 def test_print_install_summary_mixed(caplog):
+
     results = [
         {
             "target": "app1",
