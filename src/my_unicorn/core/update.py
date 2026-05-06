@@ -1020,11 +1020,14 @@ def select_asset_for_update(
     )
 
     if not appimage_asset:
-        logger.error("No AppImage found for %s", app_name)
-        return (
-            None,
-            "AppImage not found in release - may still be building",
+        # use debug level to avoid duplicate `Fetching from API:` log messages.
+        # see #294
+        #
+        # user can still see the no appimage error in the summary section.
+        logger.debug(
+            "No AppImage found for %s, may still be building", app_name
         )
+        return None, "AppImage not found in release - may still be building"
 
     return appimage_asset, None
 
