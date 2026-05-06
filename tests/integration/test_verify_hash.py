@@ -1251,3 +1251,223 @@ async def test_checksum_mismatch_parametrized(
     assert result.hash == wrong_hash
     assert result.computed_hash is not None
     assert result.hash != result.computed_hash
+
+
+# ===========================================================================
+# Section 8 — Integration Edge Cases
+# ===========================================================================
+
+
+class TestIntegrationEdgeCases:
+    """Complex fallback, warning, and failure edge cases from issue reports."""
+
+    def _make_service(self, download_svc: Any) -> VerificationService:
+        """Build a ``VerificationService`` with the given download mock."""
+        from my_unicorn.core.protocols.progress import NullProgressReporter
+        from my_unicorn.core.verify import VerificationService
+
+        return VerificationService(
+            download_service=download_svc,
+            progress_reporter=NullProgressReporter(),
+            cache_manager=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_appflowy_only_digest_fail(
+        self, app_file: Path, asset_wrong_digest: Asset
+    ) -> None:
+        """Simulate AppFlowy where ONLY digest is present. Enforce VerificationError on mismatch."""
+        download_svc = _make_mock_download_service("")
+        service = self._make_service(download_svc)
+
+        config: dict[str, Any] = {
+            "skip": False,
+            VerificationMethod.DIGEST: False,
+            "checksum_file": None,
+        }
+
+        with pytest.raises(VerificationError) as exc:
+            await service.verify_file(
+                file_path=app_file,
+                asset=asset_wrong_digest,
+                config=config,
+                owner="fake-owner",
+                repo="fake-repo",
+                tag_name="v1.0.0",
+                app_name="AppFlowy",
+                assets=None,
+            )
+        assert "Verification failed" in str(exc.value)
+
+    @pytest.mark.asyncio
+    async def test_super_productivity_partial(
+        self, app_file: Path, asset_wrong_digest: Asset
+    ) -> None:
+        """Simulate both digest and latest-linux.yml. Fail digest but pass checksum_file. Assert success + partial verification warning."""
+        yaml_content = _yaml_checksum_content(CORRECT_SHA512_B64)
+        download_svc = _make_mock_download_service(yaml_content)
+        service = self._make_service(download_svc)
+
+        config: dict[str, Any] = {
+            "skip": False,
+            VerificationMethod.DIGEST: False,
+            "checksum_file": "latest-linux.yml",
+        }
+
+        yaml_asset = Asset(
+            name="latest-linux.yml",
+            size=100,
+            browser_download_url="http://url",
+            digest="",
+        )
+
+        result = await service.verify_file(
+            file_path=app_file,
+            asset=asset_wrong_digest,
+            config=config,
+            owner="fake-owner",
+            repo="fake-repo",
+            tag_name="v1.0.0",
+            app_name="SuperProductivity",
+            assets=[yaml_asset],
+        )
+        assert result.passed is True
+        assert result.warning is not None
+        assert "partial" in result.warning.lower()
+
+    @pytest.mark.asyncio
+    async def test_super_productivity_total_failure(
+        self, app_file: Path, asset_wrong_digest: Asset
+    ) -> None:
+        """Simulate both methods failing, enforce VerificationError."""
+        import base64
+
+        wrong_sha512_b64 = base64.b64encode(
+            bytes.fromhex(WRONG_SHA512)
+        ).decode("ascii")
+        yaml_content = _yaml_checksum_content(wrong_sha512_b64)
+        download_svc = _make_mock_download_service(yaml_content)
+        service = self._make_service(download_svc)
+
+        config: dict[str, Any] = {
+            "skip": False,
+            VerificationMethod.DIGEST: False,
+            "checksum_file": "latest-linux.yml",
+        }
+        yaml_asset = Asset(
+            name="latest-linux.yml",
+            size=100,
+            browser_download_url="http://url",
+            digest="",
+        )
+
+        with pytest.raises(VerificationError):
+            await service.verify_file(
+                file_path=app_file,
+                asset=asset_wrong_digest,
+                config=config,
+                owner="fake-owner",
+                repo="fake-repo",
+                tag_name="v1.0.0",
+                app_name="SuperProductivity",
+                assets=[yaml_asset],
+            )
+
+    @pytest.mark.asyncio
+    async def test_weektodo_upstream_missing_skip(
+        self, app_file: Path, asset_no_digest: Asset
+    ) -> None:
+        """Simulate missing upstream checksums for WeekToDo with config method="skip". Validate warning "dev not provide" but success."""
+        download_svc = _make_mock_download_service("")
+        service = self._make_service(download_svc)
+
+        config: dict[str, Any] = {
+            "skip": True,
+            VerificationMethod.DIGEST: False,
+            "checksum_file": None,
+        }
+
+        result = await service.verify_file(
+            file_path=app_file,
+            asset=asset_no_digest,
+            config=config,
+            owner="fake-owner",
+            repo="fake-repo",
+            tag_name="v1.0.0",
+            app_name="WeekToDo",
+            assets=None,
+        )
+        assert result.passed is False
+        assert result.warning is not None
+        assert "not provide" in result.warning.lower()
+
+    @pytest.mark.asyncio
+    async def test_url_custom_source_missing_verifications(
+        self, app_file: Path, asset_no_digest: Asset
+    ) -> None:
+        """Simulate direct URL install with no digest/checksum. Enforce warning but success."""
+        download_svc = _make_mock_download_service("")
+        service = self._make_service(download_svc)
+
+        config: dict[str, Any] = {
+            "skip": False,
+            VerificationMethod.DIGEST: False,
+            "checksum_file": None,
+        }
+
+        result = await service.verify_file(
+            file_path=app_file,
+            asset=asset_no_digest,
+            config=config,
+            owner="fake-owner",
+            repo="fake-repo",
+            tag_name="v1.0.0",
+            app_name="CustomApp",
+            assets=[],
+        )
+        assert result.passed is False
+        assert result.warning is not None
+        assert (
+            "not provide" in result.warning.lower()
+            or "skipped" in result.warning.lower()
+            or "not verified" in result.warning.lower()
+        )
+
+    @pytest.mark.asyncio
+    async def test_reinstall_previous_verification_total_failure(
+        self, app_file: Path, asset_wrong_digest: Asset
+    ) -> None:
+        """Simulate state where previous install verified successfully via digest. Current run fails both digest and checksum. Enforce VerificationError."""
+        import base64
+
+        config: dict[str, Any] = {
+            "skip": False,
+            VerificationMethod.DIGEST: True,
+            "checksum_file": "latest-linux.yml",
+        }
+
+        wrong_sha512_b64 = base64.b64encode(
+            bytes.fromhex(WRONG_SHA512)
+        ).decode("ascii")
+        yaml_content = _yaml_checksum_content(wrong_sha512_b64)
+        download_svc = _make_mock_download_service(yaml_content)
+        service = self._make_service(download_svc)
+
+        yaml_asset = Asset(
+            name="latest-linux.yml",
+            size=100,
+            browser_download_url="http://url",
+            digest="",
+        )
+
+        with pytest.raises(VerificationError):
+            await service.verify_file(
+                file_path=app_file,
+                asset=asset_wrong_digest,
+                config=config,
+                owner="fake-owner",
+                repo="fake-repo",
+                tag_name="v1.0.0",
+                app_name="SuperProductivity",
+                assets=[yaml_asset],
+            )
