@@ -1236,7 +1236,7 @@ def _display_update_operation_summary(
         update_infos: List of UpdateInfo objects with details.
 
     """
-    logger.info("\n📦 Update Summary:")
+    logger.info("📦 Update Summary:")
     logger.info("-" * 50)
 
     updated_count = len(updated_apps)
@@ -1468,7 +1468,7 @@ def display_update_results(results: dict) -> None:  # noqa: C901, PLR0912
 
     # If we have detailed info, use formatted summary
     if update_infos:
-        logger.info("\n📦 Update Summary:")
+        logger.info("📦 Update Summary:")
         logger.info("-" * 50)
 
         # Show updated apps with version info
