@@ -11,6 +11,7 @@ from my_unicorn.logger import (
     ColoredConsoleFormatter,
     _state,
     clear_logger_state,
+    flush_all_handlers,
     get_logger,
     setup_logging,
 )
@@ -196,10 +197,7 @@ def test_logging_actually_writes_to_file(tmp_path):
     test_message = "Test log message 12345"
     logger.debug(test_message)
 
-    # Flush QueueListener handlers
-    if _state.queue_listener is not None:
-        for handler in _state.queue_listener.handlers:
-            handler.flush()
+    flush_all_handlers()
 
     # Read file and verify message was written
     assert log_file.exists()
