@@ -4,7 +4,7 @@ from my_unicorn.core.install import (
 )
 
 
-def test_display_no_targets_error(capsys):
+def test_display_no_targets_error(caplog):
     """Test display_no_targets_error shows error and help message."""
     from unittest.mock import patch
 
@@ -17,7 +17,7 @@ def test_display_no_targets_error(capsys):
         )
 
 
-def test_print_install_summary_all_already_installed(capsys):
+def test_print_install_summary_all_already_installed(caplog):
     results = [
         {
             "target": "app1",
@@ -27,12 +27,12 @@ def test_print_install_summary_all_already_installed(capsys):
         }
     ]
     print_install_summary(results)
-    captured = capsys.readouterr()
-    assert "All 1 specified app(s) are already installed" in captured.out
-    assert "• app1" in captured.out
+    captured = caplog.text
+    assert "All 1 specified app(s) are already installed" in captured
+    assert "• app1" in captured
 
 
-def test_print_install_summary_mixed(capsys):
+def test_print_install_summary_mixed(caplog):
     results = [
         {
             "target": "app1",
@@ -55,13 +55,13 @@ def test_print_install_summary_mixed(capsys):
         },
     ]
     print_install_summary(results)
-    captured = capsys.readouterr()
+    captured = caplog.text
 
     # Summary header
-    assert "Installation Summary" in captured.out
+    assert "Installation Summary" in captured
     # Installed app with version
-    assert "app1" in captured.out and "1.0.0" in captured.out
+    assert "app1" in captured and "1.0.0" in captured
     # Failed app shows error message
-    assert "app2" in captured.out and "Download failed" in captured.out
+    assert "app2" in captured and "Download failed" in captured
     # Already installed shown as info
-    assert "app3" in captured.out
+    assert "app3" in captured
