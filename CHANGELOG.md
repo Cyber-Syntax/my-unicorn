@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed autocomplete.bash script wrong dry-run implementation.
 - Fixed refresh cache flag updates the caches by requesting from the API again, but the GitHub releases section seems not to update itself (#259 by @SAY-5 in #315)
+- Fixed ui duplication in api section of update command. (#294)
 
 ### Removed
 
@@ -984,6 +985,9 @@ Please change your current configuration files to the new format. The new format
 - refactor: improve better error handling on verify.py
 - chore: add copilot instructions
 
+[2.5.2-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v2.5.1-alpha...v2.5.2-alpha
+[2.5.1-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v2.5.0-alpha...v2.5.1-alpha
+[2.5.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v2.4.3-alpha...v2.5.0-alpha
 [2.4.4-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v2.4.3-alpha...v2.4.4-alpha
 [2.4.3-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v2.4.2-alpha...v2.4.3-alpha
 [2.4.2-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v2.4.1-alpha...v2.4.2-alpha
