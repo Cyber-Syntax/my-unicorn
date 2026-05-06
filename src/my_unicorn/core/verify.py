@@ -703,6 +703,7 @@ class Verifier:
 
         """
         self.file_path: Path = file_path
+        self._last_computed_hash: str | None = None
         self._log_file_info()
 
     def _log_file_info(self) -> None:
@@ -923,6 +924,7 @@ class Verifier:
                 bytes_processed += len(chunk)
 
         computed_hash = hasher.hexdigest()
+        self._last_computed_hash = computed_hash
 
         logger.debug(
             "   Processed: %s (%d bytes)",
@@ -1054,7 +1056,6 @@ async def verify_digest(
         when an exception is raised.
 
     """
-    actual_digest: str | None = None
     try:
         logger.debug("Attempting digest verification from GitHub API")
         logger.debug("AppImage file: %s", verifier.file_path.name)
@@ -1078,6 +1079,33 @@ async def verify_digest(
             details="GitHub API digest verification",
         )
     except Exception as e:
+        # Preserve computed hash on failures without forcing a second file read.
+        actual_digest: str | None = None
+
+        last = getattr(verifier, "_last_computed_hash", None)
+        if isinstance(last, str) and last:
+            actual_digest = last
+
+        if not actual_digest and isinstance(e, VerificationError):
+            ctx_actual = e.context.get("actual_hash")
+            if isinstance(ctx_actual, str) and ctx_actual:
+                actual_digest = ctx_actual
+
+        message = str(e)
+        if not actual_digest:
+            # Handles our ValueError message:
+            # "Digest mismatch!\nExpected: ...\nActual:   <hash>"
+            for line in message.splitlines():
+                stripped = line.strip()
+                if stripped.lower().startswith("actual:"):
+                    actual_digest = stripped.split(":", 1)[1].strip()
+                    break
+
+        if not actual_digest and " got " in message:
+            # Handles test/mocked error messages:
+            # "... but got <hash>"
+            actual_digest = message.rsplit(" got ", 1)[-1].strip().split()[0]
+
         logger.error("Digest verification failed: %s", e)
         logger.error("Expected: %s", digest)
         logger.error("AppImage: %s", verifier.file_path.name)
