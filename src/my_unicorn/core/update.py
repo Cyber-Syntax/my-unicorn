@@ -529,6 +529,8 @@ class UpdateManager:
         force: bool = False,
         update_infos: list[UpdateInfo] | None = None,
         api_task_id: str | None = None,
+        *,
+        refresh_cache: bool = False,
     ) -> tuple[dict[str, bool], dict[str, str]]:
         """Update multiple apps.
 
@@ -538,6 +540,9 @@ class UpdateManager:
             update_infos: Optional pre-fetched update info objects with cached
                 release data
             api_task_id: Optional API progress task ID for tracking
+            refresh_cache: Whether the upstream check bypassed the cache.
+                Forwarded so the progress description does not falsely
+                report "from cache" (issue #259).
 
         Returns:
             Tuple of (success status dict, error reasons dict)
@@ -556,6 +561,7 @@ class UpdateManager:
             self.update_single_app,
             update_cached_progress,
             self.progress_reporter,
+            refresh_cache=refresh_cache,
         )
 
 
@@ -563,13 +569,20 @@ async def update_cached_progress(
     app_name: str,
     shared_api_task_id: str | None,
     progress_reporter: ProgressReporter,
+    *,
+    from_cache: bool = True,
 ) -> None:
-    """Update progress for cached update info.
+    """Update progress for previously-resolved update info.
 
     Args:
         app_name: Name of the app being processed
         shared_api_task_id: Shared API task ID for progress tracking
         progress_reporter: Progress reporter instance
+        from_cache: True if the release data was served from the on-disk
+            cache, False if it was freshly fetched from the API. The flag
+            controls the wording shown in the progress description so the
+            "GitHub Releases" section does not report "Retrieved from cache"
+            when --refresh-cache bypassed the cache (issue #259).
 
     """
     if not shared_api_task_id:
@@ -592,11 +605,12 @@ async def update_cached_progress(
             if total_value and total_value > 0
             else new_completed
         )
+        source = "cached" if from_cache else "fresh"
         await progress_reporter.update_task(
             shared_api_task_id,
             completed=float(new_completed),
             description=(
-                f"🌐 Retrieved {app_name} (cached) ({new_completed}/{total})"
+                f"🌐 Retrieved {app_name} ({source}) ({new_completed}/{total})"
             ),
         )
     except Exception as e:
@@ -767,10 +781,10 @@ async def update_multiple_apps(
         [str, aiohttp.ClientSession, bool, UpdateInfo | None],
         Awaitable[tuple[bool, str | None]],
     ],
-    update_cached_progress_func: Callable[
-        [str, str | None, ProgressReporter], Awaitable[None]
-    ],
+    update_cached_progress_func: Callable[..., Awaitable[None]],
     progress_reporter: ProgressReporter,
+    *,
+    refresh_cache: bool = False,
 ) -> tuple[dict[str, bool], dict[str, str]]:
     """Update multiple apps.
 
@@ -784,6 +798,10 @@ async def update_multiple_apps(
         update_single_app_func: Function to update single app
         update_cached_progress_func: Function to update cached progress
         progress_reporter: Progress reporter instance
+        refresh_cache: Whether the upstream check bypassed the cache.
+            Forwarded to update_cached_progress_func as ``from_cache``
+            (issue #259) so the GitHub Releases section does not
+            falsely report "Retrieved from cache" after --refresh-cache.
 
     Returns:
         Tuple of (success status dict, error reasons dict)
@@ -820,7 +838,10 @@ async def update_multiple_apps(
                 # Update progress for cached data outside semaphore
                 if cached_info:
                     await update_cached_progress_func(
-                        app_name, api_task_id, progress_reporter
+                        app_name,
+                        api_task_id,
+                        progress_reporter,
+                        from_cache=not refresh_cache,
                     )
 
                 async with semaphore:
