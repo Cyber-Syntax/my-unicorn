@@ -15,6 +15,7 @@ Note on test approach:
     actual production behaviour being tested.
 """
 
+import asyncio
 import logging
 from logging.handlers import RotatingFileHandler
 
@@ -53,13 +54,13 @@ async def test_logger_info_suppressed_during_progress(caplog):
     logger = get_logger("test_progress")
     progress = ProgressDisplay()
 
-    # Verify logger.info works before progress (caplog is fine here — we are
-    # outside the session, so the handler level is at its default).
+    baseline_level = _console_handler_level()
+
+    # Verify logger.info works before progress
     with caplog.at_level(logging.INFO):
         logger.info("Before progress")
         assert "Before progress" in caplog.text
 
-    # Start progress session
     async with progress.session(1):
         await progress.add_task(
             name="test",
@@ -67,18 +68,19 @@ async def test_logger_info_suppressed_during_progress(caplog):
             total=100,
         )
 
-        # Console handler must be at WARNING — INFO won't reach the terminal.
         level = _console_handler_level()
         assert level is not None, "QueueListener must be initialised"
         assert level == logging.WARNING, (
             f"Console handler should be WARNING during progress, got {level}"
         )
 
-    # After the session the handler level must be restored.
+    # After session: must be restored exactly
     level = _console_handler_level()
-    assert level is None or level <= logging.WARNING, (
-        f"Console handler should be restored after progress, got {level}"
+    assert level == baseline_level, (
+        f"Console handler should be restored after progress, got {level}, "
+        f"expected {baseline_level}"
     )
+
     caplog.clear()
     with caplog.at_level(logging.INFO):
         logger.info("After progress")
@@ -129,17 +131,12 @@ async def test_logger_error_shown_during_progress(caplog):
 
 @pytest.mark.asyncio
 async def test_logger_levels_restored_after_progress_error(caplog):
-    """Test that console handler level is restored after a session error."""
     logger = get_logger("test_progress_restore")
     progress = ProgressDisplay()
 
-    # Verify logger.info works before
-    with caplog.at_level(logging.INFO):
-        logger.info("Before error")
-        assert "Before error" in caplog.text
+    baseline_level = _console_handler_level()
 
-    # Progress session that raises an exception mid-flight
-    with pytest.raises(RuntimeError):  # noqa: PT012
+    try:
         async with progress.session(1):
             await progress.add_task(
                 name="test",
@@ -147,21 +144,23 @@ async def test_logger_levels_restored_after_progress_error(caplog):
                 total=100,
             )
 
-            # Console handler must be at WARNING inside the session.
             level = _console_handler_level()
-            assert level is not None, "QueueListener must be initialised"
-            assert level == logging.WARNING, (
-                f"Console handler should be WARNING, got {level}"
-            )
+            assert level == logging.WARNING
 
-            msg = "Test error"
-            raise RuntimeError(msg)
+            raise RuntimeError("Test error")
 
-    # SessionManager.stop_session() must restore the level even after an error.
+    except RuntimeError:
+        pass
+
+    # 🔑 IMPORTANT: ensure session fully unwound before asserting
+    await asyncio.sleep(0)
+
     level = _console_handler_level()
-    assert level is None or level <= logging.WARNING, (
-        f"Console handler not restored after exception, got {level}"
+    assert level == baseline_level, (
+        f"Console handler not restored after exception, got {level}, "
+        f"expected {baseline_level}"
     )
+
     caplog.clear()
     with caplog.at_level(logging.INFO):
         logger.info("After error")
@@ -174,47 +173,51 @@ async def test_multiple_progress_sessions(caplog):
     logger = get_logger("test_multiple_sessions")
     progress = ProgressDisplay()
 
-    # First session — console handler must be at WARNING.
+    baseline_level = _console_handler_level()
+
     async with progress.session(1):
         await progress.add_task(
             name="test1",
             progress_type=ProgressType.DOWNLOAD,
             total=100,
         )
+
         level = _console_handler_level()
         assert level is not None, "QueueListener must be initialised"
         assert level == logging.WARNING, (
             f"Console handler should be WARNING (first session), got {level}"
         )
 
-    # Between sessions — handler must be restored.
     level = _console_handler_level()
-    assert level is None or level <= logging.WARNING, (
-        f"Console handler not restored between sessions, got {level}"
+    assert level == baseline_level, (
+        f"Console handler not restored between sessions, got {level}, "
+        f"expected {baseline_level}"
     )
+
     caplog.clear()
     with caplog.at_level(logging.INFO):
         logger.info("Between sessions")
         assert "Between sessions" in caplog.text
 
-    # Second session — suppression must activate again.
     async with progress.session(1):
         await progress.add_task(
             name="test2",
             progress_type=ProgressType.VERIFICATION,
             total=100,
         )
+
         level = _console_handler_level()
         assert level is not None, "QueueListener must be initialised"
         assert level == logging.WARNING, (
             f"Console handler should be WARNING (second session), got {level}"
         )
 
-    # After all sessions — handler must be fully restored.
     level = _console_handler_level()
-    assert level is None or level <= logging.WARNING, (
-        f"Console handler not restored after all sessions, got {level}"
+    assert level == baseline_level, (
+        f"Console handler not restored after all sessions, got {level}, "
+        f"expected {baseline_level}"
     )
+
     caplog.clear()
     with caplog.at_level(logging.INFO):
         logger.info("After all sessions")
