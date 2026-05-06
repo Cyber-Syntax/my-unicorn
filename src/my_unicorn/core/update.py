@@ -1489,8 +1489,10 @@ def display_update_results(results: dict) -> None:  # noqa: C901, PLR0912
         for app_name in failed:
             app_info = _find_update_info(app_name, update_infos)
             logger.info("%-25s ❌ Update failed", app_name)
+            # Keep error reason indented under the app name
+            # app name is already shown in the log line above
             if app_info.error_reason:
-                logger.info("%25s    → %s", app_name, app_info.error_reason)
+                logger.info("%25s    → %s", "", app_info.error_reason)
 
         # Show up-to-date apps
         for app_name in up_to_date:
