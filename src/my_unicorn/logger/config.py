@@ -106,11 +106,15 @@ def update_logger_from_config(state: "_LoggerState") -> None:
         config = config_mgr.load_global_config()
 
         # Extract log settings from config
-        console_level_str = config.get("console_log_level", "WARNING")
+        console_level_str = config.get(
+            "console_log_level", DEFAULT_CONSOLE_LOG_LEVEL
+        )
         file_level_str = config.get("log_level", "INFO")
 
         # Convert to logging level constants
-        console_level = getattr(logging, console_level_str, logging.WARNING)
+        console_level = getattr(
+            logging, console_level_str, DEFAULT_CONSOLE_LOG_LEVEL
+        )
         file_level = getattr(logging, file_level_str, logging.INFO)
 
         # Update handlers in the QueueListener
