@@ -11,7 +11,7 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from my_unicorn.constants import DEFAULT_LOG_LEVEL
+from my_unicorn.constants import DEFAULT_CONSOLE_LOG_LEVEL, DEFAULT_LOG_LEVEL
 
 if TYPE_CHECKING:
     from my_unicorn.logger.state import _LoggerState
@@ -45,7 +45,7 @@ def load_log_settings() -> tuple[str, str, Path]:
 
     Returns:
         Tuple of (console_level, file_level, log_path) where:
-            - console_level: Log level for console output (default: WARNING)
+            - console_level: Log level for console output (default: INFO)
             - file_level: Log level for file output (default: INFO)
             - log_path: Path to log file (overridable via MY_UNICORN_LOG_DIR)
 
@@ -54,7 +54,7 @@ def load_log_settings() -> tuple[str, str, Path]:
         later via update_logger_from_config() to avoid circular dependencies.
 
     """
-    default_console_level = "WARNING"
+    default_console_level = DEFAULT_CONSOLE_LOG_LEVEL
     default_file_level = DEFAULT_LOG_LEVEL
 
     # Check for test environment override
