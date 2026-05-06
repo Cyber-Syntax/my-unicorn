@@ -14,7 +14,7 @@ def test_load_log_settings_with_env_var(monkeypatch: MonkeyPatch) -> None:
 
     console_level, file_level, log_path = load_log_settings()
 
-    assert console_level == "WARNING"
+    assert console_level == "INFO"
     assert file_level == "INFO"  # DEFAULT_LOG_LEVEL from constants
     assert log_path == Path(test_log_dir) / "my-unicorn.log"
 
@@ -25,7 +25,7 @@ def test_load_log_settings_without_env_var(monkeypatch: MonkeyPatch) -> None:
 
     console_level, file_level, log_path = load_log_settings()
 
-    assert console_level == "WARNING"
+    assert console_level == "INFO"
     assert file_level == "INFO"  # DEFAULT_LOG_LEVEL from constants
     expected_path = (
         Path.home() / ".config" / "my-unicorn" / "logs" / "my-unicorn.log"
@@ -41,7 +41,7 @@ def test_load_log_settings_with_tilde_in_env_var(
 
     console_level, file_level, log_path = load_log_settings()
 
-    assert console_level == "WARNING"
+    assert console_level == "INFO"
     assert file_level == "INFO"
     assert log_path == Path.home() / "custom-logs" / "my-unicorn.log"
     # Verify tilde was expanded

@@ -39,6 +39,9 @@ _HASH_LENGTH_MAP: dict[int, HashType] = {
     128: "sha512",
 }
 
+_HASH_TYPE_LENGTH_MAP: dict[HashType, int] = {
+    hash_type: length for length, hash_type in _HASH_LENGTH_MAP.items()
+}
 
 _BSD_CHECKSUM_PATTERN = re.compile(
     r"(?P<algo>SHA\d+|MD5|sha\d+|md5)\s*\((?P<filename>.+)\)\s*=\s*(?P<hash>[A-Fa-f0-9]+)",
@@ -331,19 +334,49 @@ def _generate_variants(name: str) -> set[str]:
     return {variant for variant in variants if variant}
 
 
+def _parse_hash_only_content(content: str, hash_type: HashType) -> str | None:
+    """Parse checksum files that contain a single raw hash only.
+
+    This is used for formats like `.sha512` files that sometimes
+    contain only a hash without filename mapping.
+
+    Rules:
+    - Must contain exactly one non-empty, non-comment line
+    - Must be a valid hex string
+    - Must match the expected hash length for the detected hash type
+    """
+    lines = [
+        line.strip()
+        for line in content.strip().split("\n")
+        if line.strip() and not line.strip().startswith("#")
+    ]
+
+    if len(lines) != 1:
+        return None
+
+    candidate = lines[0]
+
+    if not all(c in "0123456789abcdefABCDEF" for c in candidate):
+        return None
+
+    expected_length = _HASH_TYPE_LENGTH_MAP[hash_type]
+    if len(candidate) != expected_length:
+        logger.debug(
+            "   Hash-only candidate length %d does not match %s length %d",
+            len(candidate),
+            hash_type,
+            expected_length,
+        )
+        return None
+
+    return candidate
+
+
 def _parse_traditional_checksum_file(
     content: str, filename: str, hash_type: HashType
 ) -> str | None:
-    """Parse a traditional checksum file (e.g., SHA256SUMS).
+    """Parse a traditional checksum file (e.g., SHA256SUMS)."""
 
-    Args:
-        content: The file content.
-        filename: The filename to find the hash for.
-        hash_type: The expected hash type.
-
-    Returns:
-        The hash value as string or None if not found.
-    """
     logger.debug("   Parsing as traditional checksum file format")
     logger.debug("   Looking for: %s", filename)
     logger.debug("   Hash type: %s", hash_type)
@@ -353,6 +386,16 @@ def _parse_traditional_checksum_file(
 
     target_variants = _generate_variants(filename)
 
+    # Hash-only fallback for .sha256/.sha512 style files. The checksum
+    # filename is not available here, so rely on the already-detected hash
+    # type passed by the caller and validate the raw hash length strictly.
+    hash_only = _parse_hash_only_content(content, hash_type)
+    if hash_only:
+        logger.debug("   ✅ Hash-only checksum detected (fallback mode)")
+        logger.debug("   Hash: %s", hash_only)
+        return hash_only
+
+    # Standard filename-based parsing
     for line_num, raw_line in enumerate(lines, 1):
         line = raw_line.strip()
         if not line or line.startswith("#"):
@@ -375,6 +418,7 @@ def _parse_traditional_checksum_file(
             file_in_checksum,
         )
 
+        # direct match
         if file_in_checksum == filename or file_in_checksum.endswith(
             f"/{filename}"
         ):
@@ -382,6 +426,7 @@ def _parse_traditional_checksum_file(
             logger.debug("   Hash: %s", hash_value)
             return hash_value
 
+        # relaxed variant match
         file_variants = _generate_variants(file_in_checksum)
         if target_variants.intersection(file_variants):
             logger.debug(
@@ -592,37 +637,57 @@ def _parse_yaml_checksum_file(
 
 
 def _parse_all_yaml_checksums(content: str) -> dict[str, str]:
-    """Parse all filename-to-hash mappings from YAML checksum format.
-
-    Args:
-        content: The YAML checksum file content.
-
-    Returns:
-        Dictionary mapping filenames to hash values.
-
-    """
+    """Parse all filename-to-hash mappings from YAML checksum format."""
     if not _YAML_AVAILABLE or not yaml:
         return {}
-
-    hashes: dict[str, str] = {}
 
     try:
         data = yaml.safe_load(content)
         if not isinstance(data, dict):
             return {}
-
-        for filename, hash_data in data.items():
-            if isinstance(hash_data, dict):
-                result = _extract_hash_from_dict(hash_data)
-                if result:
-                    hash_value, _ = result
-                    hashes[filename] = hash_value
-            elif isinstance(hash_data, str):
-                hashes[filename] = _normalize_hash_value(hash_data)
-
     except yaml.YAMLError:
         logger.debug("Failed to parse YAML for all checksums")
         return {}
+
+    hashes: dict[str, str] = {}
+
+    # electron-builder: files is a list of {url, sha512, size}
+    files = data.get("files")
+    if isinstance(files, list):
+        for entry in files:
+            if not isinstance(entry, dict):
+                continue
+            filename = entry.get("url") or entry.get("name")
+            if not filename:
+                continue
+            result = _extract_hash_from_dict(entry)
+            if result:
+                hash_value, _ = result
+                hashes[filename] = hash_value
+
+    # Also capture root-level entry (primary file)
+    root_path = data.get("path")
+    if root_path:
+        result = _extract_hash_from_dict(data)
+        if result:
+            hash_value, _ = result
+            hashes[root_path] = hash_value
+
+    # Fallback: generic {filename: hash_str} flat structure
+    if not hashes:
+        for key, value in data.items():
+            if isinstance(value, str) and key not in (
+                "version",
+                "path",
+                "releaseDate",
+                "releaseNotes",
+            ):
+                hashes[key] = _normalize_hash_value(value)
+            elif isinstance(value, dict):
+                result = _extract_hash_from_dict(value)
+                if result:
+                    hash_value, _ = result
+                    hashes[key] = hash_value
 
     return hashes
 

@@ -1,0 +1,15 @@
+version: 3.20.2
+files:
+  - url: YTDownloader_Linux.AppImage
+    sha512: yiC8XMzjnZH0VZlkncWt3SyuxMnJ2YLn/DQyqyL8o1MQdhEs5uw6crgWpL7SZmgtFkwjVuAqmaVkI7sqanVk3w==
+    size: 169670402
+    blockMapSize: 177942
+  - url: YTDownloader_Linux.rpm
+    sha512: QwarBiAIPz/0IelaDmBv08m22a7eiPXrMiWvJvn26/ibuqpmqhcoIEGVFLEAwI4uiLmj/dQK5hAXplu4GbQpoQ==
+    size: 114756949
+  - url: YTDownloader_Linux.deb
+    sha512: gWFbOBVAXzJCx0tqgHbzEPzP56aB0AgiibyZkPz2aWXEhEQfjL5g7ku446FGSbkG1EVFLJBxIEhT0JKFbCV1yA==
+    size: 115899650
+path: YTDownloader_Linux.AppImage
+sha512: yiC8XMzjnZH0VZlkncWt3SyuxMnJ2YLn/DQyqyL8o1MQdhEs5uw6crgWpL7SZmgtFkwjVuAqmaVkI7sqanVk3w==
+releaseDate: '2025-11-27T06:42:36.951Z'
