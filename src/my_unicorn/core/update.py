@@ -1262,7 +1262,7 @@ def _display_update_operation_summary(
 
     # Show summary stats
     if updated_count > 0:
-        logger.info("🎉 Successfully updated %s app(s)", updated_count)
+        logger.info("\n🎉 Successfully updated %s app(s)", updated_count)
     if failed_count > 0:
         logger.info("❌ %s app(s) failed to update", failed_count)
 
@@ -1509,7 +1509,7 @@ def display_update_results(results: dict) -> None:  # noqa: C901, PLR0912
 
         # Show summary stats
         if updated:
-            logger.info("🎉 Successfully updated %s app(s)", len(updated))
+            logger.info("\n🎉 Successfully updated %s app(s)", len(updated))
         if failed:
             logger.info("❌ %s app(s) failed to update", len(failed))
         if up_to_date:
