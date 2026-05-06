@@ -1,0 +1,4 @@
+# QOwnNotes - Traditional Hexadecimal SHA256
+# Standard checksum format: hash  filename
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  QOwnNotes-24.1.5-x86_64.AppImage
+a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a  QOwnNotes-24.1.5-aarch64.AppImage

@@ -7,11 +7,11 @@ import pytest
 
 from my_unicorn.constants import VerificationMethod
 from my_unicorn.core.api import Asset
-from my_unicorn.core.verification.context import (
+from my_unicorn.core.verify import (
     VerificationConfig,
     VerificationContext,
+    Verifier,
 )
-from my_unicorn.core.verification.verifier import Verifier
 from my_unicorn.types import ChecksumFileInfo
 
 

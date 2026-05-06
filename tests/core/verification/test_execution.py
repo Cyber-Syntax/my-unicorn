@@ -17,13 +17,13 @@ import pytest
 
 from my_unicorn.constants import VerificationMethod
 from my_unicorn.core.api import Asset
-from my_unicorn.core.verification.context import VerificationContext
-from my_unicorn.core.verification.execution import (
+from my_unicorn.core.verify import (
+    MethodResult,
+    VerificationContext,
     execute_all_verification_methods,
     execute_checksum_file_verification,
     execute_digest_verification,
 )
-from my_unicorn.core.verification.results import MethodResult
 from my_unicorn.types import ChecksumFileInfo
 
 
@@ -114,7 +114,7 @@ class TestExecuteDigestVerification:
     ) -> None:
         """Test successful digest verification."""
         with patch(
-            "my_unicorn.core.verification.execution.verify_digest",
+            "my_unicorn.core.verify.verify_digest",
             new_callable=AsyncMock,
             return_value=MethodResult(
                 passed=True,
@@ -133,7 +133,7 @@ class TestExecuteDigestVerification:
     ) -> None:
         """Test failed digest verification."""
         with patch(
-            "my_unicorn.core.verification.execution.verify_digest",
+            "my_unicorn.core.verify.verify_digest",
             new_callable=AsyncMock,
             return_value=MethodResult(
                 passed=False, hash="expected_hash", details="Hash mismatch"
@@ -183,7 +183,7 @@ class TestExecuteChecksumFileVerification:
             format_type=format_type,
         )
         with patch(
-            "my_unicorn.core.verification.execution.verify_checksum_file",
+            "my_unicorn.core.verify.verify_checksum_file",
             new_callable=AsyncMock,
             return_value=MethodResult(
                 passed=passed,
@@ -243,21 +243,21 @@ class TestExecuteAllVerificationMethods:
 
         with (
             patch(
-                "my_unicorn.core.verification.execution.verify_digest",
+                "my_unicorn.core.verify.verify_digest",
                 new_callable=AsyncMock,
                 return_value=MethodResult(
                     passed=digest_passed, hash="abc123", details="Digest"
                 ),
             ),
             patch(
-                "my_unicorn.core.verification.execution.verify_checksum_file",
+                "my_unicorn.core.verify.verify_checksum_file",
                 new_callable=AsyncMock,
                 return_value=MethodResult(
                     passed=checksum_passed, hash="xyz789", details="Checksum"
                 ),
             ),
             patch(
-                "my_unicorn.core.verification.detection.prioritize_checksum_files",
+                "my_unicorn.core.verify.prioritize_checksum_files",
                 return_value=[checksum_file],
             ),
         ):
@@ -288,7 +288,7 @@ class TestExecuteAllVerificationMethods:
         object.__setattr__(context_with_digest, "checksum_files", None)
 
         with patch(
-            "my_unicorn.core.verification.execution.verify_digest",
+            "my_unicorn.core.verify.verify_digest",
             new_callable=AsyncMock,
             return_value=MethodResult(
                 passed=True, hash="abc123", details="Digest"
@@ -320,14 +320,14 @@ class TestExecuteAllVerificationMethods:
 
         with (
             patch(
-                "my_unicorn.core.verification.execution.verify_checksum_file",
+                "my_unicorn.core.verify.verify_checksum_file",
                 new_callable=AsyncMock,
                 return_value=MethodResult(
                     passed=True, hash="xyz789", details="Checksum"
                 ),
             ),
             patch(
-                "my_unicorn.core.verification.detection.prioritize_checksum_files",
+                "my_unicorn.core.verify.prioritize_checksum_files",
                 return_value=[checksum_file],
             ),
         ):
@@ -380,17 +380,17 @@ class TestExecuteAllVerificationMethods:
 
         with (
             patch(
-                "my_unicorn.core.verification.execution.verify_digest",
+                "my_unicorn.core.verify.verify_digest",
                 new_callable=AsyncMock,
                 side_effect=digest_impl,
             ),
             patch(
-                "my_unicorn.core.verification.execution.verify_checksum_file",
+                "my_unicorn.core.verify.verify_checksum_file",
                 new_callable=AsyncMock,
                 side_effect=checksum_impl,
             ),
             patch(
-                "my_unicorn.core.verification.detection.prioritize_checksum_files",
+                "my_unicorn.core.verify.prioritize_checksum_files",
                 return_value=[checksum_file],
             ),
         ):
@@ -419,19 +419,19 @@ class TestExecuteAllVerificationMethods:
 
         with (
             patch(
-                "my_unicorn.core.verification.execution.verify_digest",
+                "my_unicorn.core.verify.verify_digest",
                 new_callable=AsyncMock,
                 side_effect=RuntimeError("Test error"),
             ),
             patch(
-                "my_unicorn.core.verification.execution.verify_checksum_file",
+                "my_unicorn.core.verify.verify_checksum_file",
                 new_callable=AsyncMock,
                 return_value=MethodResult(
                     passed=True, hash="xyz789", details="Checksum"
                 ),
             ),
             patch(
-                "my_unicorn.core.verification.detection.prioritize_checksum_files",
+                "my_unicorn.core.verify.prioritize_checksum_files",
                 return_value=[checksum_file],
             ),
         ):
@@ -470,21 +470,21 @@ class TestExecuteAllVerificationMethods:
 
         with (
             patch(
-                "my_unicorn.core.verification.execution.verify_digest",
+                "my_unicorn.core.verify.verify_digest",
                 new_callable=AsyncMock,
                 return_value=MethodResult(
                     passed=True, hash="abc123", details="Digest"
                 ),
             ),
             patch(
-                "my_unicorn.core.verification.execution.verify_checksum_file",
+                "my_unicorn.core.verify.verify_checksum_file",
                 new_callable=AsyncMock,
                 return_value=MethodResult(
                     passed=True, hash="xyz789", details="Checksum"
                 ),
             ),
             patch(
-                "my_unicorn.core.verification.detection.prioritize_checksum_files",
+                "my_unicorn.core.verify.prioritize_checksum_files",
                 return_value=[checksum_file],
             ),
         ):

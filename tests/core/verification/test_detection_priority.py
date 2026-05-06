@@ -7,7 +7,7 @@ YAML, etc.) for better verification success.
 
 from __future__ import annotations
 
-from my_unicorn.core.verification.detection import prioritize_checksum_files
+from my_unicorn.core.verify import prioritize_checksum_files
 from my_unicorn.types import ChecksumFileInfo
 
 

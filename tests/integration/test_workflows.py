@@ -30,7 +30,7 @@ from my_unicorn.core.protocols.progress import (
     ProgressType,
 )
 from my_unicorn.core.update import UpdateManager
-from my_unicorn.core.verification.service import VerificationService
+from my_unicorn.core.verify import VerificationService
 from my_unicorn.exceptions import InstallError, UpdateError, VerificationError
 
 

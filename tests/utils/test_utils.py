@@ -1,4 +1,4 @@
-from my_unicorn.core.verification.verifier import format_bytes
+from my_unicorn.core.verify import format_bytes
 from my_unicorn.utils.desktop_utils import (
     create_desktop_entry_name,
     sanitize_filename,

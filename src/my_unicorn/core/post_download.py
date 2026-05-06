@@ -19,7 +19,7 @@ from my_unicorn.core.protocols.progress import (
     NullProgressReporter,
     ProgressReporter,
 )
-from my_unicorn.core.verification import VerificationService
+from my_unicorn.core.verify import VerificationService
 from my_unicorn.logger import get_logger
 from my_unicorn.utils.appimage_setup import (
     create_desktop_entry,

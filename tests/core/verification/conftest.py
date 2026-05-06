@@ -13,7 +13,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from my_unicorn.core.api import Asset
-from my_unicorn.core.verification.service import VerificationService
+from my_unicorn.core.verify import VerificationService
 
 
 @pytest.fixture

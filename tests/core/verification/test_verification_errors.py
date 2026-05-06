@@ -16,7 +16,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from my_unicorn.core.api import Asset
-from my_unicorn.core.verification.service import VerificationService
+from my_unicorn.core.verify import VerificationService
 
 # Test data constants - SHA256 hash of b"test content"
 TEST_HASH = "6ae8a75555209fd6c44157c0aed8016e763ff435a19cf186f76863140143ff72"

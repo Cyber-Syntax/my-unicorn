@@ -19,8 +19,6 @@ CHECKSUM_FILE_PATTERNS = [
     r".*checksums?\.txt$",
     r".*checksums?\.yml$",
     r".*checksums?\.yaml$",
-    r".*checksums?\.md5$",
-    r".*checksums?\.sha1$",
     r".*checksums?\.sha256$",
     r".*checksums?\.sha512$",
     r"SHA\d+SUMS?(\.txt)?$",
@@ -37,8 +35,6 @@ CHECKSUM_FILE_PATTERNS = [
 SPECIFIC_CHECKSUM_EXTENSIONS = [
     ".sha256sum",
     ".sha512sum",
-    ".sha1sum",
-    ".md5sum",
     ".digest",
     ".sum",
     ".hash",

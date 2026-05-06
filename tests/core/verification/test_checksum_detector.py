@@ -9,7 +9,7 @@ Functions tested:
 
 from unittest.mock import patch
 
-from my_unicorn.core.verification.checksum_parser import (
+from my_unicorn.core.checksum_parser import (
     detect_hash_type_from_checksum_filename,
     find_checksum_entry,
     parse_all_checksums,
@@ -96,7 +96,7 @@ def test_find_checksum_entry_yaml_not_found() -> None:
 
 
 @patch(
-    "my_unicorn.core.verification.checksum_parser.yaml_parser._YAML_AVAILABLE",
+    "my_unicorn.core.checksum_parser._YAML_AVAILABLE",
     False,
 )
 def test_find_checksum_entry_yaml_not_available() -> None:
@@ -206,8 +206,6 @@ def test_detect_hash_type_from_filename() -> None:
     assert (
         detect_hash_type_from_checksum_filename("SHA256SUMS.txt") == "sha256"
     )
-    assert detect_hash_type_from_checksum_filename("checksums.sha1") == "sha1"
-    assert detect_hash_type_from_checksum_filename("hashes.md5") == "md5"
     assert (
         detect_hash_type_from_checksum_filename("latest-linux.yml") == "sha512"
     )
@@ -219,7 +217,6 @@ def test_detect_hash_type_from_hyphenated_filename() -> None:
     assert (
         detect_hash_type_from_checksum_filename("SHA-256SUMS.txt") == "sha256"
     )
-    assert detect_hash_type_from_checksum_filename("checksums.sha-1") == "sha1"
 
 
 class TestParseAllChecksums:

@@ -7,7 +7,7 @@ format in addition to the legacy {"skip": True} format.
 
 from __future__ import annotations
 
-from my_unicorn.core.verification.detection import should_skip_verification
+from my_unicorn.core.verify import should_skip_verification
 
 
 class TestCatalogMethodSkipFormat:
