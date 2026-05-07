@@ -1,4 +1,6 @@
 # UI Documentation
+> [!WARNING] 
+> This design is currently in use but going to change to pacman-style design which will be more easy to develop which current one is complex.
 
 Welcome to the UI documentation for my-unicorn! This guide shows you what the command-line interface looks like during different operations. Each example demonstrates real output, so you can see exactly what happens when you run commands.
 
@@ -18,20 +20,30 @@ my-unicorn install weektodo
 
 ```
 Fetching from API:
-GitHub Releases      1/1 Retrieved from cache
+GitHub Releases      3/3 Retrieved
 
-Downloading:
-WeekToDo-2.2.0  108.6 MiB  11.2 MB/s 00:00 [==============================]   100% ✓
+Downloading (3):
+AppFlowy-0.11.1-linux-x86_64   77.6 MiB   5.3 MB/s 00:00 [==============================]   100% ✓
+QOwnNotes-x86_64               41.6 MiB   4.5 MB/s 00:00 [==============================]   100% ✓
+WeekToDo-2.2.0                108.6 MiB  10.7 MB/s 00:00 [==============================]   100% ✓
 
 Installing:
+(1/2) Verifying qownnotes ✓
+(2/2) Installing qownnotes ✓
+(1/2) Verifying appflowy ✓
+(2/2) Installing appflowy ✓
 (1/2) Verifying weektodo !
     not verified (dev did not provide checksums)
 (2/2) Installing weektodo ✓
 
+
 Installation Summary:
 --------------------------------------------------
+appflowy                  ✓ 0.11.1
+qownnotes                 ✓ 26.2.4
 weektodo                  ✓ 2.2.0
                              ! Not verified - developer did not provide checksums
+
 ```
 
 #### Example: Installing from a GitHub URL with partial verification
@@ -66,25 +78,31 @@ When everything verifies perfectly, you get clean output.
 #### Example: Fresh install from API
 
 ```bash
-my-unicorn install qownnotes
+my-unicorn install qownnotes appflowy
 ```
 
 **Output:**
 
 ```
 Fetching from API:
-GitHub Releases      1/1 Retrieved
+GitHub Releases      2/2 Retrieved
 
-Downloading:
-QOwnNotes-x86_64   41.6 MiB  19.8 MB/s 00:00 [==============================]   100% ✓
+Downloading (2):
+AppFlowy-0.11.1-linux-x86_64   77.6 MiB  10.8 MB/s 00:00 [==============================]   100% ✓
+QOwnNotes-x86_64               41.6 MiB   3.6 MB/s 00:00 [==============================]   100% ✓
 
 Installing:
 (1/2) Verifying qownnotes ✓
 (2/2) Installing qownnotes ✓
+(1/2) Verifying appflowy ✓
+(2/2) Installing appflowy ✓
+
 
 Installation Summary:
 --------------------------------------------------
-qownnotes                 ✓ 26.2.0
+appflowy                  ✓ 0.11.1
+qownnotes                 ✓ 26.2.4
+
 ```
 
 ## Update Examples
@@ -124,18 +142,18 @@ Fetching from API:
 GitHub Releases      2/2 Retrieved from cache
 
 Downloading:
-helium-0.10.2.1-x86_64  143.9 MiB  10.8 MB/s 00:00 [==============================]   100% ✓
+QOwnNotes-x86_64   57.8 MiB  10.0 MB/s 00:00 [==============================]   100% ✓
 
 Installing:
-(1/2) Verifying helium-linux ✓
-(2/2) Installing helium-linux ✓
-
+(1/2) Verifying qownnotes ✓
+(2/2) Installing qownnotes ✓
 
 Update Summary:
 --------------------------------------------------
-helium-linux              ✓ 0.9.4.1 → 0.10.2.1
-nuclear                   × Update failed
+qownnotes                 ✓ 0.1.0 → 26.5.5
+ytmdesktop                × Update failed
                              → AppImage not found in release - may still be building
+appflowy                  Already up to date (0.11.8)
 ```
 
 ## Remove Examples
@@ -282,6 +300,35 @@ freetube                  Already up to date (0.23.13-beta)
 appflowy                  Already up to date (0.11.1)
 ```
 
+### Example: already installed
+
+```bash
+my-unicorn install appflowy qownnotes
+```
+
+**Output:**
+
+```
+✓ All 2 specified app(s) are already installed:
+   - appflowy
+   - qownnotes
+```
+
+### Example: already updated
+
+```bash
+my-unicorn install appflowy qownnotes
+```
+
+**Output:**
+
+```
+Update Summary:
+--------------------------------------------------
+qownnotes                 Already up to date (26.5.5)
+appflowy                  Already up to date (0.11.8)
+```
+
 ## Understanding the Output
 
 ### API Fetching Phase
@@ -304,4 +351,4 @@ Shows progress bars with speed and completion status.
 
 - **✓**: Successfully installed/updated
 - **!**: Warnings present
-- **ℹ️**: Already installed (no action needed)
+- Already installed (no action needed)
