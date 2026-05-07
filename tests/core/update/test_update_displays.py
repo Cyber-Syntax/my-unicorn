@@ -132,7 +132,6 @@ class TestDisplayUpdateResults:
         assert "app1" in captured
         assert "✅" in captured
         assert "1.0.0 → 2.0.0" in captured
-        assert "Successfully updated 1 app(s)" in captured
 
     def test_display_update_results_with_failures(self, caplog):
         """Test display_update_results with failed updates."""
@@ -158,7 +157,6 @@ class TestDisplayUpdateResults:
         assert "app1" in captured
         assert "❌ Update failed" in captured
         assert "Network timeout" in captured
-        assert "1 app(s) failed to update" in captured
 
     def test_display_update_results_with_up_to_date(self, caplog):
         """Test display_update_results with up-to-date apps."""

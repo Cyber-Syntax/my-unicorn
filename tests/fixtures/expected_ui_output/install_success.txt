@@ -16,5 +16,3 @@ Installing:
 --------------------------------------------------
 appflowy                  ✅ 0.11.1
 qownnotes                 ✅ 26.2.4
-
-🎉 Successfully installed 2 app(s)

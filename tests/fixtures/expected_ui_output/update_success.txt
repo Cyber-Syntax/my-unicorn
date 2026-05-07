@@ -15,6 +15,3 @@ Installing:
 --------------------------------------------------
 qownnotes                 ✅ 26.2.1 → 26.2.4
 appflowy                  ✅ 0.11.0 → 0.11.1
-
-🎉 Successfully updated 2 app(s)
-

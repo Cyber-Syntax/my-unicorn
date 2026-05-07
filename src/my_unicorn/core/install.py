@@ -122,22 +122,6 @@ def _print_result_line(result: dict[str, Any]) -> None:
         logger.warning("%-25s    ⚠️  %s", "", result["warning"])
 
 
-def _print_statistics(categories: dict[str, list]) -> None:
-    """Print final installation statistics."""
-    if categories["newly_installed"]:
-        count = len(categories["newly_installed"])
-        logger.info("\n🎉 Successfully installed %s app(s)", count)
-    if categories["with_warnings"]:
-        count = len(categories["with_warnings"])
-        logger.warning("⚠️  %s app(s) installed with warnings", count)
-    if categories["already_installed"]:
-        count = len(categories["already_installed"])
-        logger.info("ℹ️  %s app(s) already installed", count)
-    if categories["failed"]:
-        count = len(categories["failed"])
-        logger.error("❌ %s app(s) failed to install", count)
-
-
 def print_install_summary(results: list[dict[str, Any]]) -> None:
     """Print an installation summary to stdout."""
     if not results:
@@ -155,8 +139,6 @@ def print_install_summary(results: list[dict[str, Any]]) -> None:
 
     for result in results:
         _print_result_line(result)
-
-    _print_statistics(categories)
 
 
 def display_no_targets_error() -> None:

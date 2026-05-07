@@ -124,7 +124,6 @@ class TestInstallSummaryUI:
         assert "qownnotes" in output
         assert "✅" in output
         assert "26.2.4" in output
-        assert "🎉 Successfully installed 1 app(s)" in output
 
     def test_install_summary_with_warnings_ui(
         self, caplog: pytest.LogCaptureFixture
@@ -159,8 +158,6 @@ class TestInstallSummaryUI:
         assert "2.2.0" in output
         assert "⚠️" in output
         assert "developer did not provide checksums" in output
-        assert "🎉 Successfully installed 1 app(s)" in output
-        assert "⚠️  1 app(s) installed with warnings" in output
 
     def test_install_summary_alignment_ui(
         self, caplog: pytest.LogCaptureFixture
@@ -240,11 +237,6 @@ class TestInstallSummaryUI:
         assert "-" * 50 in output
         assert "appflowy" in output
         assert "qownnotes" in output
-        assert "🎉 Successfully installed 2 app(s)" in output
-        # Should not show other stats after successful message
-        success_split = output.split("🎉")
-        if len(success_split) > 1:
-            assert "⚠️" not in success_split[0]
 
     def test_install_all_already_installed(
         self, caplog: pytest.LogCaptureFixture
@@ -316,7 +308,6 @@ class TestUpdateSummaryUI:
         assert "qownnotes" in output
         assert "✅" in output
         assert "26.2.1 → 26.2.4" in output
-        assert "🎉 Successfully updated 1 app(s)" in output
 
     def test_update_summary_already_updated_ui(
         self, caplog: pytest.LogCaptureFixture
@@ -399,7 +390,6 @@ class TestUpdateSummaryUI:
         assert "appflowy" in output
         assert "26.2.1 → 26.2.4" in output
         assert "0.11.0 → 0.11.1" in output
-        assert "🎉 Successfully updated 2 app(s)" in output
 
     def test_update_summary_mixed_states_ui(
         self, caplog: pytest.LogCaptureFixture
@@ -514,7 +504,6 @@ class TestSummaryUIFixtureValidation:
         assert "-" * 50 in normalized_summary
         assert "→" in normalized_summary  # Version change arrow
         assert "✅" in normalized_summary
-        assert "🎉 Successfully updated" in normalized_summary
 
     def test_install_warning_matches_fixture_format(
         self, install_warning_output: str
@@ -567,7 +556,7 @@ class TestSummaryUIFixtureValidation:
 @pytest.fixture
 def update_summary_full_output() -> str:
     fixture_path = (
-        Path(__file__).resolve().parents[2] 
+        Path(__file__).resolve().parents[2]
         / "fixtures"
         / "expected_ui_output"
         / "update_summary.txt"

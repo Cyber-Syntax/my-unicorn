@@ -4,7 +4,3 @@ qownnotes                 ✅ 26.5.1 → 26.5.4
 ytmdesktop                ❌ Update failed
                              → AppImage not found in release - may still be building
 appflowy                  ℹ️  Already up to date (0.11.8)
-
-🎉 Successfully updated 1 app(s)
-❌ 1 app(s) failed to update
-ℹ️  1 app(s) already up to date

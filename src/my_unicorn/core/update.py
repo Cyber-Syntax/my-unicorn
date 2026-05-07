@@ -1251,7 +1251,7 @@ def display_check_results(results: dict) -> None:
         logger.info("✅ All apps are up to date")
 
 
-def display_update_results(results: dict) -> None:  # noqa: C901, PLR0912
+def display_update_results(results: dict) -> None:
     """Display update operation results from update service.
 
     Args:
@@ -1302,16 +1302,6 @@ def display_update_results(results: dict) -> None:  # noqa: C901, PLR0912
             else:
                 logger.info("%-25s ℹ️  Already up to date", app_name)  # noqa: RUF001
 
-        # Show summary stats
-        if updated:
-            logger.info("\n🎉 Successfully updated %s app(s)", len(updated))
-        if failed:
-            logger.info("❌ %s app(s) failed to update", len(failed))
-        if up_to_date:
-            info_icon = "ℹ️"  # noqa: RUF001
-            logger.info(
-                "%s  %s app(s) already up to date", info_icon, len(up_to_date)
-            )
     else:
         # Fallback to simple logger output
         if updated:

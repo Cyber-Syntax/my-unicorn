@@ -32,9 +32,6 @@ Installing:
 --------------------------------------------------
 weektodo                  ✅ 2.2.0
                              ⚠️  Not verified - developer did not provide checksums
-
-🎉 Successfully installed 1 app(s)
-⚠️  1 app(s) installed with warnings
 ```
 
 #### Example: Installing from a GitHub URL with partial verification
@@ -60,9 +57,6 @@ Installing:
 --------------------------------------------------
 legcord                   ✅ 1.2.1
                              ⚠️  Partial verification: 2 passed, 1 failed
-
-🎉 Successfully installed 1 app(s)
-⚠️  1 app(s) installed with warnings
 ```
 
 ### Without Warnings
@@ -91,8 +85,6 @@ Installing:
 📦 Installation Summary:
 --------------------------------------------------
 qownnotes                 ✅ 26.2.0
-
-🎉 Successfully installed 1 app(s)
 ```
 
 ## Update Examples
@@ -120,10 +112,7 @@ Installing:
 
 📦 Update Summary:
 --------------------------------------------------
-Successfully updated qownnotes
 qownnotes                 ✅ 0.1.0 → 26.2.0
-
-🎉 Successfully updated 1 app(s)
 ```
 
 #### Example may still building
@@ -147,9 +136,6 @@ Installing:
 helium-linux              ✅ 0.9.4.1 → 0.10.2.1
 nuclear                   ❌ Update failed
                              → AppImage not found in release - may still be building
-
-🎉 Successfully updated 1 app(s)
-❌ 1 app(s) failed to update
 ```
 
 ## Remove Examples
@@ -205,9 +191,6 @@ legcord                   ✅ 1.2.1
 flameshot                 ✅ 13.3.0
 appflowy                  ℹ️  Already installed
 standard-notes            ℹ️  Already installed
-
-🎉 Successfully installed 2 app(s)
-ℹ️  2 app(s) already installed
 ```
 
 ### Example: Updating multiple apps
@@ -248,8 +231,6 @@ flameshot                 ✅ 0.1.0 → 13.3.0
 appflowy                  ✅ 0.1.0 → 0.11.1
 keepassxc                 ✅ 0.1.0 → 2.7.11
 standard-notes            ✅ 0.1.0 → 3.201.10
-
-🎉 Successfully updated 5 app(s)
 ```
 
 ### Example: Updating all installed apps
@@ -299,9 +280,6 @@ beekeeper-studio          ℹ️  Already up to date (5.5.6)
 standard-notes            ℹ️  Already up to date (3.201.10)
 freetube                  ℹ️  Already up to date (0.23.13-beta)
 appflowy                  ℹ️  Already up to date (0.11.1)
-
-🎉 Successfully updated 3 app(s)
-ℹ️  16 app(s) already up to date
 ```
 
 ## Understanding the Output

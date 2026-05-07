@@ -156,9 +156,6 @@ def test_print_install_summary_all_successful(
     assert "✅ v1.3.2" in output
     assert "✅ v4.1.0" in output
 
-    # Verify statistics
-    assert "🎉 Successfully installed 3 app(s)" in output
-
 
 def test_print_install_summary_all_already_installed(
     caplog: pytest.LogCaptureFixture,
@@ -210,11 +207,6 @@ def test_print_install_summary_mixed_results(
     assert "⚠️" in output
     assert "Desktop entry creation failed but app is installed" in output
 
-    # Verify statistics
-    assert "🎉 Successfully installed 2 app(s)" in output
-    assert "❌ 1 app(s) failed to install" in output
-    assert "ℹ️  1 app(s) already installed" in output  # noqa: RUF001
-
 
 def test_print_install_summary_all_failed(
     caplog: pytest.LogCaptureFixture,
@@ -246,9 +238,6 @@ def test_print_install_summary_all_failed(
     assert "app2" in output
     assert "Network error" in output
     assert "Hash verification failed" in output
-
-    # Verify statistics
-    assert "❌ 2 app(s) failed to install" in output
 
 
 def test_print_install_summary_with_warnings(
@@ -285,9 +274,6 @@ def test_print_install_summary_with_warnings(
     # Verify warnings are displayed
     assert "⚠️  Failed to create desktop entry" in output
     assert "⚠️  Custom warning message" in output
-
-    # Verify warning count in statistics
-    assert "⚠️  2 app(s) installed with warnings" in output
 
 
 def test_print_install_summary_empty_results(
