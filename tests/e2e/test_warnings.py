@@ -11,7 +11,7 @@ from tests.e2e.warnings import (
 
 def test_find_partial_verifications_from_cli_summary() -> None:
     """Detect partial verification from user-facing install summary."""
-    text = "⚠️  Partial verification: 2 passed, 1 failed"
+    text = "! Partial verification: 2 passed, 1 failed"
 
     matches = find_partial_verifications(text, "legcord")
 

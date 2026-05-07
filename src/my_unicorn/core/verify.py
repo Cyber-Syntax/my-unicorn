@@ -616,14 +616,14 @@ class VerificationService:
         logger.debug(
             "   🔐 Strong methods available: %s", strong_methods_available
         )
-        logger.debug("   ✅ Verification passed: %s", overall_passed)
+        logger.debug("   ✓ Verification passed: %s", overall_passed)
         methods = context.verification_methods or {}
         logger.debug("   📋 Methods used: %s", list(methods.keys()))
         for method, result in methods.items():
             logger.debug(
                 "      %s: %s",
                 method,
-                "✅ PASS" if result.get("passed") else "❌ FAIL",
+                "✓ PASS" if result.get("passed") else "× FAIL",
             )
 
     async def _finish_progress(
@@ -718,7 +718,7 @@ class Verifier:
                 f"{file_size:,}",
             )
         else:
-            logger.warning("⚠️  File does not exist: %s", self.file_path)
+            logger.warning("! File does not exist: %s", self.file_path)
 
     def verify_digest(self, expected_digest: str) -> None:
         """Verify the file against a GitHub API digest string.
@@ -742,18 +742,18 @@ class Verifier:
 
         if not expected_digest:
             msg = "Digest cannot be empty"
-            logger.error("❌ %s", msg)
+            logger.error("× %s", msg)
             raise ValueError(msg)
 
         algo, _, hash_value = expected_digest.partition(":")
         if not hash_value:
             msg = f"Invalid digest format: {expected_digest}"
-            logger.error("❌ %s", msg)
+            logger.error("× %s", msg)
             raise ValueError(msg)
 
         if algo not in SUPPORTED_HASH_ALGORITHMS:
             msg = f"Unsupported digest algorithm: {algo}"
-            logger.error("❌ %s", msg)
+            logger.error("× %s", msg)
             raise ValueError(msg)
 
         logger.debug("   Algorithm: %s", algo.upper())
@@ -769,14 +769,14 @@ class Verifier:
                 f"Expected: {hash_value}\n"
                 f"Actual:   {actual_hash}"
             )
-            logger.error("❌ Digest verification FAILED!")
+            logger.error("× Digest verification FAILED!")
             logger.error("   Expected:  %s", hash_value)
             logger.error("   Actual:    %s", actual_hash)
             logger.error("   Algorithm: %s", algo.upper())
             logger.error("   File:      %s", self.file_path)
             raise ValueError(msg)
 
-        logger.debug("✅ Digest verification PASSED!")
+        logger.debug("✓ Digest verification PASSED!")
         logger.debug("   Algorithm: %s", algo.upper())
         logger.debug("   Hash: %s", actual_hash)
 
@@ -808,13 +808,13 @@ class Verifier:
                 f"Expected: {expected_hash}\n"
                 f"Actual:   {actual_hash}"
             )
-            logger.error("❌ %s verification FAILED!", hash_type.upper())
+            logger.error("× %s verification FAILED!", hash_type.upper())
             logger.error("   Expected: %s", expected_hash)
             logger.error("   Actual:   %s", actual_hash)
             logger.error("   File: %s", self.file_path)
             raise ValueError(msg)
 
-        logger.debug("✅ %s verification PASSED!", hash_type.upper())
+        logger.debug("✓ %s verification PASSED!", hash_type.upper())
         logger.debug("   Hash: %s", actual_hash)
 
     def compute_hash(self, hash_type: HashType) -> str:
@@ -856,7 +856,7 @@ class Verifier:
         """
         if not self.file_path.exists():
             msg = f"File not found: {self.file_path}"
-            logger.error("❌ %s", msg)
+            logger.error("× %s", msg)
             raise FileNotFoundError(msg)
 
         file_size = self.file_path.stat().st_size
@@ -895,7 +895,7 @@ class Verifier:
         """
         if not self.file_path.exists():
             msg = f"File not found: {self.file_path}"
-            logger.error("❌ %s", msg)
+            logger.error("× %s", msg)
             raise FileNotFoundError(msg)
 
         hash_algorithms = {
@@ -905,7 +905,7 @@ class Verifier:
 
         if hash_type not in hash_algorithms:
             msg = f"Unsupported hash type: {hash_type}"
-            logger.error("❌ %s", msg)
+            logger.error("× %s", msg)
             raise ValueError(msg)
 
         logger.debug(
@@ -976,11 +976,11 @@ class Verifier:
 
         if not expected_hash:
             msg = f"Hash for {target_filename} not found in checksum file"
-            logger.error("❌ %s", msg)
+            logger.error("× %s", msg)
             logger.debug("   Checksum file content:\n%s", checksum_content)
             raise ValueError(msg)
 
-        logger.debug("✅ Found expected hash in checksum file")
+        logger.debug("✓ Found expected hash in checksum file")
         logger.debug("   Expected hash: %s", expected_hash)
 
         self.verify_hash(expected_hash, hash_type)
@@ -1384,13 +1384,13 @@ def check_digest_availability(asset: Asset, config: dict[str, Any]) -> bool:
 
     if digest_requested and not has_digest:
         logger.warning(
-            "⚠️  Digest verification requested but no digest available "
+            "! Digest verification requested but no digest available "
             "from GitHub API"
         )
-        logger.debug("   📦 Asset digest field: '%s'", digest_value or "None")
+        logger.debug("   Asset digest field: '%s'", digest_value or "None")
     elif has_digest:
         logger.debug(
-            "✅ Digest available for verification: %s…",
+            "✓ Digest available for verification: %s…",
             digest_value[:16],
         )
 

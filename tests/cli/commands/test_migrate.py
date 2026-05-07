@@ -291,7 +291,7 @@ class TestMigrateHandler:
             result = await handler._migrate_app_configs()
 
             assert result == {"migrated": 0, "errors": 1}
-            assert "❌ testapp" in caplog.text
+            assert "× testapp" in caplog.text
             assert "Migration failed" in caplog.text
 
     @pytest.mark.asyncio
@@ -398,7 +398,7 @@ class TestMigrateHandler:
             result = await handler._migrate_catalog_configs()
 
             assert result == {"migrated": 0, "errors": 1}
-            assert "❌" in caplog.text
+            assert "×" in caplog.text
 
     @pytest.mark.asyncio
     async def test_migrate_catalog_configs_exception_handling(

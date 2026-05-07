@@ -14,7 +14,7 @@ def test_print_installation_summary_all_already_installed(caplog):
     print_install_summary(results)
     captured = caplog.text
     assert "All 1 specified app(s) are already installed" in captured
-    assert "• app1" in captured
+    assert "- app1" in captured
 
 
 def test_print_installation_summary_mixed(caplog):

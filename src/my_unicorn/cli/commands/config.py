@@ -53,4 +53,4 @@ class ConfigHandler(BaseCommandHandler):
 
         # Load fresh config (which will create defaults)
         self.config_manager.load_global_config()
-        logger.info("✅ Configuration reset to defaults")
+        logger.info("✓ Configuration reset to defaults")

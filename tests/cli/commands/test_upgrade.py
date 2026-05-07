@@ -54,7 +54,7 @@ async def test_execute_perform_update_failure() -> None:
         mock_check.assert_called_once()
         mock_perform.assert_called_once_with("2.0.1")
         mock_logger.info.assert_any_call(
-            "❌ Upgrade failed. Please try again or update manually."
+            "× Upgrade failed. Please try again or update manually."
         )
 
 
@@ -121,7 +121,7 @@ async def test_execute_check_version_newer_available() -> None:
             "2.0.0",
             "2.0.1",
         )
-        mock_logger.info.assert_any_call("✅ A newer version is available!")
+        mock_logger.info.assert_any_call("✓ A newer version is available!")
 
 
 @pytest.mark.asyncio

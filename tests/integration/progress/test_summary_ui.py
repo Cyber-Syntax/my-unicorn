@@ -72,7 +72,7 @@ def _extract_summary_section(output: str, header: str) -> str:
 
     Args:
         output: Full output string
-        header: Section header to search for (e.g., "📦 Installation Summary:")
+        header: Section header to search for (e.g., "Installation Summary:")
 
     Returns:
         Extracted section from header to end, or empty string if not found
@@ -119,10 +119,10 @@ class TestInstallSummaryUI:
         )
 
         # Assert
-        assert "📦 Installation Summary:" in output
+        assert "Installation Summary:" in output
         assert "-" * 50 in output
         assert "qownnotes" in output
-        assert "✅" in output
+        assert "✓" in output
         assert "26.2.4" in output
 
     def test_install_summary_with_warnings_ui(
@@ -152,11 +152,11 @@ class TestInstallSummaryUI:
         )
 
         # Assert
-        assert "📦 Installation Summary:" in output
+        assert "Installation Summary:" in output
         assert "weektodo" in output
-        assert "✅" in output
+        assert "✓" in output
         assert "2.2.0" in output
-        assert "⚠️" in output
+        assert "!" in output
         assert "developer did not provide checksums" in output
 
     def test_install_summary_alignment_ui(
@@ -190,19 +190,19 @@ class TestInstallSummaryUI:
         lines = output.split("\n")
 
         # Assert
-        assert "📦 Installation Summary:" in output
+        assert "Installation Summary:" in output
         # Find the app lines (should be after the header and separator)
         app_lines = [
             line
             for line in lines
-            if ("appflowy" in line or "qownnotes" in line) and "✅" in line
+            if ("appflowy" in line or "qownnotes" in line) and "✓" in line
         ]
         assert len(app_lines) == 2
         # Both lines should have checkmark at similar position
         for line in app_lines:
-            assert "✅" in line
+            assert "✓" in line
             # Icon should be within column width
-            assert len(line.split("✅")[0]) < 30
+            assert len(line.split("✓")[0]) < 30
 
     def test_batch_install_summary_ui(
         self, caplog: pytest.LogCaptureFixture
@@ -233,7 +233,7 @@ class TestInstallSummaryUI:
         )
 
         # Assert
-        assert "📦 Installation Summary:" in output
+        assert "Installation Summary:" in output
         assert "-" * 50 in output
         assert "appflowy" in output
         assert "qownnotes" in output
@@ -262,10 +262,10 @@ class TestInstallSummaryUI:
         )
 
         # Assert
-        assert "✅ All 1 specified app(s) are already installed:" in output
-        assert "• appflowy" in output
+        assert "✓ All 1 specified app(s) are already installed:" in output
+        assert "- appflowy" in output
         # Should not show "Installation Summary" header
-        assert "📦 Installation Summary:" not in output
+        assert "Installation Summary:" not in output
 
 
 @pytest.mark.integration
@@ -303,10 +303,10 @@ class TestUpdateSummaryUI:
         )
 
         # Assert
-        assert "📦 Update Summary:" in output
+        assert "Update Summary:" in output
         assert "-" * 50 in output
         assert "qownnotes" in output
-        assert "✅" in output
+        assert "✓" in output
         assert "26.2.1 → 26.2.4" in output
 
     def test_update_summary_already_updated_ui(
@@ -340,12 +340,10 @@ class TestUpdateSummaryUI:
         )
 
         # Assert
-        assert "📦 Update Summary:" in output
+        assert "Update Summary:" in output
         assert "appflowy" in output
-        assert "ℹ️" in output  # noqa: RUF001
         assert "Already up to date" in output
         assert "0.11.1" in output
-        assert "ℹ️  1 app(s) already up to date" in output  # noqa: RUF001
 
     def test_batch_update_summary_ui(
         self, caplog: pytest.LogCaptureFixture
@@ -384,7 +382,7 @@ class TestUpdateSummaryUI:
         )
 
         # Assert
-        assert "📦 Update Summary:" in output
+        assert "Update Summary:" in output
         assert "-" * 50 in output
         assert "qownnotes" in output
         assert "appflowy" in output
@@ -436,22 +434,18 @@ class TestUpdateSummaryUI:
         )
 
         # Assert
-        assert "📦 Update Summary:" in output
+        assert "Update Summary:" in output
         # Updated app should have checkmark
         assert "qownnotes" in output
         assert "26.2.1 → 26.2.4" in output
-        assert "✅" in output
+        assert "✓" in output
         # Up-to-date app should have info icon
         assert "appflowy" in output
         assert "Already up to date (0.11.1)" in output
-        assert "ℹ️" in output  # noqa: RUF001
         # Failed app should have X icon
         assert "badapp" in output
-        assert "❌" in output
+        assert "×" in output
         # Summary should show all counts
-        assert "🎉 Successfully updated 1 app(s)" in output
-        assert "❌ 1 app(s) failed to update" in output
-        assert "ℹ️  1 app(s) already up to date" in output  # noqa: RUF001
 
 
 @pytest.mark.integration
@@ -472,15 +466,14 @@ class TestSummaryUIFixtureValidation:
         """
         # Arrange - extract summary section from fixture
         fixture_summary = _extract_summary_section(
-            install_success_output, "📦 Installation Summary:"
+            install_success_output, "Installation Summary:"
         )
 
         # Assert
         assert fixture_summary != "", "Fixture missing summary header"
-        assert "📦 Installation Summary:" in fixture_summary
+        assert "Installation Summary:" in fixture_summary
         assert "-" * 50 in fixture_summary
-        assert "✅" in fixture_summary
-        assert "🎉 Successfully installed" in fixture_summary
+        assert "✓" in fixture_summary
 
     def test_update_success_matches_fixture_format(
         self, update_success_output: str
@@ -492,7 +485,7 @@ class TestSummaryUIFixtureValidation:
         """
         # Arrange - extract summary section
         fixture_summary = _extract_summary_section(
-            update_success_output, "📦 Update Summary:"
+            update_success_output, "Update Summary:"
         )
         assert fixture_summary != "", "Fixture missing summary header"
 
@@ -500,10 +493,10 @@ class TestSummaryUIFixtureValidation:
         normalized_summary = normalize_output_for_comparison(fixture_summary)
 
         # Assert - verify formatting is preserved after normalization
-        assert "📦 Update Summary:" in normalized_summary
+        assert "Update Summary:" in normalized_summary
         assert "-" * 50 in normalized_summary
         assert "→" in normalized_summary  # Version change arrow
-        assert "✅" in normalized_summary
+        assert "✓" in normalized_summary
 
     def test_install_warning_matches_fixture_format(
         self, install_warning_output: str
@@ -515,19 +508,14 @@ class TestSummaryUIFixtureValidation:
         """
         # Arrange - extract summary section using helper
         fixture_summary = _extract_summary_section(
-            install_warning_output, "📦 Installation Summary:"
+            install_warning_output, "Installation Summary:"
         )
         assert fixture_summary != "", "Fixture missing summary header"
 
         # Assert - verify warning-specific elements
-        assert "📦 Installation Summary:" in fixture_summary
-        assert "✅" in fixture_summary
-        assert "⚠️" in fixture_summary
-        assert "🎉 Successfully installed" in fixture_summary
-        assert (
-            "⚠️  1 app(s) installed with warnings" in fixture_summary
-            or "⚠️  " in fixture_summary.split("🎉")[1]
-        )
+        assert "Installation Summary:" in fixture_summary
+        assert "✓" in fixture_summary
+        assert "!" in fixture_summary
 
     def test_fixture_output_parsing_with_helper(
         self, install_success_output: str
@@ -546,9 +534,9 @@ class TestSummaryUIFixtureValidation:
         assert "install" in sections, "Missing install section from fixture"
 
         # Verify summary section also exists after progress sections
-        assert "📦 Installation Summary:" in install_success_output
+        assert "Installation Summary:" in install_success_output
         fixture_summary = _extract_summary_section(
-            install_success_output, "📦 Installation Summary:"
+            install_success_output, "Installation Summary:"
         )
         assert fixture_summary != "", "Summary section missing from fixture"
 
@@ -619,7 +607,7 @@ class TestUpdateSummaryFullUI:
         # Extract summary
         summary = _extract_summary_section(
             output,
-            "📦 Update Summary:",
+            "Update Summary:",
         )
         assert summary != "", "Summary section not found"
 

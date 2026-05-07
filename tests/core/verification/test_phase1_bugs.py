@@ -28,7 +28,7 @@ class TestSkipVerificationBug:
 
         Bug: _prepare_verification was returning passed=True for skipped
         verification, which caused config to persist "passed": true and
-        suppressed the "⚠️ Not verified" warning.
+        suppressed the "!Not verified" warning.
 
         Fix: Return passed=False when verification is skipped.
         """

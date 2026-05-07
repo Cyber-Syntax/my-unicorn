@@ -50,7 +50,7 @@ def main() -> None:
         logger.info("CLI cancelled by user")
         sys.exit(1)
     except Exception:
-        logger.exception("❌ Unexpected error")
+        logger.exception("× Unexpected error")
         sys.exit(1)
 
 

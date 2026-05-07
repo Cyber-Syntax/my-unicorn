@@ -52,14 +52,14 @@ class CatalogService:
         try:
             info = self.get_app_display_info(app_name)
         except (FileNotFoundError, ValueError):
-            logger.info("❌ App '%s' not found in catalog", app_name)
+            logger.info("× App '%s' not found in catalog", app_name)
             logger.exception("Failed to load catalog entry for %s", app_name)
             return
 
         is_installed = self.is_app_installed(app_name)
         status = "Installed" if is_installed else "Not installed"
 
-        logger.info("📦 %s", info["display_name"])
+        logger.info("%s", info["display_name"])
         logger.info("")
         logger.info("  %s", info["description"])
         logger.info("")
@@ -82,7 +82,7 @@ class CatalogService:
         app_details = self.list_installed_with_details()
         logger.info("Listing %d installed apps", len(app_details))
 
-        logger.info("📦 Installed AppImages:")
+        logger.info("Installed AppImages:")
 
         if not app_details:
             logger.info("  None found")

@@ -420,4 +420,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
         f.write(result.stdout)
         f.write("```\n")
 
-    print(f"\n✅ Integration test passed! Results written to {output_file}")
+    print(f"\n✓ Integration test passed! Results written to {output_file}")

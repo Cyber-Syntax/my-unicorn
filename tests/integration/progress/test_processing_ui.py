@@ -66,7 +66,7 @@ class TestVerificationWarningUI:
     """Test suite for verification warnings display."""
 
     def test_verification_warning_ui(self) -> None:
-        """Verify '⚠ not verified (dev did not provide checksums)' format."""
+        """Verify '! not verified (dev did not provide checksums)' format."""
         # Arrange - create a verification with warning
         task = TaskState(
             task_id="v1",
@@ -97,7 +97,7 @@ class TestVerificationWarningUI:
         assert "(1/2)" in output
         assert "Verifying" in output
         assert "weektodo" in output
-        assert "⚠" in output  # Warning symbol
+        assert "!" in output  # Warning symbol
         # Warning message should be on next line with indentation
         assert "not verified (dev did not provide checksums)" in output
 
@@ -143,7 +143,7 @@ class TestVerificationWarningUI:
 
         # Assert - should show both phases
         assert "Installing:" in output
-        assert "(1/2) Verifying weektodo ⚠" in output
+        assert "(1/2) Verifying weektodo !" in output
         assert "(2/2) Installing weektodo ✓" in output
 
 

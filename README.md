@@ -39,7 +39,7 @@ Installing:
 (2/2) Installing qownnotes ✓
 
 
-📦 Installation Summary:
+Installation Summary:
 --------------------------------------------------
 qownnotes                 ✓ 25.12.7
 ```

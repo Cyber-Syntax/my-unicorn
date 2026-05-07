@@ -747,7 +747,7 @@ async def update_single_app(
 
         if result.success:
             logger.debug(
-                "✅ Successfully updated %s to %s",
+                "✓ Successfully updated %s to %s",
                 app_name,
                 update_info.latest_version,
             )
@@ -1227,7 +1227,7 @@ def display_update_error(message: str) -> None:
         message: Error message to display.
 
     """
-    logger.error("❌ %s", message)
+    logger.error("× %s", message)
 
 
 def display_check_results(results: dict) -> None:
@@ -1248,7 +1248,7 @@ def display_check_results(results: dict) -> None:
             )
         logger.info("\nRun 'my-unicorn update' to install updates")
     else:
-        logger.info("✅ All apps are up to date")
+        logger.info("✓ All apps are up to date")
 
 
 def display_update_results(results: dict) -> None:
@@ -1266,7 +1266,7 @@ def display_update_results(results: dict) -> None:
 
     # If we have detailed info, use formatted summary
     if update_infos:
-        logger.info("📦 Update Summary:")
+        logger.info("Update Summary:")
         logger.info("-" * 50)
 
         # Show updated apps with version info
@@ -1276,14 +1276,14 @@ def display_update_results(results: dict) -> None:
                 version_info = (
                     f"{app_info.current_version} → {app_info.latest_version}"
                 )
-                logger.info("%-25s ✅ %s", app_name, version_info)
+                logger.info("%-25s ✓ %s", app_name, version_info)
             else:
-                logger.info("%-25s ✅ Updated", app_name)
+                logger.info("%-25s ✓ Updated", app_name)
 
         # Show failed apps with error info
         for app_name in failed:
             app_info = _find_update_info(app_name, update_infos)
-            logger.info("%-25s ❌ Update failed", app_name)
+            logger.info("%-25s × Update failed", app_name)
             # Keep error reason indented under the app name
             # app name is already shown in the log line above
             if app_info and app_info.error_reason:
@@ -1295,19 +1295,19 @@ def display_update_results(results: dict) -> None:
             if app_info.is_success:
                 version = app_info.current_version
                 logger.info(
-                    "%-25s ℹ️  Already up to date (%s)",  # noqa: RUF001
+                    "%-25s Already up to date (%s)",  # noqa: RUF001
                     app_name,
                     version,
                 )
             else:
-                logger.info("%-25s ℹ️  Already up to date", app_name)  # noqa: RUF001
+                logger.info("%-25s Already up to date", app_name)  # noqa: RUF001
 
     else:
         # Fallback to simple logger output
         if updated:
-            logger.info("✅ Successfully updated: %s", ", ".join(updated))
+            logger.info("✓ Successfully updated: %s", ", ".join(updated))
         if failed:
-            logger.error("❌ Failed to update: %s", ", ".join(failed))
+            logger.error("× Failed to update: %s", ", ".join(failed))
         if up_to_date:
             logger.info("Already up to date: %s", ", ".join(up_to_date))
 
@@ -1323,7 +1323,7 @@ def display_invalid_apps(
 
     """
     if invalid_apps:
-        logger.warning("⚠️  Apps not found: %s", ", ".join(invalid_apps))
+        logger.warning("! Apps not found: %s", ", ".join(invalid_apps))
         installed = config_manager.list_installed_apps()
         if installed:
             logger.info("   Installed apps: %s", ", ".join(installed))

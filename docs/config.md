@@ -321,7 +321,7 @@ For complete examples, see [docs/example_app_state_configs/](dev/data/example_ap
 
 #### Backup metadata.json implementation
 
-##### 1. **Backup Storage Structure** ✅
+##### 1. **Backup Storage Structure** ✓
 
 ```
 ~/Applications/backups/
@@ -335,7 +335,7 @@ For complete examples, see [docs/example_app_state_configs/](dev/data/example_ap
       └── metadata.json
 ```
 
-##### 2. **Metadata Structure (metadata.json)** ✅
+##### 2. **Metadata Structure (metadata.json)** ✓
 
 > [!NOTE]
 > file path: `~/Applications/backups/obsidian/metadata.json`

@@ -1,0 +1,33 @@
+Fetching from API:
+GitHub Releases      1/1 Retrieved from cache
+
+Update Summary:
+--------------------------------------------------
+ytmdesktop                × Update failed
+                             → AppImage not found in release - may still be building
+beekeeper-studio          Already up to date (5.7.2)
+cherrytree                Already up to date (1.6.3)
+endless-sky               Already up to date (0.10.16)
+freetube                  Already up to date (0.24.0-beta)
+kdiskmark                 Already up to date (3.2.0)
+nuclear                   Already up to date (1.35.0)
+obsidian                  Already up to date (1.12.7)
+standard-notes            Already up to date (3.201.21)
+super-productivity        Already up to date (18.4.4)
+tagspaces                 Already up to date (6.11.4)
+zen-browser               Already up to date (1.19.11b)
+weektodo                  Already up to date (2.2.0)
+muffon                    Already up to date (2.4.0)
+pear-desktop              Already up to date (3.11.0)
+helium-linux              Already up to date (0.12.1.1)
+spotube                   Already up to date (5.1.1)
+simpmusic                 Already up to date (1.1.1)
+zettlr                    Already up to date (4.4.0)
+joplin                    Already up to date (3.5.13)
+ytdownloader              Already up to date (3.20.2)
+qownnotes                 Already up to date (26.5.5)
+neovim                    Already up to date (0.12.2)
+keepassxc                 Already up to date (2.7.12)
+flameshot                 Already up to date (13.3.0)
+legcord                   Already up to date (1.2.4)
+appflowy                  Already up to date (0.11.8)

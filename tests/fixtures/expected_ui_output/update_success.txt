@@ -11,7 +11,7 @@ Installing:
 (1/2) Verifying qownnotes ✓
 (2/2) Updating qownnotes ✓
 
-📦 Update Summary:
+Update Summary:
 --------------------------------------------------
-qownnotes                 ✅ 26.2.1 → 26.2.4
-appflowy                  ✅ 0.11.0 → 0.11.1
+qownnotes                 ✓ 26.2.1 → 26.2.4
+appflowy                  ✓ 0.11.0 → 0.11.1

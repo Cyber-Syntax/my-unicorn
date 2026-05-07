@@ -138,7 +138,7 @@ class RemoveService:
         try:
             app_config = self.config_manager.load_app_config(app_name)
             if not app_config:
-                logger.error("❌ App '%s' not found", app_name)
+                logger.error("× App '%s' not found", app_name)
                 return RemovalResult(
                     success=False,
                     app_name=app_name,
@@ -221,11 +221,11 @@ class RemoveService:
         """Log user-facing results of removal operations."""
         if appimage_op.files:
             files_str = ", ".join(appimage_op.files)
-            logger.info("✅ Removed AppImage(s): %s", files_str)
+            logger.info("✓ Removed AppImage(s): %s", files_str)
 
         if cache_op.metadata.get("owner") and cache_op.metadata.get("repo"):
             logger.info(
-                "✅ Removed cache for %s/%s",
+                "✓ Removed cache for %s/%s",
                 cache_op.metadata["owner"],
                 cache_op.metadata["repo"],
             )
@@ -233,25 +233,25 @@ class RemoveService:
         if backup_path := backup_op.metadata.get("path"):
             if backup_op.files:
                 logger.info(
-                    "✅ Removed all backups and metadata for %s",
+                    "✓ Removed all backups and metadata for %s",
                     app_name,
                 )
             else:
-                logger.info("⚠️  No backups found at: %s", backup_path)
+                logger.info("! No backups found at: %s", backup_path)
 
         if desktop_op.success:
-            logger.info("✅ Removed desktop entry for %s", app_name)
+            logger.info("✓ Removed desktop entry for %s", app_name)
 
         if icon_path := icon_op.metadata.get("path"):
             if icon_op.files:
-                logger.info("✅ Removed icon: %s", icon_path)
+                logger.info("✓ Removed icon: %s", icon_path)
             else:
-                logger.info("⚠️  Icon not found at: %s", icon_path)
+                logger.info("! Icon not found at: %s", icon_path)
 
         if keep_config:
-            logger.info("✅ Kept config for %s", app_name)
+            logger.info("✓ Kept config for %s", app_name)
         else:
-            logger.info("✅ Removed config for %s", app_name)
+            logger.info("✓ Removed config for %s", app_name)
 
     def _build_result(
         self,

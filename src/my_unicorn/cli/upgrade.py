@@ -178,7 +178,7 @@ def perform_self_update(version: str) -> bool:
         )
     except (OSError, FileNotFoundError) as e:
         logger.exception("Update failed")
-        logger.info("❌ Update failed: %s", e)
+        logger.info("× Update failed: %s", e)
         return False
 
 

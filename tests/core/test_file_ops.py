@@ -146,4 +146,4 @@ def test_install_update_naming_consistency(
 
     # Both install and update should produce the same naming pattern
     assert final_file.name == updated_file.name
-    print(f"✅ Install and update both create: {final_file.name}")
+    print(f"✓ Install and update both create: {final_file.name}")

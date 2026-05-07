@@ -135,7 +135,7 @@ class ProgressDisplay(ProgressReporter):
 
         """
         return (
-            f"📦 {name}"
+            f"{name}"
             if progress_type == ProgressType.DOWNLOAD
             else f"⚙️ {name}"
         )

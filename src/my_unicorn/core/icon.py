@@ -117,7 +117,7 @@ class AppImageIconExtractor:
                 raise
             except Exception as e:
                 logger.exception(
-                    "❌ Failed to extract icon from %s",
+                    "× Failed to extract icon from %s",
                     appimage_path.name,
                 )
                 error_msg = f"Icon extraction failed: {e}"
@@ -443,7 +443,7 @@ class AppImageIconExtractor:
 
             # Copy the icon
             _ = shutil.copy2(source, dest)
-            logger.info("✅ Icon extracted and copied: %s", dest)
+            logger.info("✓ Icon extracted and copied: %s", dest)
 
         except (OSError, shutil.Error) as e:
             error_msg = f"Failed to copy icon to {dest}: {e}"

@@ -20,7 +20,7 @@ def test_display_no_targets_error():
     with patch("my_unicorn.core.install.logger") as mock_logger:
         display_no_targets_error()
 
-        mock_logger.error.assert_called_once_with("❌ No targets specified.")
+        mock_logger.error.assert_called_once_with("× No targets specified.")
         mock_logger.info.assert_called_once_with(
             "💡 Use 'my-unicorn catalog' to see available catalog apps."
         )
@@ -39,7 +39,7 @@ def test_print_install_summary_all_already_installed(caplog):
     print_install_summary(results)
     captured = caplog.text
     assert "All 1 specified app(s) are already installed" in captured
-    assert "• app1" in captured
+    assert "- app1" in captured
 
 
 def test_print_install_summary_mixed(caplog):

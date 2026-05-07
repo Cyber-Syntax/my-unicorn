@@ -45,13 +45,13 @@ class AuthHandler(BaseCommandHandler):
         """
         configured = self.auth_manager.is_authenticated()
         if configured:
-            logger.info("✅ GitHub token is configured")
+            logger.info("✓ GitHub token is configured")
             logger.info(
                 "GitHub token is configured. Fetching Github rate limit info..."
             )
         else:
             logger.info("No GitHub token configured.")
-            logger.info("❌ No GitHub token configured")
+            logger.info("× No GitHub token configured")
             logger.info("Use 'my-unicorn token --save' to set a token")
             logger.info(
                 "No token configured. Fetching Github rate limit info."
@@ -95,7 +95,7 @@ class AuthHandler(BaseCommandHandler):
         except (aiohttp.ClientError, OSError):
             # Security: Sanitize error messages to avoid information disclosure
             logger.warning("Failed to fetch fresh rate limit info")
-            logger.info("   ⚠️  Failed to connect to GitHub API")
+            logger.info("   ! Failed to connect to GitHub API")
             return None
 
     def _extract_core_rate_limit_info(
@@ -200,9 +200,9 @@ class AuthHandler(BaseCommandHandler):
         """Display rate limit warnings if applicable."""
         if remaining < WARN_THRESHOLD:
             if remaining < WARN_CRITICAL:
-                logger.info("   ⚠️  WARNING: Very low rate limit remaining!")
+                logger.info("   ! WARNING: Very low rate limit remaining!")
             else:
-                logger.info("   ⚠️  Rate limit getting low")
+                logger.info("   ! Rate limit getting low")
 
     def _display_additional_rate_limit_details(
         self, rate_limit_data: dict[str, object] | None, remaining: int

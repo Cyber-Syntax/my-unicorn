@@ -149,7 +149,7 @@ class TestBackupHandler:
         mock_logger.info.assert_any_call(
             "\n📊 Backup Statistics for %s:", "testapp"
         )
-        mock_logger.info.assert_any_call("  📦 Total backups: %s", 1)
+        mock_logger.info.assert_any_call("  Total backups: %s", 1)
         mock_logger.info.assert_any_call("\n⚙️  Configuration:")
 
         # Test --list-backups command output
@@ -176,5 +176,5 @@ class TestBackupHandler:
             "🔄 Cleaning up old backups%s...", " for testapp"
         )
         mock_logger.info.assert_any_call(
-            "✅ Cleanup completed (keeping %s most recent backups)", 3
+            "✓ Cleanup completed (keeping %s most recent backups)", 3
         )

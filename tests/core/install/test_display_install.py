@@ -152,9 +152,9 @@ def test_print_install_summary_all_successful(
     assert "blender" in output
 
     # Verify success indicators
-    assert "✅ v24.12.5" in output
-    assert "✅ v1.3.2" in output
-    assert "✅ v4.1.0" in output
+    assert "✓ v24.12.5" in output
+    assert "✓ v1.3.2" in output
+    assert "✓ v4.1.0" in output
 
 
 def test_print_install_summary_all_already_installed(
@@ -168,7 +168,7 @@ def test_print_install_summary_all_already_installed(
     output = caplog.text
 
     # Verify all already installed message
-    assert "✅ All 2 specified app(s) are already installed:" in output
+    assert "✓ All 2 specified app(s) are already installed:" in output
 
     # Verify app names appear
     assert "brave" in output
@@ -192,19 +192,19 @@ def test_print_install_summary_mixed_results(
     assert "Installation Summary:" in output
 
     # Verify success indicators
-    assert "✅ v24.12.5" in output  # successful
+    assert "✓ v24.12.5" in output  # successful
 
     # Verify failure indicators
-    assert "❌ Installation failed" in output
+    assert "× Installation failed" in output
     assert "zen-browser" in output
     assert "Download failed: Connection timeout" in output
 
     # Verify already installed indicators
-    assert "ℹ️  Already installed" in output  # noqa: RUF001
+    assert "Already installed" in output  # noqa: RUF001
     assert "brave" in output
 
     # Verify warning indicators
-    assert "⚠️" in output
+    assert "!" in output
     assert "Desktop entry creation failed but app is installed" in output
 
 
@@ -233,7 +233,7 @@ def test_print_install_summary_all_failed(
     assert "Installation Summary:" in output
 
     # Verify all failure indicators
-    assert "❌ Installation failed" in output
+    assert "× Installation failed" in output
     assert "app1" in output
     assert "app2" in output
     assert "Network error" in output
@@ -272,8 +272,8 @@ def test_print_install_summary_with_warnings(
     output = caplog.text
 
     # Verify warnings are displayed
-    assert "⚠️  Failed to create desktop entry" in output
-    assert "⚠️  Custom warning message" in output
+    assert "! Failed to create desktop entry" in output
+    assert "! Custom warning message" in output
 
 
 def test_print_install_summary_empty_results(
@@ -338,7 +338,7 @@ def test_print_result_line_formatting(
 
     # Verify formatting: name (left-aligned, 25 chars) + status
     assert "qownnotes" in output
-    assert "✅ v24.12.5" in output
+    assert "✓ v24.12.5" in output
 
 
 def test_print_result_line_with_warning(
@@ -353,10 +353,10 @@ def test_print_result_line_with_warning(
 
     # Verify app name and success
     assert "inkscape" in output
-    assert "✅ v1.3.2" in output
+    assert "✓ v1.3.2" in output
 
     # Verify warning on second line
-    assert "⚠️" in output
+    assert "!" in output
     assert "Desktop entry creation failed but app is installed" in output
 
 
@@ -371,7 +371,7 @@ def test_print_result_line_already_installed(
     output = caplog.text
 
     assert "brave" in output
-    assert "ℹ️  Already installed" in output  # noqa: RUF001
+    assert "Already installed" in output  # noqa: RUF001
 
 
 def test_print_result_line_failed(
@@ -386,7 +386,7 @@ def test_print_result_line_failed(
 
     # Verify failure indicator and error message
     assert "zen-browser" in output
-    assert "❌ Installation failed" in output
+    assert "× Installation failed" in output
     assert "Download failed: Connection timeout" in output
 
 
@@ -397,7 +397,7 @@ def test_display_no_targets_error(caplog: pytest.LogCaptureFixture) -> None:
 
     # Verify error log entry
     assert any(
-        "❌ No targets specified." in record.message
+        "× No targets specified." in record.message
         for record in caplog.records
         if record.levelname == "ERROR"
     )
@@ -428,7 +428,7 @@ def test_print_install_summary_result_without_name(
 
     # Should show "Unknown" as fallback
     assert "Unknown" in output
-    assert "✅ v1.0.0" in output
+    assert "✓ v1.0.0" in output
 
 
 def test_categorize_results_empty() -> None:

@@ -206,7 +206,7 @@ async def extract_icon_from_appimage(
 
         if extracted_icon:
             logger.info(
-                "✅ Icon extracted successfully: %s", extracted_icon.name
+                "✓ Icon extracted successfully: %s", extracted_icon.name
             )
             return extracted_icon
 

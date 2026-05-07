@@ -68,7 +68,7 @@ class TestCacheHandler:
             await cache_handler.execute(args)
 
             mock_cache_manager.clear_cache.assert_called_once_with()
-            mock_logger.info.assert_called_with("✅ Cleared all cache entries")
+            mock_logger.info.assert_called_with("✓ Cleared all cache entries")
 
     @pytest.mark.asyncio
     async def test_execute_clear_specific_app_with_owner_repo(
@@ -86,7 +86,7 @@ class TestCacheHandler:
                 "owner", "repo"
             )
             mock_logger.info.assert_called_with(
-                "✅ Cleared cache for %s/%s", "owner", "repo"
+                "✓ Cleared cache for %s/%s", "owner", "repo"
             )
 
     @pytest.mark.asyncio
@@ -108,7 +108,7 @@ class TestCacheHandler:
                 "test-owner", "test-repo"
             )
             mock_logger.info.assert_called_with(
-                "✅ Cleared cache for %s/%s", "test-owner", "test-repo"
+                "✓ Cleared cache for %s/%s", "test-owner", "test-repo"
             )
 
     @pytest.mark.asyncio
@@ -188,7 +188,7 @@ class TestCacheHandler:
         with patch("my_unicorn.cli.commands.cache.logger") as mock_logger:
             await cache_handler.execute(args)
 
-            mock_logger.info.assert_any_call("✅ Fresh Entries: %s", 3)
+            mock_logger.info.assert_any_call("✓ Fresh Entries: %s", 3)
             mock_logger.info.assert_any_call("⏰ Expired Entries: %s", 2)
 
     @pytest.mark.asyncio
@@ -233,7 +233,7 @@ class TestCacheHandler:
         with patch("my_unicorn.cli.commands.cache.logger") as mock_logger:
             await cache_handler.execute(args)
 
-            mock_logger.info.assert_any_call("❌ Corrupted Entries: %s", 1)
+            mock_logger.info.assert_any_call("× Corrupted Entries: %s", 1)
 
     @pytest.mark.asyncio
     async def test_execute_stats_with_error(
@@ -257,7 +257,7 @@ class TestCacheHandler:
             await cache_handler.execute(args)
 
             mock_logger.info.assert_any_call(
-                "⚠️ Error getting stats: %s", "Permission denied"
+                "!Error getting stats: %s", "Permission denied"
             )
 
     @pytest.mark.asyncio
@@ -277,7 +277,7 @@ class TestCacheHandler:
             await cache_handler.execute(args)
 
             mock_logger.info.assert_called_with(
-                "❌ Failed to get cache stats: %s", test_exception
+                "× Failed to get cache stats: %s", test_exception
             )
             mock_exit.assert_called_with(1)
 
@@ -337,7 +337,7 @@ class TestCacheHandler:
 
             # _handle_stats catches exception and logs via info, then exits
             mock_logger.info.assert_called_with(
-                "❌ Failed to get cache stats: %s", test_exception
+                "× Failed to get cache stats: %s", test_exception
             )
             mock_exit.assert_called_with(1)
 
@@ -393,7 +393,7 @@ class TestCacheHandler:
             await cache_handler._handle_clear(args)
 
             mock_cache_manager.clear_cache.assert_called_once_with()
-            mock_logger.info.assert_called_with("✅ Cleared all cache entries")
+            mock_logger.info.assert_called_with("✓ Cleared all cache entries")
 
     @pytest.mark.asyncio
     async def test_handle_clear_specific_app(
@@ -409,7 +409,7 @@ class TestCacheHandler:
                 "owner", "repo"
             )
             mock_logger.info.assert_called_with(
-                "✅ Cleared cache for %s/%s", "owner", "repo"
+                "✓ Cleared cache for %s/%s", "owner", "repo"
             )
 
     @pytest.mark.asyncio

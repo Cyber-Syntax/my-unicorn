@@ -24,14 +24,14 @@ Downloading:
 WeekToDo-2.2.0  108.6 MiB  11.2 MB/s 00:00 [==============================]   100% ✓
 
 Installing:
-(1/2) Verifying weektodo ⚠
+(1/2) Verifying weektodo !
     not verified (dev did not provide checksums)
 (2/2) Installing weektodo ✓
 
-📦 Installation Summary:
+Installation Summary:
 --------------------------------------------------
-weektodo                  ✅ 2.2.0
-                             ⚠️  Not verified - developer did not provide checksums
+weektodo                  ✓ 2.2.0
+                             ! Not verified - developer did not provide checksums
 ```
 
 #### Example: Installing from a GitHub URL with partial verification
@@ -53,10 +53,10 @@ Installing:
 (1/2) Verifying legcord ✓
 (2/2) Installing legcord ✓
 
-📦 Installation Summary:
+Installation Summary:
 --------------------------------------------------
-legcord                   ✅ 1.2.1
-                             ⚠️  Partial verification: 2 passed, 1 failed
+legcord                   ✓ 1.2.1
+                             ! Partial verification: 2 passed, 1 failed
 ```
 
 ### Without Warnings
@@ -82,9 +82,9 @@ Installing:
 (1/2) Verifying qownnotes ✓
 (2/2) Installing qownnotes ✓
 
-📦 Installation Summary:
+Installation Summary:
 --------------------------------------------------
-qownnotes                 ✅ 26.2.0
+qownnotes                 ✓ 26.2.0
 ```
 
 ## Update Examples
@@ -110,9 +110,9 @@ Installing:
 (1/2) Verifying qownnotes ✓
 (2/2) Installing qownnotes ✓
 
-📦 Update Summary:
+Update Summary:
 --------------------------------------------------
-qownnotes                 ✅ 0.1.0 → 26.2.0
+qownnotes                 ✓ 0.1.0 → 26.2.0
 ```
 
 #### Example may still building
@@ -131,10 +131,10 @@ Installing:
 (2/2) Installing helium-linux ✓
 
 
-📦 Update Summary:
+Update Summary:
 --------------------------------------------------
-helium-linux              ✅ 0.9.4.1 → 0.10.2.1
-nuclear                   ❌ Update failed
+helium-linux              ✓ 0.9.4.1 → 0.10.2.1
+nuclear                   × Update failed
                              → AppImage not found in release - may still be building
 ```
 
@@ -151,12 +151,12 @@ my-unicorn remove qownnotes
 **Output:**
 
 ```
-✅ Removed AppImage(s): /home/developer/Applications/qownnotes.AppImage
-✅ Removed cache for pbek/QOwnNotes
-⚠️  No backups found at: /home/developer/Applications/backups/qownnotes
-✅ Removed desktop entry for qownnotes
-✅ Removed icon: /home/developer/Applications/icons/qownnotes.png
-✅ Removed config for qownnotes
+✓ Removed AppImage(s): /home/developer/Applications/qownnotes.AppImage
+✓ Removed cache for pbek/QOwnNotes
+! No backups found at: /home/developer/Applications/backups/qownnotes
+✓ Removed desktop entry for qownnotes
+✓ Removed icon: /home/developer/Applications/icons/qownnotes.png
+✓ Removed config for qownnotes
 ```
 
 ## Batch Operations
@@ -185,12 +185,12 @@ Installing:
 (1/2) Verifying legcord ✓
 (2/2) Installing legcord ✓
 
-📦 Installation Summary:
+Installation Summary:
 --------------------------------------------------
-legcord                   ✅ 1.2.1
-flameshot                 ✅ 13.3.0
-appflowy                  ℹ️  Already installed
-standard-notes            ℹ️  Already installed
+legcord                   ✓ 1.2.1
+flameshot                 ✓ 13.3.0
+appflowy                  Already installed
+standard-notes            Already installed
 ```
 
 ### Example: Updating multiple apps
@@ -224,13 +224,13 @@ Installing:
 (1/2) Verifying standard-notes ✓
 (2/2) Installing standard-notes ✓
 
-📦 Update Summary:
+Update Summary:
 --------------------------------------------------
-legcord                   ✅ 0.1.0 → 1.2.1
-flameshot                 ✅ 0.1.0 → 13.3.0
-appflowy                  ✅ 0.1.0 → 0.11.1
-keepassxc                 ✅ 0.1.0 → 2.7.11
-standard-notes            ✅ 0.1.0 → 3.201.10
+legcord                   ✓ 0.1.0 → 1.2.1
+flameshot                 ✓ 0.1.0 → 13.3.0
+appflowy                  ✓ 0.1.0 → 0.11.1
+keepassxc                 ✓ 0.1.0 → 2.7.11
+standard-notes            ✓ 0.1.0 → 3.201.10
 ```
 
 ### Example: Updating all installed apps
@@ -259,27 +259,27 @@ Installing:
 (2/2) Installing tagspaces ✓
 
 
-📦 Update Summary:
+Update Summary:
 --------------------------------------------------
-tagspaces                 ✅ 6.8.2 → 6.9.0
-super-productivity        ✅ 17.1.2 → 17.1.3
-zen-browser               ✅ 1.18.4b → 1.18.5b
-neovim                    ℹ️  Already up to date (0.11.6)
-kdiskmark                 ℹ️  Already up to date (3.2.0)
-legcord                   ℹ️  Already up to date (1.2.1)
-obsidian                  ℹ️  Already up to date (1.11.7)
-qownnotes                 ℹ️  Already up to date (26.2.0)
-cherrytree                ℹ️  Already up to date (1.6.3)
-keepassxc                 ℹ️  Already up to date (2.7.11)
-heroicgameslauncher       ℹ️  Already up to date (2.19.1)
-weektodo                  ℹ️  Already up to date (2.2.0)
-endless-sky               ℹ️  Already up to date (0.10.16)
-nuclear                   ℹ️  Already up to date (0.6.48)
-flameshot                 ℹ️  Already up to date (13.3.0)
-beekeeper-studio          ℹ️  Already up to date (5.5.6)
-standard-notes            ℹ️  Already up to date (3.201.10)
-freetube                  ℹ️  Already up to date (0.23.13-beta)
-appflowy                  ℹ️  Already up to date (0.11.1)
+tagspaces                 ✓ 6.8.2 → 6.9.0
+super-productivity        ✓ 17.1.2 → 17.1.3
+zen-browser               ✓ 1.18.4b → 1.18.5b
+neovim                    Already up to date (0.11.6)
+kdiskmark                 Already up to date (3.2.0)
+legcord                   Already up to date (1.2.1)
+obsidian                  Already up to date (1.11.7)
+qownnotes                 Already up to date (26.2.0)
+cherrytree                Already up to date (1.6.3)
+keepassxc                 Already up to date (2.7.11)
+heroicgameslauncher       Already up to date (2.19.1)
+weektodo                  Already up to date (2.2.0)
+endless-sky               Already up to date (0.10.16)
+nuclear                   Already up to date (0.6.48)
+flameshot                 Already up to date (13.3.0)
+beekeeper-studio          Already up to date (5.5.6)
+standard-notes            Already up to date (3.201.10)
+freetube                  Already up to date (0.23.13-beta)
+appflowy                  Already up to date (0.11.1)
 ```
 
 ## Understanding the Output
@@ -298,10 +298,10 @@ Shows progress bars with speed and completion status.
 
 - **Verifying**: Checking file integrity with checksums
 - **✓**: Success
-- **⚠**: Warning (e.g., no checksums provided)
+- **!**: Warning (e.g., no checksums provided)
 
 ### Summary Phase
 
-- **✅**: Successfully installed/updated
-- **⚠️**: Warnings present
+- **✓**: Successfully installed/updated
+- **!**: Warnings present
 - **ℹ️**: Already installed (no action needed)

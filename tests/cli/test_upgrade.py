@@ -68,7 +68,7 @@ def test_perform_self_update_failure() -> None:
         assert result is False
         mock_logger.exception.assert_called_once()
         call_args = mock_logger.info.call_args
-        assert call_args[0][0] == "❌ Update failed: %s"
+        assert call_args[0][0] == "× Update failed: %s"
         assert isinstance(call_args[0][1], OSError)
         assert str(call_args[0][1]) == "Command failed"
 

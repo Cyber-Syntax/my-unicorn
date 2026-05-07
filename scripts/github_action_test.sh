@@ -31,7 +31,7 @@ run_all_tests() {
     echo
     run_bats_tests
     echo
-    echo -e "${GREEN}✅ All tests passed!${NC}"
+    echo -e "${GREEN}✓ All tests passed!${NC}"
 }
 
 show_help() {

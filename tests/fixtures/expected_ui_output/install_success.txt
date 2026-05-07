@@ -12,7 +12,7 @@ Installing:
 (2/2) Installing appflowy ✓
 
 
-📦 Installation Summary:
+Installation Summary:
 --------------------------------------------------
-appflowy                  ✅ 0.11.1
-qownnotes                 ✅ 26.2.4
+appflowy                  ✓ 0.11.1
+qownnotes                 ✓ 26.2.4

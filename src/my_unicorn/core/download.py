@@ -423,7 +423,7 @@ class DownloadService:
 
                 if attempt == retry_attempts:
                     logger.exception(
-                        "❌ %s failed after %s attempts",
+                        "× %s failed after %s attempts",
                         description,
                         retry_attempts,
                     )

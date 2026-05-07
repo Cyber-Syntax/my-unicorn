@@ -249,7 +249,7 @@ class PostDownloadProcessor:
                 await self.progress_reporter.finish_task(
                     installation_task_id,
                     success=True,
-                    description=f"✅ {context.app_name}",
+                    description=f"✓ {context.app_name}",
                 )
 
             logger.info(
@@ -280,7 +280,7 @@ class PostDownloadProcessor:
                 await self.progress_reporter.finish_task(
                     installation_task_id,
                     success=False,
-                    description=f"❌ {context.app_name} failed",
+                    description=f"× {context.app_name} failed",
                 )
 
             return PostDownloadResult(
@@ -535,7 +535,7 @@ class PostDownloadProcessor:
             self.backup_service.cleanup_old_backups(app_name)
         except Exception as e:
             logger.warning(
-                "⚠️  Failed to cleanup old backups for %s: %s",
+                "! Failed to cleanup old backups for %s: %s",
                 app_name,
                 e,
             )

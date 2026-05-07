@@ -285,7 +285,7 @@ class ReleaseAPIClient:
                         # Retrying with the same invalid token is pointless, so
                         # fail immediately with an actionable message.
                         logger.error(
-                            "❌ GitHub token is invalid or revoked (401). "
+                            "× GitHub token is invalid or revoked (401). "
                             "Run 'my-unicorn token --save' to update it."
                         )
                         response.raise_for_status()  # raises ClientResponseError
@@ -341,7 +341,7 @@ class ReleaseAPIClient:
                 )
                 if attempt == self._retry_attempts:
                     logger.error(  # noqa: TRY400
-                        "❌ API fetch failed after %d attempts: %s - %s",
+                        "× API fetch failed after %d attempts: %s - %s",
                         self._retry_attempts,
                         url,
                         e,
@@ -358,7 +358,7 @@ class ReleaseAPIClient:
                 )
                 if attempt == self._retry_attempts:
                     logger.error(  # noqa: TRY400
-                        "❌ API fetch failed after %d attempts: %s - %s",
+                        "× API fetch failed after %d attempts: %s - %s",
                         self._retry_attempts,
                         url,
                         e,
@@ -1135,16 +1135,16 @@ class AssetSelector:
            compatibility
 
         Examples:
-            ✅ "QOwnNotes-x86_64.AppImage.sha256sum" (AppImage-specific)
-            ✅ "KeePassXC-2.7.10-x86_64.AppImage.DIGEST" (AppImage-specific)
-            ✅ "Joplin-3.4.12.AppImage.sha512" (AppImage-specific)
-            ✅ "SHA256SUMS.txt" (standalone)
-            ✅ "latest-linux.yml" (standalone)
-            ✅ "SHA256SUMS" (standalone)
-            ❌ "KeePassXC-2.7.10-Win64.msi.DIGEST" (Windows)
-            ❌ "Obsidian-1.9.14-arm64.AppImage.sha256" (ARM)
-            ❌ "latest-linux-arm.yml" (ARM)
-            ❌ "latest-mac-arm64.yml" (macOS)
+            ✓ "QOwnNotes-x86_64.AppImage.sha256sum" (AppImage-specific)
+            ✓ "KeePassXC-2.7.10-x86_64.AppImage.DIGEST" (AppImage-specific)
+            ✓ "Joplin-3.4.12.AppImage.sha512" (AppImage-specific)
+            ✓ "SHA256SUMS.txt" (standalone)
+            ✓ "latest-linux.yml" (standalone)
+            ✓ "SHA256SUMS" (standalone)
+            × "KeePassXC-2.7.10-Win64.msi.DIGEST" (Windows)
+            × "Obsidian-1.9.14-arm64.AppImage.sha256" (ARM)
+            × "latest-linux-arm.yml" (ARM)
+            × "latest-mac-arm64.yml" (macOS)
 
         Args:
             filename: Checksum filename to check

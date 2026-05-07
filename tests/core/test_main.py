@@ -68,5 +68,5 @@ def test_main_exception(monkeypatch):
     with patch("my_unicorn.main.logger") as mock_logger:
         with pytest.raises(SystemExit):
             main.main()
-        mock_logger.exception.assert_called_with("❌ Unexpected error")
+        mock_logger.exception.assert_called_with("× Unexpected error")
         assert called["exit"] == 1

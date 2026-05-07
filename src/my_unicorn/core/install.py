@@ -83,10 +83,10 @@ def _categorize_results(results: list[dict[str, Any]]) -> dict[str, list]:
 def _print_all_already_installed(results: list[dict[str, Any]]) -> None:
     """Print message when all apps are already installed."""
     logger.info(
-        "✅ All %s specified app(s) are already installed:", len(results)
+        "✓ All %s specified app(s) are already installed:", len(results)
     )
     for result in results:
-        logger.info("   • %s", result.get("name", "Unknown"))
+        logger.info("   - %s", result.get("name", "Unknown"))
 
 
 def _print_result_line(result: dict[str, Any]) -> None:
@@ -106,20 +106,20 @@ def _print_result_line(result: dict[str, Any]) -> None:
     app_name = result.get("name", "Unknown")
 
     if not result.get("success", False):
-        logger.error("%-25s ❌ Installation failed", app_name)
+        logger.error("%-25s × Installation failed", app_name)
         logger.error("%-25s    → %s", "", result.get("error", "Unknown error"))
         return
 
     if result.get("status") == "already_installed":
-        logger.info("%-25s ℹ️  Already installed", app_name)
+        logger.info("%-25s Already installed", app_name)
         return
 
     version = result.get("version", "")
-    status_msg = f"✅ {version}" if version else "✅ Installed"
+    status_msg = f"✓ {version}" if version else "✓ Installed"
     logger.info("%-25s %s", app_name, status_msg)
 
     if result.get("warning"):
-        logger.warning("%-25s    ⚠️  %s", "", result["warning"])
+        logger.warning("%-25s    ! %s", "", result["warning"])
 
 
 def print_install_summary(results: list[dict[str, Any]]) -> None:
@@ -134,7 +134,7 @@ def print_install_summary(results: list[dict[str, Any]]) -> None:
         _print_all_already_installed(results)
         return
 
-    logger.info("📦 Installation Summary:")
+    logger.info("Installation Summary:")
     logger.info("-" * 50)
 
     for result in results:
@@ -143,7 +143,7 @@ def print_install_summary(results: list[dict[str, Any]]) -> None:
 
 def display_no_targets_error() -> None:
     """Display error when no installation targets are specified."""
-    logger.error("❌ No targets specified.")
+    logger.error("× No targets specified.")
     logger.info("💡 Use 'my-unicorn catalog' to see available catalog apps.")
 
 

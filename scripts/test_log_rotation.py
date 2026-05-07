@@ -78,7 +78,7 @@ def check_rotation_results(log_dir: Path) -> None:
     log_files = sorted(log_dir.glob("my-unicorn*.log*"))
 
     if not log_files:
-        print("❌ No log files found!")
+        print("× No log files found!")
         return
 
     print(f"\nFound {len(log_files)} log file(s):\n")
@@ -91,10 +91,10 @@ def check_rotation_results(log_dir: Path) -> None:
 
     if rotated_files:
         print(
-            f"\n✅ Rotation successful! Found {len(rotated_files)} backup file(s)"
+            f"\n✓ Rotation successful! Found {len(rotated_files)} backup file(s)"
         )
     else:
-        print("\n⚠️  No backup files found - rotation may not have occurred")
+        print("\n! No backup files found - rotation may not have occurred")
 
 
 def main() -> None:
@@ -115,7 +115,7 @@ def main() -> None:
     return_code = run_install_command()
 
     if return_code != 0:
-        print(f"\n⚠️  Command exited with code {return_code}")
+        print(f"\n! Command exited with code {return_code}")
         print("This might be expected if qownnotes isn't available")
 
     # Step 3: Check results

@@ -66,7 +66,7 @@ class TestDisplayMessageFunctions:
         display_update_error("Update failed")
 
         captured = caplog.text
-        assert "❌ Update failed" in captured
+        assert "× Update failed" in captured
 
 
 class TestDisplayCheckResults:
@@ -106,7 +106,7 @@ class TestDisplayCheckResults:
             display_check_results(results)
 
             mock_logger.info.assert_called_once_with(
-                "✅ All apps are up to date"
+                "✓ All apps are up to date"
             )
 
 
@@ -128,9 +128,9 @@ class TestDisplayUpdateResults:
         display_update_results(results)
 
         captured = caplog.text
-        assert "📦 Update Summary:" in captured
+        assert "Update Summary:" in captured
         assert "app1" in captured
-        assert "✅" in captured
+        assert "✓" in captured
         assert "1.0.0 → 2.0.0" in captured
 
     def test_display_update_results_with_failures(self, caplog):
@@ -155,7 +155,7 @@ class TestDisplayUpdateResults:
 
         captured = caplog.text
         assert "app1" in captured
-        assert "❌ Update failed" in captured
+        assert "× Update failed" in captured
         assert "Network timeout" in captured
 
     def test_display_update_results_with_up_to_date(self, caplog):
@@ -190,10 +190,10 @@ class TestDisplayUpdateResults:
             display_update_results(results)
 
             mock_logger.info.assert_any_call(
-                "✅ Successfully updated: %s", "app1"
+                "✓ Successfully updated: %s", "app1"
             )
             mock_logger.error.assert_any_call(
-                "❌ Failed to update: %s", "app2"
+                "× Failed to update: %s", "app2"
             )
             mock_logger.info.assert_any_call("Already up to date: %s", "app3")
 
@@ -215,9 +215,9 @@ class TestDisplayUpdateResults:
 
         captured = caplog.text
         assert "app1" in captured
-        assert "✅" in captured
+        assert "✓" in captured
         assert "app2" in captured
-        assert "❌" in captured
+        assert "×" in captured
         assert "app3" in captured
         assert "Already up to date" in captured
 
@@ -237,7 +237,7 @@ class TestDisplayInvalidApps:
             display_invalid_apps(["unknown"], mock_config_manager)
 
             mock_logger.warning.assert_called_once_with(
-                "⚠️  Apps not found: %s", "unknown"
+                "! Apps not found: %s", "unknown"
             )
             mock_logger.info.assert_called_once_with(
                 "   Installed apps: %s", "firefox, chrome"
