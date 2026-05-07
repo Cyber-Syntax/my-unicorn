@@ -494,7 +494,7 @@ class BackupService:
                 config_version,
             )
             logger.info("")
-            logger.info("⚠️  Old Configuration Format Detected")
+            logger.info("! Old Configuration Format Detected")
             logger.info("")
             logger.info(
                 "The app '%s' uses config version %s (current: %s).",

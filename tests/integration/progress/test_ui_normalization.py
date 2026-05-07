@@ -166,7 +166,7 @@ app-2  200 MB  8.0 MB/s 00:25 [===] 25%
         Version numbers are static content (don't change between runs),
         so they should be preserved as-is.
         """
-        output = "qownnotes                 ✅ 26.2.1 → 26.2.4"
+        output = "qownnotes                 ✓ 26.2.1 → 26.2.4"
 
         normalized = normalize_output_for_comparison(output)
 
@@ -177,9 +177,9 @@ app-2  200 MB  8.0 MB/s 00:25 [===] 25%
 
     def test_normalize_separator_lines(self) -> None:
         """Test normalization of separator lines."""
-        output = """📦 Update Summary:
+        output = """Update Summary:
 --------------------------------------------------
-qownnotes                 ✅ 26.2.1 → 26.2.4
+qownnotes                 ✓ 26.2.1 → 26.2.4
 """
 
         normalized = normalize_output_for_comparison(output)
@@ -190,7 +190,7 @@ qownnotes                 ✅ 26.2.1 → 26.2.4
 
     def test_normalize_indented_warning_messages(self) -> None:
         """Test normalization of indented warning/error messages."""
-        output = """(1/2) Verifying weektodo ⚠
+        output = """(1/2) Verifying weektodo !
     not verified (dev did not provide checksums)
 (2/2) Installing weektodo ✓"""
 

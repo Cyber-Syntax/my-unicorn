@@ -50,7 +50,7 @@ class TestAuthHandler:
 
         auth_handler.auth_manager.is_authenticated.assert_called_once()
         mock_fetch_fresh_rate_limit.assert_called_once()
-        mock_logger.info.assert_any_call("✅ GitHub token is configured")
+        mock_logger.info.assert_any_call("✓ GitHub token is configured")
         mock_logger.info.assert_any_call("")
         mock_logger.info.assert_any_call("📊 GitHub API Rate Limit Status:")
 
@@ -77,7 +77,7 @@ class TestAuthHandler:
             await auth_handler.execute(args)
 
         auth_handler.auth_manager.is_authenticated.assert_called_once()
-        mock_logger.info.assert_any_call("❌ No GitHub token configured")
+        mock_logger.info.assert_any_call("× No GitHub token configured")
         mock_logger.info.assert_any_call(
             "Use 'my-unicorn token --save' to set a token"
         )

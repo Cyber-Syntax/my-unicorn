@@ -39,11 +39,9 @@ Installing:
 (2/2) Installing qownnotes ✓
 
 
-📦 Installation Summary:
+Installation Summary:
 --------------------------------------------------
-qownnotes                 ✅ 25.12.7
-
-🎉 Successfully installed 1 app(s)
+qownnotes                 ✓ 25.12.7
 ```
 
 ## 💡 Yükleme

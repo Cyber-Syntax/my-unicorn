@@ -49,7 +49,7 @@ notify_cli_upgrade() {
 show_cli_upgrade() {
   local output
   if ! output=$(check_upgrade); then
-    echo "⚠️ Could not check CLI upgrade information."
+    echo "!Could not check CLI upgrade information."
     return 1
   fi
 
@@ -108,7 +108,7 @@ update_all() {
 show_updates() {
   local output
   if ! output=$(check_updates); then
-    echo "⚠️ Could not fetch update information."
+    echo "!Could not fetch update information."
     return 1
   fi
 
@@ -177,7 +177,7 @@ update_outdated() {
   echo "Updating ${#outdated_apps[@]} outdated app(s): ${outdated_apps[*]}"
 
   # Update all outdated apps concurrently. The inner command already
-  # prints its own structured summary (per-app ✅/❌ lines + a count
+  # prints its own structured summary (per-app ✓/× lines + a count
   # of failures). Don't print our own "all updated successfully"
   # message here — `my-unicorn update` exits 0 even when some apps
   # failed (e.g. the AppImage wasn't published yet), so an

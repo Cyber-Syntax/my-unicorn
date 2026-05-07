@@ -96,7 +96,7 @@ if [[ -d "$REPO_AUTOCOMPLETE" && -f "$REPO_AUTOCOMPLETE/bash_autocomplete" ]]; t
 elif [[ -d "$INSTALL_DIR/autocomplete" ]]; then
     SRC_DIR="$INSTALL_DIR/autocomplete"
 else
-    printf '❌ Error: Could not find autocomplete source files\n' >&2
+    printf '× Error: Could not find autocomplete source files\n' >&2
     exit 1
 fi
 
@@ -142,7 +142,7 @@ parse_args() {
                 usage 0
                 ;;
             *)
-                printf '❌ Unknown argument: %s\n' "$1" >&2
+                printf '× Unknown argument: %s\n' "$1" >&2
                 usage 1
                 ;;
         esac
@@ -222,17 +222,17 @@ replace_file_if_changed() {
 
     if [[ -f "$dst" ]]; then
         if ! src_sum="$(sha256 "$src")"; then
-            printf '❌ Failed to checksum source file: %s\n' "$src" >&2
+            printf '× Failed to checksum source file: %s\n' "$src" >&2
             return 1
         fi
 
         if ! dst_sum="$(sha256 "$dst")"; then
-            printf '❌ Failed to checksum destination file: %s\n' "$dst" >&2
+            printf '× Failed to checksum destination file: %s\n' "$dst" >&2
             return 1
         fi
 
         if [[ "$src_sum" == "$dst_sum" && "$FORCE" == false ]]; then
-            printf 'ℹ️  Unchanged: %s\n' "$rel"
+            printf 'Unchanged: %s\n' "$rel"
             return 0
         fi
 
@@ -244,7 +244,7 @@ replace_file_if_changed() {
         mkdir -p "$(dirname "$dst")"
 
         if ! cp -a "$src" "$dst"; then
-            printf '❌ Failed to update: %s\n' "$dst" >&2
+            printf '× Failed to update: %s\n' "$dst" >&2
             return 1
         fi
 
@@ -263,7 +263,7 @@ replace_file_if_changed() {
     mkdir -p "$(dirname "$dst")"
 
     if ! cp -a "$src" "$dst"; then
-        printf '❌ Failed to install: %s\n' "$dst" >&2
+        printf '× Failed to install: %s\n' "$dst" >&2
         return 1
     fi
 
@@ -346,7 +346,7 @@ update_bash_completion() {
     # These are separate checks, so both messages can appear together.
 
     if check_bash_rc_configured "$rc_file"; then
-        printf '✅ Bash completion loader already configured in %s for %s\n' "$rc_file" "$dst_dir"
+        printf '✓ Bash completion loader already configured in %s for %s\n' "$rc_file" "$dst_dir"
         log "bash completion loader already configured in $rc_file for $dst_dir"
         return 0
     fi
@@ -355,7 +355,7 @@ update_bash_completion() {
 
     cat <<EOF
 
-⚠️  BASH COMPLETION SETUP REQUIRED
+! BASH COMPLETION SETUP REQUIRED
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 To enable bash completion for my-unicorn, add this to:
 
@@ -453,7 +453,7 @@ update_zsh_completion() {
     # These are separate checks, so both messages can appear together.
 
     if check_zsh_fpath_configured "$rc_file" "$dst_dir"; then
-        printf '✅ Zsh fpath already configured in %s for %s\n' "$rc_file" "$dst_dir"
+        printf '✓ Zsh fpath already configured in %s for %s\n' "$rc_file" "$dst_dir"
         log "zsh fpath already configured in $rc_file for $dst_dir"
         return 0
     fi
@@ -462,7 +462,7 @@ update_zsh_completion() {
 
     cat <<EOF
 
-⚠️  ZSH COMPLETION SETUP REQUIRED
+! ZSH COMPLETION SETUP REQUIRED
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Add this BEFORE any 'compinit' call inside:
 
@@ -506,7 +506,7 @@ main() {
         return 1
     fi
 
-    printf '✅ Autocomplete update finished.\n'
+    printf '✓ Autocomplete update finished.\n'
 }
 
 main "$@"

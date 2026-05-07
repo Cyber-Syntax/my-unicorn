@@ -181,7 +181,7 @@ def warn_about_migration(config_manager: Any) -> None:
         len(apps_needing_migration),
     )
     logger.info(
-        "⚠️  Found %d app(s) with old config format.",
+        "! Found %d app(s) with old config format.",
         len(apps_needing_migration),
     )
     logger.info("   Run 'my-unicorn migrate' to upgrade these apps:")

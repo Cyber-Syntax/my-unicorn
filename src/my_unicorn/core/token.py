@@ -252,7 +252,7 @@ class KeyringTokenStore:
             error_msg = str(e)
             if "DBUS" in error_msg or "DBus" in error_msg:
                 logger.exception("Keyring unavailable in headless environment")
-                logger.info("❌ Keyring not available in headless environment")
+                logger.info("× Keyring not available in headless environment")
                 logger.info(
                     "💡 Future: Environment variable support coming soon"
                 )

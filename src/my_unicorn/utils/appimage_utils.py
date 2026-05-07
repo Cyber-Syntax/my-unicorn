@@ -187,8 +187,8 @@ async def verify_appimage_download(  # noqa: PLR0913
 
     logger.debug("Performing verification: app=%s", app_name)
     logger.debug("   📋 Config: %s", config)
-    logger.debug("   📦 Asset digest: %s", asset.digest or "None")
-    logger.debug("   📦 Assets list: %d items", len(assets))
+    logger.debug("   Asset digest: %s", asset.digest or "None")
+    logger.debug("   Assets list: %d items", len(assets))
 
     try:
         # Perform verification using verification service
@@ -212,7 +212,7 @@ async def verify_appimage_download(  # noqa: PLR0913
             "updated_config": {},
         }
 
-    logger.debug("✅ Verification completed successfully")
+    logger.debug("✓ Verification completed successfully")
 
     # Handle both dict and object returns from mocked verification service
     if isinstance(result, dict):

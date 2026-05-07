@@ -63,7 +63,7 @@ class TestFormatVerificationInfo:
 
         assert "✓ SHA256 digest (github_api)" in result
         assert "✗ SHA256 checksum_file (SHA256SUMS.txt)" in result
-        assert "⚠ Partial verification: 1 passed, 1 failed" in result
+        assert "! Partial verification: 1 passed, 1 failed" in result
 
     def test_multi_method_url_source_shortened(self) -> None:
         """Test that URL sources are shortened to filename."""

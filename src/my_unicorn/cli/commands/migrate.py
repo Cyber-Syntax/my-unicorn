@@ -44,7 +44,7 @@ class MigrateHandler(BaseCommandHandler):
         )
 
         if not apps_to_migrate:
-            logger.info("ℹ️  All app configs are already up to date")
+            logger.info("All app configs are already up to date")
         else:
             logger.info(
                 "🔄 Found %s app(s) to migrate to v%s...",
@@ -64,17 +64,17 @@ class MigrateHandler(BaseCommandHandler):
 
         if total_errors > 0:
             logger.info("")
-            logger.info("⚠️  Migration completed with %s errors", total_errors)
+            logger.info("! Migration completed with %s errors", total_errors)
             return
 
         if total_migrated == 0:
             logger.info("")
-            logger.info("ℹ️  All configs already up to date")
+            logger.info("All configs already up to date")
             return
 
         logger.info("")
         logger.info(
-            "✅ Migration complete! Migrated %s configs", total_migrated
+            "✓ Migration complete! Migrated %s configs", total_migrated
         )
         logger.info("Run 'my-unicorn catalog' to verify.")
 
@@ -111,7 +111,7 @@ class MigrateHandler(BaseCommandHandler):
             logger.info("Apps to migrate:")
             for app_name, current_version in apps_to_migrate:
                 logger.info(
-                    "  • %s: v%s → v%s",
+                    "  - %s: v%s → v%s",
                     app_name,
                     current_version,
                     APP_CONFIG_VERSION,
@@ -125,7 +125,7 @@ class MigrateHandler(BaseCommandHandler):
             logger.info("Catalogs to migrate:")
             for catalog_name, current_version in catalogs_to_migrate:
                 logger.info(
-                    "  • %s: v%s → v%s",
+                    "  - %s: v%s → v%s",
                     catalog_name,
                     current_version,
                     CATALOG_CONFIG_VERSION,
@@ -143,7 +143,7 @@ class MigrateHandler(BaseCommandHandler):
             logger.info("")
             logger.info("Run without --dry-run to perform the migration")
         else:
-            logger.info("ℹ️  No migration needed")
+            logger.info("No migration needed")
 
         # Allow time for queue to drain
         await asyncio.sleep(0.1)
@@ -158,7 +158,7 @@ class MigrateHandler(BaseCommandHandler):
         apps = self.config_manager.app_config_manager.list_installed_apps()
 
         if not apps:
-            logger.info("ℹ️  No apps installed")
+            logger.info("No apps installed")
             return {"migrated": 0, "errors": 0}
 
         migrated = 0
@@ -172,7 +172,7 @@ class MigrateHandler(BaseCommandHandler):
                 # Only show apps that were actually migrated
                 if result["migrated"]:
                     logger.info(
-                        "✅ %s: v%s → v%s",
+                        "✓ %s: v%s → v%s",
                         app_name,
                         result["from"],
                         result["to"],
@@ -181,7 +181,7 @@ class MigrateHandler(BaseCommandHandler):
                 # Silently skip apps already at target version
 
             except Exception as e:
-                logger.info("❌ %s: %s", app_name, e)
+                logger.info("× %s: %s", app_name, e)
                 logger.error("Failed to migrate %s: %s", app_name, e)
                 errors += 1
 
@@ -199,7 +199,7 @@ class MigrateHandler(BaseCommandHandler):
             catalog_files = list(catalog_dir.glob("*.json"))
 
             if not catalog_files:
-                logger.info("ℹ️  No catalog files found")
+                logger.info("No catalog files found")
                 return {"migrated": 0, "errors": 0}
 
             migrated = 0
@@ -217,7 +217,7 @@ class MigrateHandler(BaseCommandHandler):
                         base.save_json_file(catalog_file, migrated_catalog)
 
                         logger.info(
-                            "✅ %s: v%s → v%s",
+                            "✓ %s: v%s → v%s",
                             catalog_file.stem,
                             current_version,
                             CATALOG_CONFIG_VERSION,
@@ -227,12 +227,12 @@ class MigrateHandler(BaseCommandHandler):
 
                 except Exception as e:
                     logger.error("Failed to migrate %s: %s", catalog_file, e)
-                    logger.info("❌ %s: %s", catalog_file.stem, e)
+                    logger.info("× %s: %s", catalog_file.stem, e)
                     return {"migrated": 0, "errors": 1}
 
             return {"migrated": migrated, "errors": 0}
 
         except Exception as e:
             logger.error("Catalog migration failed: %s", e)
-            logger.info("❌ Catalog migration failed: %s", e)
+            logger.info("× Catalog migration failed: %s", e)
             return {"migrated": 0, "errors": 1}

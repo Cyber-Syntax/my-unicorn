@@ -6,16 +6,16 @@ These should pass through filtering and be cached:
 
 ```
 # checksum files
-✅ "QOwnNotes-x86_64.AppImage.sha256sum"
-✅ "Flameshot-13.3.0.x86_64.AppImage.sha256sum"
-✅ "<appimage_name>.sha512sum"
-✅ "KeePassXC-2.7.10-x86_64.AppImage.DIGEST"
-✅ "latest-linux.yml"
-✅ "SHA256SUMS"
-✅ "SHA256SUMS.txt"
+✓ "QOwnNotes-x86_64.AppImage.sha256sum"
+✓ "Flameshot-13.3.0.x86_64.AppImage.sha256sum"
+✓ "<appimage_name>.sha512sum"
+✓ "KeePassXC-2.7.10-x86_64.AppImage.DIGEST"
+✓ "latest-linux.yml"
+✓ "SHA256SUMS"
+✓ "SHA256SUMS.txt"
 
 # appimages
-✅ "QOwnNotes-x86_64.AppImage"
+✓ "QOwnNotes-x86_64.AppImage"
 ✅ "standard-notes-3.198.5-linux-x86_64.AppImage"
 ✅ "zen-x86_64.AppImage"
 ✅ "tagspaces-linux-x86_64-6.6.4.AppImage"
@@ -44,18 +44,18 @@ These should pass through filtering and be cached:
 These should NOT appear in cache files:
 
 ```
-❌ "freetube-0.23.12-beta-armv7l.AppImage"           # ARM 32-bit
-❌ "freetube-0.23.12-beta-arm64.AppImage"            # ARM 64-bit
-❌ "QOwnNotes-x86_64-Qt6-experimental.AppImage"      # Experimental
-❌ "QOwnNotes-x86_64-Qt6-experimental.AppImage.sha256sum"  # Experimental checksum
-❌ "Obsidian-1.9.14-arm64.AppImage"                  # ARM 64-bit
-❌ "nvim-linux-arm64.appimage"                       # ARM 64-bit
-❌ "latest-linux-arm.yml"                            # ARM
-❌ "latest-mac-arm64.yml"                            # macOS
-❌ "KeePassXC-2.7.10-Win64.zip.DIGEST"               # Windows
-❌ "KeePassXC-2.7.10-Win64.msi.DIGEST"               # Windows
-❌ "KeePassXC-2.7.10-Win64-LegacyWindows.zip.DIGEST" # Windows
-❌ "KeePassXC-2.7.10-Win64-LegacyWindows.msi.DIGEST" # Windows
-❌ "KeePassXC-2.7.10-arm64.dmg.DIGEST"               # macOS
-❌ "KeePassXC-2.7.10-x86_64.dmg.DIGEST"              # macOS
+× "freetube-0.23.12-beta-armv7l.AppImage"           # ARM 32-bit
+× "freetube-0.23.12-beta-arm64.AppImage"            # ARM 64-bit
+× "QOwnNotes-x86_64-Qt6-experimental.AppImage"      # Experimental
+× "QOwnNotes-x86_64-Qt6-experimental.AppImage.sha256sum"  # Experimental checksum
+× "Obsidian-1.9.14-arm64.AppImage"                  # ARM 64-bit
+× "nvim-linux-arm64.appimage"                       # ARM 64-bit
+× "latest-linux-arm.yml"                            # ARM
+× "latest-mac-arm64.yml"                            # macOS
+× "KeePassXC-2.7.10-Win64.zip.DIGEST"               # Windows
+× "KeePassXC-2.7.10-Win64.msi.DIGEST"               # Windows
+× "KeePassXC-2.7.10-Win64-LegacyWindows.zip.DIGEST" # Windows
+× "KeePassXC-2.7.10-Win64-LegacyWindows.msi.DIGEST" # Windows
+× "KeePassXC-2.7.10-arm64.dmg.DIGEST"               # macOS
+× "KeePassXC-2.7.10-x86_64.dmg.DIGEST"              # macOS
 ```

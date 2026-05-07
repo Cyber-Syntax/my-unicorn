@@ -391,7 +391,7 @@ def _parse_traditional_checksum_file(
     # type passed by the caller and validate the raw hash length strictly.
     hash_only = _parse_hash_only_content(content, hash_type)
     if hash_only:
-        logger.debug("   ✅ Hash-only checksum detected (fallback mode)")
+        logger.debug("   ✓ Hash-only checksum detected (fallback mode)")
         logger.debug("   Hash: %s", hash_only)
         return hash_only
 
@@ -422,7 +422,7 @@ def _parse_traditional_checksum_file(
         if file_in_checksum == filename or file_in_checksum.endswith(
             f"/{filename}"
         ):
-            logger.debug("   ✅ Match found on line %d", line_num)
+            logger.debug("   ✓ Match found on line %d", line_num)
             logger.debug("   Hash: %s", hash_value)
             return hash_value
 
@@ -430,7 +430,7 @@ def _parse_traditional_checksum_file(
         file_variants = _generate_variants(file_in_checksum)
         if target_variants.intersection(file_variants):
             logger.debug(
-                "   ⚠️ Relaxed match found on line %d (variants): %s",
+                "   !Relaxed match found on line %d (variants): %s",
                 line_num,
                 file_in_checksum,
             )
@@ -611,7 +611,7 @@ def _parse_yaml_checksum_file(
         Tuple of (hash_value, algorithm) or None.
     """
     if not _YAML_AVAILABLE:
-        logger.warning("⚠️  YAML parsing not available")
+        logger.warning("! YAML parsing not available")
         return None
 
     try:
@@ -632,7 +632,7 @@ def _parse_yaml_checksum_file(
             return _parse_yaml_files_list(files, filename)
         return None  # noqa: TRY300 - multiple early returns in try block
     except yaml.YAMLError:
-        logger.exception("❌ Failed to parse YAML checksum file")
+        logger.exception("× Failed to parse YAML checksum file")
         return None
 
 
@@ -722,7 +722,7 @@ def convert_base64_to_hex(base64_hash: str) -> str:
     try:
         return base64.b64decode(base64_hash).hex()
     except Exception as exc:  # pragma: no cover - kept for safety
-        logger.exception("❌ Failed to convert base64 to hex")
+        logger.exception("× Failed to convert base64 to hex")
         msg = f"Invalid base64 hash: {base64_hash}"
         raise ValueError(msg) from exc
 

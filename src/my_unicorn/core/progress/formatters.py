@@ -68,7 +68,7 @@ def format_app_status_line(
 
     Args:
         app_name: Name of the application.
-        status_icon: Icon/emoji representing status (✅, ❌, etc.).
+        status_icon: Icon/emoji representing status (✓, ×, etc.).
         status_message: Status message to display.
         name_width: Width for the app name column.
 
@@ -158,7 +158,7 @@ def determine_task_status_symbol(
         spinner: Spinner character to use for in-progress tasks.
 
     Returns:
-        Status symbol: ✓ (success), ✖ (error), ⚠ (warning), or spinner.
+        Status symbol: ✓ (success), ✖ (error), ! (warning), or spinner.
 
     """
     if not status_info.is_finished:
@@ -170,7 +170,7 @@ def determine_task_status_symbol(
         and status_info.description
         and "not verified" in status_info.description.lower()
     ):
-        return "⚠"
+        return "!"
 
     return "✓" if status_info.success else "✖"
 
@@ -224,7 +224,7 @@ def format_verification_info(verification: dict[str, Any]) -> str:
     Example output:
         ✓ SHA256 digest (github_api)
         ✗ SHA256 checksum (SHA256SUMS.txt)
-        ⚠ Partial verification: 1 passed, 1 failed
+        ! Partial verification: 1 passed, 1 failed
 
     """
     methods = verification.get("methods")
@@ -248,7 +248,7 @@ def format_verification_info(verification: dict[str, Any]) -> str:
 
     warning = verification.get("warning")
     if warning:
-        lines.append(f"⚠ {warning}")
+        lines.append(f"! {warning}")
 
     return "\n".join(lines)
 

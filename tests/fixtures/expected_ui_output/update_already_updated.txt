@@ -1,0 +1,4 @@
+Update Summary:
+--------------------------------------------------
+qownnotes                 Already up to date (26.5.5)
+appflowy                  Already up to date (0.11.8)

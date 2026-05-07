@@ -183,7 +183,7 @@ cache.py (base)
 **Core → UI**:
 
 - `ProgressReporter`: Protocol implemented by UI layer
-- UI imports Core (not vice versa) ✅ Dependency inversion
+- UI imports Core (not vice versa) ✓ Dependency inversion
 
 **Core → Utils**:
 

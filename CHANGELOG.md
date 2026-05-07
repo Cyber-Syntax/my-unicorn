@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - sha1, md5 checksum support removed #269
+- Removed redundant summary field and emojis from cli output.
 
 ## [2.5.2-alpha] - 2026-04-30
 

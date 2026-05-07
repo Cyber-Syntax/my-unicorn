@@ -85,7 +85,7 @@ async def test_catalog_installed_apps(
 
     await catalog_handler.execute(args)
 
-    mock_logger.info.assert_any_call("📦 Installed AppImages:")
+    mock_logger.info.assert_any_call("Installed AppImages:")
     # Check for migration prompt
     assert any(
         "my-unicorn migrate" in str(call)
@@ -103,6 +103,6 @@ async def test_catalog_info(
 
     await catalog_handler.execute(args)
 
-    mock_logger.info.assert_any_call("📦 %s", "app1")
+    mock_logger.info.assert_any_call("%s", "app1")
     mock_logger.info.assert_any_call("  %s", "Test app description")
     mock_logger.info.assert_any_call("  Repository:     %s", "test/app1")

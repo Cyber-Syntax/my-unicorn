@@ -11,17 +11,14 @@ Installing:
 (2/2) Installing qownnotes ✓
 (1/2) Verifying appflowy ✓
 (2/2) Installing appflowy ✓
-(1/2) Verifying weektodo ⚠
+(1/2) Verifying weektodo !
     not verified (dev did not provide checksums)
 (2/2) Installing weektodo ✓
 
 
-📦 Installation Summary:
+Installation Summary:
 --------------------------------------------------
-appflowy                  ✅ 0.11.1
-qownnotes                 ✅ 26.2.4
-weektodo                  ✅ 2.2.0
-                             ⚠️  Not verified - developer did not provide checksums
-
-🎉 Successfully installed 3 app(s)
-⚠️  1 app(s) installed with warnings
+appflowy                  ✓ 0.11.1
+qownnotes                 ✓ 26.2.4
+weektodo                  ✓ 2.2.0
+                             ! Not verified - developer did not provide checksums

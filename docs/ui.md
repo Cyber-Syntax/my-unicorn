@@ -1,4 +1,6 @@
 # UI Documentation
+> [!WARNING] 
+> This design is currently in use but going to change to pacman-style design which will be more easy to develop which current one is complex.
 
 Welcome to the UI documentation for my-unicorn! This guide shows you what the command-line interface looks like during different operations. Each example demonstrates real output, so you can see exactly what happens when you run commands.
 
@@ -18,23 +20,30 @@ my-unicorn install weektodo
 
 ```
 Fetching from API:
-GitHub Releases      1/1 Retrieved from cache
+GitHub Releases      3/3 Retrieved
 
-Downloading:
-WeekToDo-2.2.0  108.6 MiB  11.2 MB/s 00:00 [==============================]   100% ✓
+Downloading (3):
+AppFlowy-0.11.1-linux-x86_64   77.6 MiB   5.3 MB/s 00:00 [==============================]   100% ✓
+QOwnNotes-x86_64               41.6 MiB   4.5 MB/s 00:00 [==============================]   100% ✓
+WeekToDo-2.2.0                108.6 MiB  10.7 MB/s 00:00 [==============================]   100% ✓
 
 Installing:
-(1/2) Verifying weektodo ⚠
+(1/2) Verifying qownnotes ✓
+(2/2) Installing qownnotes ✓
+(1/2) Verifying appflowy ✓
+(2/2) Installing appflowy ✓
+(1/2) Verifying weektodo !
     not verified (dev did not provide checksums)
 (2/2) Installing weektodo ✓
 
-📦 Installation Summary:
---------------------------------------------------
-weektodo                  ✅ 2.2.0
-                             ⚠️  Not verified - developer did not provide checksums
 
-🎉 Successfully installed 1 app(s)
-⚠️  1 app(s) installed with warnings
+Installation Summary:
+--------------------------------------------------
+appflowy                  ✓ 0.11.1
+qownnotes                 ✓ 26.2.4
+weektodo                  ✓ 2.2.0
+                             ! Not verified - developer did not provide checksums
+
 ```
 
 #### Example: Installing from a GitHub URL with partial verification
@@ -56,13 +65,10 @@ Installing:
 (1/2) Verifying legcord ✓
 (2/2) Installing legcord ✓
 
-📦 Installation Summary:
+Installation Summary:
 --------------------------------------------------
-legcord                   ✅ 1.2.1
-                             ⚠️  Partial verification: 2 passed, 1 failed
-
-🎉 Successfully installed 1 app(s)
-⚠️  1 app(s) installed with warnings
+legcord                   ✓ 1.2.1
+                             ! Partial verification: 2 passed, 1 failed
 ```
 
 ### Without Warnings
@@ -72,27 +78,31 @@ When everything verifies perfectly, you get clean output.
 #### Example: Fresh install from API
 
 ```bash
-my-unicorn install qownnotes
+my-unicorn install qownnotes appflowy
 ```
 
 **Output:**
 
 ```
 Fetching from API:
-GitHub Releases      1/1 Retrieved
+GitHub Releases      2/2 Retrieved
 
-Downloading:
-QOwnNotes-x86_64   41.6 MiB  19.8 MB/s 00:00 [==============================]   100% ✓
+Downloading (2):
+AppFlowy-0.11.1-linux-x86_64   77.6 MiB  10.8 MB/s 00:00 [==============================]   100% ✓
+QOwnNotes-x86_64               41.6 MiB   3.6 MB/s 00:00 [==============================]   100% ✓
 
 Installing:
 (1/2) Verifying qownnotes ✓
 (2/2) Installing qownnotes ✓
+(1/2) Verifying appflowy ✓
+(2/2) Installing appflowy ✓
 
-📦 Installation Summary:
+
+Installation Summary:
 --------------------------------------------------
-qownnotes                 ✅ 26.2.0
+appflowy                  ✓ 0.11.1
+qownnotes                 ✓ 26.2.4
 
-🎉 Successfully installed 1 app(s)
 ```
 
 ## Update Examples
@@ -118,12 +128,9 @@ Installing:
 (1/2) Verifying qownnotes ✓
 (2/2) Installing qownnotes ✓
 
-📦 Update Summary:
+Update Summary:
 --------------------------------------------------
-Successfully updated qownnotes
-qownnotes                 ✅ 0.1.0 → 26.2.0
-
-🎉 Successfully updated 1 app(s)
+qownnotes                 ✓ 0.1.0 → 26.2.0
 ```
 
 #### Example may still building
@@ -135,21 +142,18 @@ Fetching from API:
 GitHub Releases      2/2 Retrieved from cache
 
 Downloading:
-helium-0.10.2.1-x86_64  143.9 MiB  10.8 MB/s 00:00 [==============================]   100% ✓
+QOwnNotes-x86_64   57.8 MiB  10.0 MB/s 00:00 [==============================]   100% ✓
 
 Installing:
-(1/2) Verifying helium-linux ✓
-(2/2) Installing helium-linux ✓
+(1/2) Verifying qownnotes ✓
+(2/2) Installing qownnotes ✓
 
-
-📦 Update Summary:
+Update Summary:
 --------------------------------------------------
-helium-linux              ✅ 0.9.4.1 → 0.10.2.1
-nuclear                   ❌ Update failed
+qownnotes                 ✓ 0.1.0 → 26.5.5
+ytmdesktop                × Update failed
                              → AppImage not found in release - may still be building
-
-🎉 Successfully updated 1 app(s)
-❌ 1 app(s) failed to update
+appflowy                  Already up to date (0.11.8)
 ```
 
 ## Remove Examples
@@ -165,12 +169,12 @@ my-unicorn remove qownnotes
 **Output:**
 
 ```
-✅ Removed AppImage(s): /home/developer/Applications/qownnotes.AppImage
-✅ Removed cache for pbek/QOwnNotes
-⚠️  No backups found at: /home/developer/Applications/backups/qownnotes
-✅ Removed desktop entry for qownnotes
-✅ Removed icon: /home/developer/Applications/icons/qownnotes.png
-✅ Removed config for qownnotes
+✓ Removed AppImage(s): /home/developer/Applications/qownnotes.AppImage
+✓ Removed cache for pbek/QOwnNotes
+! No backups found at: /home/developer/Applications/backups/qownnotes
+✓ Removed desktop entry for qownnotes
+✓ Removed icon: /home/developer/Applications/icons/qownnotes.png
+✓ Removed config for qownnotes
 ```
 
 ## Batch Operations
@@ -199,15 +203,12 @@ Installing:
 (1/2) Verifying legcord ✓
 (2/2) Installing legcord ✓
 
-📦 Installation Summary:
+Installation Summary:
 --------------------------------------------------
-legcord                   ✅ 1.2.1
-flameshot                 ✅ 13.3.0
-appflowy                  ℹ️  Already installed
-standard-notes            ℹ️  Already installed
-
-🎉 Successfully installed 2 app(s)
-ℹ️  2 app(s) already installed
+legcord                   ✓ 1.2.1
+flameshot                 ✓ 13.3.0
+appflowy                  Already installed
+standard-notes            Already installed
 ```
 
 ### Example: Updating multiple apps
@@ -241,15 +242,13 @@ Installing:
 (1/2) Verifying standard-notes ✓
 (2/2) Installing standard-notes ✓
 
-📦 Update Summary:
+Update Summary:
 --------------------------------------------------
-legcord                   ✅ 0.1.0 → 1.2.1
-flameshot                 ✅ 0.1.0 → 13.3.0
-appflowy                  ✅ 0.1.0 → 0.11.1
-keepassxc                 ✅ 0.1.0 → 2.7.11
-standard-notes            ✅ 0.1.0 → 3.201.10
-
-🎉 Successfully updated 5 app(s)
+legcord                   ✓ 0.1.0 → 1.2.1
+flameshot                 ✓ 0.1.0 → 13.3.0
+appflowy                  ✓ 0.1.0 → 0.11.1
+keepassxc                 ✓ 0.1.0 → 2.7.11
+standard-notes            ✓ 0.1.0 → 3.201.10
 ```
 
 ### Example: Updating all installed apps
@@ -278,30 +277,56 @@ Installing:
 (2/2) Installing tagspaces ✓
 
 
-📦 Update Summary:
+Update Summary:
 --------------------------------------------------
-tagspaces                 ✅ 6.8.2 → 6.9.0
-super-productivity        ✅ 17.1.2 → 17.1.3
-zen-browser               ✅ 1.18.4b → 1.18.5b
-neovim                    ℹ️  Already up to date (0.11.6)
-kdiskmark                 ℹ️  Already up to date (3.2.0)
-legcord                   ℹ️  Already up to date (1.2.1)
-obsidian                  ℹ️  Already up to date (1.11.7)
-qownnotes                 ℹ️  Already up to date (26.2.0)
-cherrytree                ℹ️  Already up to date (1.6.3)
-keepassxc                 ℹ️  Already up to date (2.7.11)
-heroicgameslauncher       ℹ️  Already up to date (2.19.1)
-weektodo                  ℹ️  Already up to date (2.2.0)
-endless-sky               ℹ️  Already up to date (0.10.16)
-nuclear                   ℹ️  Already up to date (0.6.48)
-flameshot                 ℹ️  Already up to date (13.3.0)
-beekeeper-studio          ℹ️  Already up to date (5.5.6)
-standard-notes            ℹ️  Already up to date (3.201.10)
-freetube                  ℹ️  Already up to date (0.23.13-beta)
-appflowy                  ℹ️  Already up to date (0.11.1)
+tagspaces                 ✓ 6.8.2 → 6.9.0
+super-productivity        ✓ 17.1.2 → 17.1.3
+zen-browser               ✓ 1.18.4b → 1.18.5b
+neovim                    Already up to date (0.11.6)
+kdiskmark                 Already up to date (3.2.0)
+legcord                   Already up to date (1.2.1)
+obsidian                  Already up to date (1.11.7)
+qownnotes                 Already up to date (26.2.0)
+cherrytree                Already up to date (1.6.3)
+keepassxc                 Already up to date (2.7.11)
+heroicgameslauncher       Already up to date (2.19.1)
+weektodo                  Already up to date (2.2.0)
+endless-sky               Already up to date (0.10.16)
+nuclear                   Already up to date (0.6.48)
+flameshot                 Already up to date (13.3.0)
+beekeeper-studio          Already up to date (5.5.6)
+standard-notes            Already up to date (3.201.10)
+freetube                  Already up to date (0.23.13-beta)
+appflowy                  Already up to date (0.11.1)
+```
 
-🎉 Successfully updated 3 app(s)
-ℹ️  16 app(s) already up to date
+### Example: already installed
+
+```bash
+my-unicorn install appflowy qownnotes
+```
+
+**Output:**
+
+```
+✓ All 2 specified app(s) are already installed:
+   - appflowy
+   - qownnotes
+```
+
+### Example: already updated
+
+```bash
+my-unicorn install appflowy qownnotes
+```
+
+**Output:**
+
+```
+Update Summary:
+--------------------------------------------------
+qownnotes                 Already up to date (26.5.5)
+appflowy                  Already up to date (0.11.8)
 ```
 
 ## Understanding the Output
@@ -320,10 +345,10 @@ Shows progress bars with speed and completion status.
 
 - **Verifying**: Checking file integrity with checksums
 - **✓**: Success
-- **⚠**: Warning (e.g., no checksums provided)
+- **!**: Warning (e.g., no checksums provided)
 
 ### Summary Phase
 
-- **✅**: Successfully installed/updated
-- **⚠️**: Warnings present
-- **ℹ️**: Already installed (no action needed)
+- **✓**: Successfully installed/updated
+- **!**: Warnings present
+- Already installed (no action needed)

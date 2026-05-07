@@ -49,7 +49,7 @@ class BackupHandler(BaseCommandHandler):
             return True  # Global cleanup allowed
 
         if not args.app_name:
-            logger.error("❌ App name is required for this operation")
+            logger.error("× App name is required for this operation")
             logger.info("Usage: backup <app_name> [options]")
             return False
 
@@ -59,7 +59,7 @@ class BackupHandler(BaseCommandHandler):
             .replace(".", "")
             .isalnum()
         ):
-            logger.error("❌ Invalid app name: %s", args.app_name)
+            logger.error("× Invalid app name: %s", args.app_name)
             return False
 
         return True
@@ -78,12 +78,12 @@ class BackupHandler(BaseCommandHandler):
         if path := service.restore_latest_backup(app_name, storage_dir):
             version = config.get("state", {}).get("version", "unknown")
             logger.info(
-                "✅ Successfully restored %s from latest backup", app_name
+                "✓ Successfully restored %s from latest backup", app_name
             )
             logger.info("Restored to: %s", path)
             logger.info("App configuration updated to version: %s", version)
         else:
-            logger.error("❌ No backups found for %s", app_name)
+            logger.error("× No backups found for %s", app_name)
 
     async def _restore_version(
         self, service: BackupService, app_name: str, version: str
@@ -98,10 +98,10 @@ class BackupHandler(BaseCommandHandler):
         if path := service.restore_specific_version(
             app_name, version, storage_dir
         ):
-            logger.info("✅ Successfully restored %s v%s", app_name, version)
+            logger.info("✓ Successfully restored %s v%s", app_name, version)
             logger.info("Restored to: %s", path)
         else:
-            logger.error("❌ Version %s not found for %s", version, app_name)
+            logger.error("× Version %s not found for %s", version, app_name)
 
     async def _create_backup(
         self, service: BackupService, app_name: str
@@ -124,7 +124,7 @@ class BackupHandler(BaseCommandHandler):
         appimage_path = storage_dir / f"{app_rename}.AppImage"
 
         if not appimage_path.exists():
-            logger.error("❌ AppImage file not found: %s", appimage_path)
+            logger.error("× AppImage file not found: %s", appimage_path)
             return
 
         version = config.get("state", {}).get("version", "unknown")
@@ -132,11 +132,11 @@ class BackupHandler(BaseCommandHandler):
             appimage_path, app_name, version
         ):
             logger.info(
-                "✅ Successfully created backup for %s v%s", app_name, version
+                "✓ Successfully created backup for %s v%s", app_name, version
             )
             logger.info("Backup saved to: %s", backup_path)
         else:
-            logger.error("❌ Failed to create backup for %s", app_name)
+            logger.error("× Failed to create backup for %s", app_name)
 
     async def _list_backups(
         self, service: BackupService, app_name: str
@@ -158,7 +158,7 @@ class BackupHandler(BaseCommandHandler):
                 if backup["created"]
                 else "Unknown"
             )
-            symbol = "✅" if backup["exists"] else "❌"
+            symbol = "✓" if backup["exists"] else "×"
             logger.info("  %s v%s", symbol, backup["version"])
             logger.info("     File: %s", backup["filename"])
             logger.info("     Size: %.1f MB", size_mb)
@@ -178,10 +178,10 @@ class BackupHandler(BaseCommandHandler):
         service.cleanup_old_backups(app_name)
         max_backups = self.global_config["max_backup"]
         if max_backups == 0:
-            logger.info("✅ All backups removed (max_backup=0)")
+            logger.info("✓ All backups removed (max_backup=0)")
         else:
             logger.info(
-                "✅ Cleanup completed (keeping %s most recent backups)",
+                "✓ Cleanup completed (keeping %s most recent backups)",
                 max_backups,
             )
 
@@ -198,7 +198,7 @@ class BackupHandler(BaseCommandHandler):
         )
         logger.info("\n📊 Backup Statistics for %s:", app_name)
         logger.info("=" * 60)
-        logger.info("  📦 Total backups: %s", len(backups))
+        logger.info("  Total backups: %s", len(backups))
         logger.info("  📏 Total size: %.1f MB", total_size_mb)
 
         if backups:
@@ -240,7 +240,7 @@ class BackupHandler(BaseCommandHandler):
         """Check if app is installed and return config if found."""
         config = self.config_manager.load_app_config(app_name)
         if not config:
-            logger.error("❌ App '%s' is not installed", app_name)
+            logger.error("× App '%s' is not installed", app_name)
             logger.info(
                 "Use 'my-unicorn catalog' to see installed applications"
             )

@@ -72,12 +72,12 @@ class CacheHandler(BaseCommandHandler):
         """
         if args.all:
             await self.cache_manager.clear_cache()
-            logger.info("✅ Cleared all cache entries")
+            logger.info("✓ Cleared all cache entries")
         elif args.app_name:
             # Parse owner/repo from app name
             owner, repo = self._parse_app_name(args.app_name)
             await self.cache_manager.clear_cache(owner, repo)
-            logger.info("✅ Cleared cache for %s/%s", owner, repo)
+            logger.info("✓ Cleared cache for %s/%s", owner, repo)
         else:
             logger.error("Please specify either --all or an app name to clear")
             sys.exit(1)
@@ -100,18 +100,18 @@ class CacheHandler(BaseCommandHandler):
 
             total_entries = stats["total_entries"]
             if isinstance(total_entries, int) and total_entries > 0:
-                logger.info("✅ Fresh Entries: %s", stats["fresh_entries"])
+                logger.info("✓ Fresh Entries: %s", stats["fresh_entries"])
                 logger.info("⏰ Expired Entries: %s", stats["expired_entries"])
                 corrupted = stats["corrupted_entries"]
                 if isinstance(corrupted, int) and corrupted > 0:
-                    logger.info("❌ Corrupted Entries: %s", corrupted)
+                    logger.info("× Corrupted Entries: %s", corrupted)
             else:
                 logger.info("📭 No cache entries found")
 
             if "error" in stats:
-                logger.info("⚠️ Error getting stats: %s", stats["error"])
+                logger.info("!Error getting stats: %s", stats["error"])
         except Exception as e:
-            logger.info("❌ Failed to get cache stats: %s", e)
+            logger.info("× Failed to get cache stats: %s", e)
             sys.exit(1)
 
     def _parse_app_name(self, app_name: str) -> tuple[str, str]:

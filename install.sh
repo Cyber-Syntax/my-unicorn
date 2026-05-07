@@ -99,7 +99,7 @@ print_error() {
   local message
   message="$1"
 
-  printf '❌ %s\n' "$message" >&2
+  printf '× %s\n' "$message" >&2
 }
 
 # -----------------------------------------------------------------------------
@@ -191,13 +191,13 @@ normalize_version_tag() {
 # to run `my-unicorn`.
 check_local_bin_in_path() {
   if [[ ":$PATH:" == *":$LOCAL_BIN_DIR:"* ]]; then
-    print_info "✅ $LOCAL_BIN_DIR is already in your PATH"
+    print_info "✓ $LOCAL_BIN_DIR is already in your PATH"
     return 0
   fi
 
   cat <<EOF
 
-⚠️  IMPORTANT: $LOCAL_BIN_DIR is not in your PATH
+! IMPORTANT: $LOCAL_BIN_DIR is not in your PATH
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 To use '${CLI_NAME}' from anywhere, add this line to your shell config:
 
@@ -246,7 +246,7 @@ setup_autocomplete_from_src() {
     return 0
   fi
 
-  print_info "⚠️  Warning: Autocomplete helper not found at $autocomplete_helper"
+  print_info "! Warning: Autocomplete helper not found at $autocomplete_helper"
 }
 
 # -----------------------------------------------------------------------------
@@ -269,7 +269,7 @@ copy_update_script() {
   src_path="$src_dir/scripts/update.bash"
 
   if [[ ! -f "$src_path" ]]; then
-    print_info "⚠️  Warning: Update script not found at $src_path, skipping copy."
+    print_info "! Warning: Update script not found at $src_path, skipping copy."
     return 0
   fi
 
@@ -285,7 +285,7 @@ copy_update_script() {
     return 1
   fi
 
-  print_info "✅ Update script copied to $UPDATE_SCRIPT_PATH"
+  print_info "✓ Update script copied to $UPDATE_SCRIPT_PATH"
 }
 
 # -----------------------------------------------------------------------------
@@ -409,7 +409,7 @@ install_with_uv_tool() {
   setup_autocomplete_from_src "$src_dir"
   copy_update_script
 
-  print_info "✅ Installation complete using uv tool."
+  print_info "✓ Installation complete using uv tool."
   print_info "Run '${CLI_NAME} --help' to get started."
 }
 
@@ -444,7 +444,7 @@ install_with_uv_editable() {
   setup_autocomplete_from_src "$src_dir"
   copy_update_script
 
-  print_info "✅ Editable installation complete."
+  print_info "✓ Editable installation complete."
   print_info "Changes to source code will be reflected immediately."
 }
 
@@ -490,7 +490,7 @@ uninstall_my_unicorn() {
       fi
       print_info "🗑️  Removed uv tool installation"
     else
-      print_info "ℹ️  uv tool installation not found"
+      print_info "uv tool installation not found"
     fi
   fi
 
@@ -514,7 +514,7 @@ uninstall_my_unicorn() {
 
   cat <<EOF
 
-⚠️  MANUAL CLEANUP (OPTIONAL)
+! MANUAL CLEANUP (OPTIONAL)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 If you manually added completion config, remove from:
 
@@ -531,7 +531,7 @@ Then restart your shell.
 
 EOF
 
-  print_info "✅ Uninstall complete."
+  print_info "✓ Uninstall complete."
 }
 
 # -----------------------------------------------------------------------------

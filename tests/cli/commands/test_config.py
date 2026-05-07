@@ -96,7 +96,7 @@ async def test_execute_reset(monkeypatch, handler, mocker):
 
     await h.execute(args)
 
-    mock_logger.info.assert_any_call("✅ Configuration reset to defaults")
+    mock_logger.info.assert_any_call("✓ Configuration reset to defaults")
     assert called["file_deleted"] is True
 
 

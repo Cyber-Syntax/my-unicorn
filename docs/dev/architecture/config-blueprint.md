@@ -577,7 +577,7 @@ elif current_version.startswith("2."):
     migrated = self._migrate_v2_to_v3(config, app_name)  # Strategy 2 (future)
 ```
 
-### 4. **Validator Pattern** ✅
+### 4. **Validator Pattern** ✓
 
 **Where**: `schemas/validator.py`, `validation.py`  
 **Why**: Separate validation logic from business logic  
@@ -909,7 +909,7 @@ graph LR
     
     subgraph "v1.x Format (Flat)"
         V1_Structure["
-        ❌ Duplication
+        × Duplication
         - All fields in one level
         - No source distinction
         - Catalog data copied
@@ -919,14 +919,14 @@ graph LR
     subgraph "v2.0.0 Format (Hybrid)"
         V2_Catalog["
         Catalog Apps
-        ✅ state + ref + overrides
+        ✓ state + ref + overrides
         - Minimal storage
         - Merge on load
         "]
         
         V2_URL["
         URL Apps
-        ✅ state + full config
+        ✓ state + full config
         - Self-contained
         - No catalog dependency
         "]
@@ -1293,11 +1293,11 @@ Run 'my-unicorn migrate' to upgrade.
 | Schema File | Purpose | Active Use |
 |-------------|---------|------------|
 | `app_state_v1.schema.json` | v1 detection | Migration only |
-| `app_state_v2.schema.json` | v2 validation | ✅ Runtime |
+| `app_state_v2.schema.json` | v2 validation | ✓ Runtime |
 | `catalog_v1.schema.json` | v1 detection | Migration only |
-| `catalog_v2.schema.json` | v2 validation | ✅ Runtime |
-| `cache_release.schema.json` | Release cache | ✅ Runtime |
-| `global_config_v1.schema.json` | Global config | ✅ Runtime |
+| `catalog_v2.schema.json` | v2 validation | ✓ Runtime |
+| `cache_release.schema.json` | Release cache | ✓ Runtime |
+| `global_config_v1.schema.json` | Global config | ✓ Runtime |
 
 ### Validation Points
 

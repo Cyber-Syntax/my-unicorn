@@ -60,7 +60,7 @@ class UpgradeHandler:
                     latest_version,
                 )
                 if should_upgrade:
-                    logger.info("✅ A newer version is available!")
+                    logger.info("✓ A newer version is available!")
                 else:
                     logger.info("✨ You are running the latest version.")
             else:
@@ -70,7 +70,7 @@ class UpgradeHandler:
                 )
         except Exception as e:
             logger.exception("Version check failed")
-            logger.info("❌ Version check failed: %s", e)
+            logger.info("× Version check failed: %s", e)
 
     async def _perform_upgrade(self) -> None:
         """Perform upgrade to the latest version.
@@ -116,8 +116,8 @@ class UpgradeHandler:
 
             # Only reached if execvp failed
             logger.info(
-                "❌ Upgrade failed. Please try again or update manually."
+                "× Upgrade failed. Please try again or update manually."
             )
         except Exception as e:
             logger.exception("Upgrade failed", exc_info=e)
-            logger.info("❌ Upgrade failed: %s", e)
+            logger.info("× Upgrade failed: %s", e)

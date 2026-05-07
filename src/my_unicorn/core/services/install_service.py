@@ -237,7 +237,7 @@ class InstallApplicationService:
             len(already_installed),
         )
         for app_name in already_installed:
-            logger.info("   • %s", app_name)
+            logger.info("   - %s", app_name)
 
 
 """Installation state checking for workflow planning.
