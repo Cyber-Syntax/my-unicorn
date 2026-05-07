@@ -1196,181 +1196,6 @@ class CatalogCache:
         self._cache.clear()
 
 
-def display_update_summary(
-    updated_apps: list[str],
-    failed_apps: list[str],
-    up_to_date_apps: list[str],  # noqa: ARG001
-    update_infos: list[UpdateInfo],
-    check_only: bool = False,  # noqa: FBT001, FBT002
-) -> None:
-    """Display a comprehensive summary of update results.
-
-    Args:
-        updated_apps: List of successfully updated app names.
-        failed_apps: List of failed app names.
-        up_to_date_apps: List of apps that are up to date.
-        update_infos: List of UpdateInfo objects with details.
-        check_only: If True, display check-only summary instead of
-            update summary.
-
-    """
-    if not update_infos:
-        logger.warning("No apps to process.")
-        return
-
-    if check_only:
-        _display_check_only_summary(update_infos)
-    else:
-        _display_update_operation_summary(
-            updated_apps, failed_apps, update_infos
-        )
-
-
-def _display_update_operation_summary(
-    updated_apps: list[str],
-    failed_apps: list[str],
-    update_infos: list[UpdateInfo],
-) -> None:
-    """Display summary for actual update operations.
-
-    Args:
-        updated_apps: List of successfully updated app names.
-        failed_apps: List of failed app names.
-        update_infos: List of UpdateInfo objects with details.
-
-    """
-    logger.info("📦 Update Summary:")
-    logger.info("-" * 50)
-
-    updated_count = len(updated_apps)
-    failed_count = len(failed_apps)
-
-    # Show individual results
-    for app_name in updated_apps:
-        app_info = _find_update_info(app_name, update_infos)
-        version_info = (
-            f"{app_info.current_version} → {app_info.latest_version}"
-        )
-        logger.info("%-25s ✅ %s", app_name, version_info)
-
-    for app_name in failed_apps:
-        app_info = _find_update_info(app_name, update_infos)
-        logger.info("%-25s ❌ Update failed", app_name)
-        # Display error reason if available
-        if app_info.error_reason:
-            logger.info("%25s    → %s", app_name, app_info.error_reason)
-
-    # Show summary stats
-    if updated_count > 0:
-        logger.info("\n🎉 Successfully updated %s app(s)", updated_count)
-    if failed_count > 0:
-        logger.info("❌ %s app(s) failed to update", failed_count)
-
-
-def _display_check_only_summary(update_infos: list[UpdateInfo]) -> None:
-    """Display summary for check-only operations.
-
-    Args:
-        update_infos: List of UpdateInfo objects with details.
-
-    """
-    total_apps = len(update_infos)
-    apps_with_updates = sum(1 for info in update_infos if info.has_update)
-
-    if total_apps == 0:
-        logger.info("No apps to check.")
-        return
-
-    logger.info("\n📋 Check Summary:")
-    logger.info("-" * 50)
-    logger.info("Total apps checked: %s", total_apps)
-    logger.info("Updates available: %s", apps_with_updates)
-    logger.info("Up to date: %s", total_apps - apps_with_updates)
-
-    if apps_with_updates > 0:
-        logger.info("\nApps with updates available:")
-        for info in update_infos:
-            if info.has_update:
-                version_info = (
-                    f"{info.current_version} → {info.latest_version}"
-                )
-                logger.info("  • %s: %s", info.app_name, version_info)
-
-
-def display_update_details(
-    updated_apps: list[str],
-    failed_apps: list[str],
-    update_infos: list[UpdateInfo],
-) -> None:
-    """Display detailed results including version information.
-
-    Args:
-        updated_apps: List of successfully updated app names.
-        failed_apps: List of failed app names.
-        update_infos: List of UpdateInfo objects with details.
-
-    """
-    if not update_infos:
-        logger.info("No update information available.")
-        return
-
-    logger.info("\n📊 Detailed Results:")
-    logger.info("-" * 70)
-    logger.info("%-20s %-20s %-25s", "App Name", "Status", "Version Info")
-    logger.info("-" * 70)
-
-    for info in update_infos:
-        status = _get_update_status(info, updated_apps, failed_apps)
-        version_info = _format_update_version_info(info)
-        logger.info("%-20s %-20s %-25s", info.app_name, status, version_info)
-
-
-def _get_update_status(
-    info: UpdateInfo,
-    updated_apps: list[str],
-    failed_apps: list[str],
-) -> str:
-    """Get the status string for an app.
-
-    Args:
-        info: UpdateInfo for the app.
-        updated_apps: List of successfully updated app names.
-        failed_apps: List of failed app names.
-
-    Returns:
-        Status string for display.
-
-    """
-    if info.app_name in updated_apps:
-        return "✅ Updated"
-    if info.app_name in failed_apps:
-        return "❌ Failed"
-    if info.has_update:
-        return "📦 Update available"
-    return "✅ Up to date"
-
-
-def _format_update_version_info(info: UpdateInfo) -> str:
-    """Format version information for display.
-
-    Args:
-        info: UpdateInfo containing version information.
-
-    Returns:
-        Formatted version string.
-
-    """
-    if info.has_update:
-        version_str = f"{info.current_version} → {info.latest_version}"
-    else:
-        version_str = info.current_version
-
-    # Truncate long version strings
-    if len(version_str) > 40:  # noqa: PLR2004
-        return version_str[:37] + "..."
-    return version_str
-
-
 def _find_update_info(
     app_name: str,
     update_infos: list[UpdateInfo],
@@ -1395,26 +1220,6 @@ def _find_update_info(
     )
 
 
-def display_update_progress(message: str) -> None:
-    """Display a progress message.
-
-    Args:
-        message: Progress message to display.
-
-    """
-    logger.info("🔄 %s", message)
-
-
-def display_update_success(message: str) -> None:
-    """Display a success message.
-
-    Args:
-        message: Success message to display.
-
-    """
-    logger.info("✅ %s", message)
-
-
 def display_update_error(message: str) -> None:
     """Display an error message.
 
@@ -1423,16 +1228,6 @@ def display_update_error(message: str) -> None:
 
     """
     logger.error("❌ %s", message)
-
-
-def display_update_warning(message: str) -> None:
-    """Display a warning message.
-
-    Args:
-        message: Warning message to display.
-
-    """
-    logger.warning("⚠️  %s", message)
 
 
 def display_check_results(results: dict) -> None:
@@ -1491,8 +1286,8 @@ def display_update_results(results: dict) -> None:  # noqa: C901, PLR0912
             logger.info("%-25s ❌ Update failed", app_name)
             # Keep error reason indented under the app name
             # app name is already shown in the log line above
-            if app_info.error_reason:
-                logger.info("%25s    → %s", "", app_info.error_reason)
+            if app_info and app_info.error_reason:
+                logger.info("%-25s    → %s", "", app_info.error_reason)
 
         # Show up-to-date apps
         for app_name in up_to_date:

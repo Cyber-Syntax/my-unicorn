@@ -3,7 +3,7 @@
 This package provides common utility functions including:
 - Asset validation (is_appimage_file, is_checksum_file, get_checksum_file_format_type)
 - Progress utilities (human_mib, human_speed_bps, format_eta)
-- Update display functions (display_update_summary, display_update_error)
+- Update display functions (display_update_error)
 
 Note: Functions have been reorganized following DRY principles:
 - Asset validation -> utils/asset_validation.py (shared across layers)

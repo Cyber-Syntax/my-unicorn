@@ -126,7 +126,7 @@ def _print_statistics(categories: dict[str, list]) -> None:
     """Print final installation statistics."""
     if categories["newly_installed"]:
         count = len(categories["newly_installed"])
-        logger.info("🎉 Successfully installed %s app(s)", count)
+        logger.info("\n🎉 Successfully installed %s app(s)", count)
     if categories["with_warnings"]:
         count = len(categories["with_warnings"])
         logger.warning("⚠️  %s app(s) installed with warnings", count)
