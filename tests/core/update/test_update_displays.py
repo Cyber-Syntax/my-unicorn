@@ -4,19 +4,11 @@ from dataclasses import dataclass
 from unittest.mock import MagicMock, patch
 
 from my_unicorn.core.update import (
-    _display_check_only_summary,
     _find_update_info,
-    _format_update_version_info,
-    _get_update_status,
     display_check_results,
     display_invalid_apps,
-    display_update_details,
     display_update_error,
-    display_update_progress,
     display_update_results,
-    display_update_success,
-    display_update_summary,
-    display_update_warning,
 )
 
 
@@ -34,227 +26,6 @@ class MockUpdateInfo:
     def is_success(self) -> bool:
         """Return whether the mock represents a successful update check."""
         return self.error_reason is None
-
-
-class TestDisplayUpdateSummary:
-    """Tests for display_update_summary function."""
-
-    def test_display_update_summary_no_apps(self, caplog):
-        """Test display_update_summary with no apps."""
-        display_update_summary([], [], [], [], check_only=False)
-
-        captured = caplog.text
-        assert "No apps to process." in captured
-
-    def test_display_update_summary_check_only(self, caplog):
-        """Test display_update_summary in check-only mode."""
-        update_infos = [
-            MockUpdateInfo("app1", "1.0.0", "2.0.0", has_update=True),
-            MockUpdateInfo("app2", "1.0.0", "1.0.0", has_update=False),
-        ]
-
-        display_update_summary([], [], [], update_infos, check_only=True)
-
-        captured = caplog.text
-        assert "Check Summary:" in captured
-        assert "Total apps checked: 2" in captured
-        assert "Updates available: 1" in captured
-        assert "Up to date: 1" in captured
-        assert "app1: 1.0.0 → 2.0.0" in captured
-
-    def test_display_update_summary_update_operation(self, caplog):
-        """Test display_update_summary for update operation."""
-        update_infos = [
-            MockUpdateInfo("app1", "1.0.0", "2.0.0", has_update=True),
-            MockUpdateInfo("app2", "1.0.0", "1.0.0", has_update=False),
-        ]
-        updated_apps = ["app1"]
-        failed_apps = []
-        up_to_date_apps = ["app2"]
-
-        display_update_summary(
-            updated_apps,
-            failed_apps,
-            up_to_date_apps,
-            update_infos,
-            check_only=False,
-        )
-
-        captured = caplog.text
-        assert "Update Summary:" in captured
-        assert "app1" in captured
-        assert "✅" in captured
-        assert "1.0.0 → 2.0.0" in captured
-        assert "Successfully updated 1 app(s)" in captured
-
-    def test_display_update_summary_with_failures(self, caplog):
-        """Test display_update_summary with failed updates."""
-        update_infos = [
-            MockUpdateInfo(
-                "app1",
-                "1.0.0",
-                "2.0.0",
-                has_update=True,
-                error_reason="Network error",
-            ),
-        ]
-        updated_apps = []
-        failed_apps = ["app1"]
-        up_to_date_apps = []
-
-        display_update_summary(
-            updated_apps,
-            failed_apps,
-            up_to_date_apps,
-            update_infos,
-            check_only=False,
-        )
-
-        captured = caplog.text
-        assert "Update Summary:" in captured
-        assert "app1" in captured
-        assert "❌ Update failed" in captured
-        assert "Network error" in captured
-        assert "1 app(s) failed to update" in captured
-
-
-class TestDisplayCheckOnlySummary:
-    """Tests for _display_check_only_summary function."""
-
-    def test_display_check_only_summary_no_apps(self, caplog):
-        """Test _display_check_only_summary with no apps."""
-        _display_check_only_summary([])
-
-        captured = caplog.text
-        assert "No apps to check." in captured
-
-    def test_display_check_only_summary_with_updates(self, caplog):
-        """Test _display_check_only_summary with apps having updates."""
-        update_infos = [
-            MockUpdateInfo("app1", "1.0.0", "2.0.0", has_update=True),
-            MockUpdateInfo("app2", "1.5.0", "2.5.0", has_update=True),
-            MockUpdateInfo("app3", "1.0.0", "1.0.0", has_update=False),
-        ]
-
-        _display_check_only_summary(update_infos)
-
-        captured = caplog.text
-        assert "Check Summary:" in captured
-        assert "Total apps checked: 3" in captured
-        assert "Updates available: 2" in captured
-        assert "Up to date: 1" in captured
-        assert "Apps with updates available:" in captured
-        assert "app1: 1.0.0 → 2.0.0" in captured
-        assert "app2: 1.5.0 → 2.5.0" in captured
-
-    def test_display_check_only_summary_no_updates(self, caplog):
-        """Test _display_check_only_summary with no updates available."""
-        update_infos = [
-            MockUpdateInfo("app1", "1.0.0", "1.0.0", has_update=False),
-            MockUpdateInfo("app2", "2.0.0", "2.0.0", has_update=False),
-        ]
-
-        _display_check_only_summary(update_infos)
-
-        captured = caplog.text
-        assert "Total apps checked: 2" in captured
-        assert "Updates available: 0" in captured
-        assert "Up to date: 2" in captured
-        # Should not show "Apps with updates available" section
-        assert "Apps with updates available:" not in captured
-
-
-class TestDisplayUpdateDetails:
-    """Tests for display_update_details function."""
-
-    def test_display_update_details_no_info(self, caplog):
-        """Test display_update_details with no information."""
-        display_update_details([], [], [])
-
-        captured = caplog.text
-        assert "No update information available." in captured
-
-    def test_display_update_details_with_data(self, caplog):
-        """Test display_update_details with complete data."""
-        update_infos = [
-            MockUpdateInfo("app1", "1.0.0", "2.0.0", has_update=True),
-            MockUpdateInfo("app2", "1.0.0", "1.0.0", has_update=False),
-            MockUpdateInfo("app3", "1.0.0", "2.0.0", has_update=True),
-        ]
-        updated_apps = ["app1"]
-        failed_apps = ["app3"]
-
-        display_update_details(updated_apps, failed_apps, update_infos)
-
-        captured = caplog.text
-        assert "Detailed Results:" in captured
-        assert "App Name" in captured
-        assert "Status" in captured
-        assert "Version Info" in captured
-        assert "app1" in captured
-        assert "app2" in captured
-        assert "app3" in captured
-
-
-class TestGetUpdateStatus:
-    """Tests for _get_update_status function."""
-
-    def test_get_update_status_updated(self):
-        """Test _get_update_status for updated app."""
-        info = MockUpdateInfo("app1", "1.0.0", "2.0.0", has_update=True)
-        status = _get_update_status(info, ["app1"], [])
-
-        assert status == "✅ Updated"
-
-    def test_get_update_status_failed(self):
-        """Test _get_update_status for failed app."""
-        info = MockUpdateInfo("app1", "1.0.0", "2.0.0", has_update=True)
-        status = _get_update_status(info, [], ["app1"])
-
-        assert status == "❌ Failed"
-
-    def test_get_update_status_update_available(self):
-        """Test _get_update_status for app with update available."""
-        info = MockUpdateInfo("app1", "1.0.0", "2.0.0", has_update=True)
-        status = _get_update_status(info, [], [])
-
-        assert status == "📦 Update available"
-
-    def test_get_update_status_up_to_date(self):
-        """Test _get_update_status for up-to-date app."""
-        info = MockUpdateInfo("app1", "1.0.0", "1.0.0", has_update=False)
-        status = _get_update_status(info, [], [])
-
-        assert status == "✅ Up to date"
-
-
-class TestFormatUpdateVersionInfo:
-    """Tests for _format_update_version_info function."""
-
-    def test_format_update_version_info_with_update(self):
-        """Test _format_update_version_info with update available."""
-        info = MockUpdateInfo("app1", "1.0.0", "2.0.0", has_update=True)
-        version_str = _format_update_version_info(info)
-
-        assert version_str == "1.0.0 → 2.0.0"
-
-    def test_format_update_version_info_no_update(self):
-        """Test _format_update_version_info without update."""
-        info = MockUpdateInfo("app1", "1.0.0", "1.0.0", has_update=False)
-        version_str = _format_update_version_info(info)
-
-        assert version_str == "1.0.0"
-
-    def test_format_update_version_info_long_string(self):
-        """Test _format_update_version_info with long version string."""
-        long_version = "1.0.0-very-long-version-string-that-exceeds-limit"
-        info = MockUpdateInfo(
-            "app1", long_version, long_version, has_update=False
-        )
-        version_str = _format_update_version_info(info)
-
-        assert len(version_str) <= 40
-        assert version_str.endswith("...")
 
 
 class TestFindUpdateInfo:
@@ -290,33 +61,12 @@ class TestFindUpdateInfo:
 class TestDisplayMessageFunctions:
     """Tests for display message functions."""
 
-    def test_display_update_progress(self, caplog):
-        """Test display_update_progress function."""
-        display_update_progress("Processing app1...")
-
-        captured = caplog.text
-        assert "🔄 Processing app1..." in captured
-
-    def test_display_update_success(self, caplog):
-        """Test display_update_success function."""
-        display_update_success("App updated successfully")
-
-        captured = caplog.text
-        assert "✅ App updated successfully" in captured
-
     def test_display_update_error(self, caplog):
         """Test display_update_error function."""
         display_update_error("Update failed")
 
         captured = caplog.text
         assert "❌ Update failed" in captured
-
-    def test_display_update_warning(self, caplog):
-        """Test display_update_warning function."""
-        display_update_warning("Low disk space")
-
-        captured = caplog.text
-        assert "⚠️  Low disk space" in captured
 
 
 class TestDisplayCheckResults:
