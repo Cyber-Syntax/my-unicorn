@@ -8,6 +8,7 @@ icons, and version change display.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 import pytest
@@ -561,3 +562,83 @@ class TestSummaryUIFixtureValidation:
             install_success_output, "📦 Installation Summary:"
         )
         assert fixture_summary != "", "Summary section missing from fixture"
+
+
+@pytest.fixture
+def update_summary_full_output() -> str:
+    fixture_path = (
+        Path(__file__).resolve().parents[2] 
+        / "fixtures"
+        / "expected_ui_output"
+        / "update_summary.txt"
+    )
+    return fixture_path.read_text()
+
+
+@pytest.mark.integration
+class TestUpdateSummaryFullUI:
+    """End-to-end UI validation for full update summary output."""
+
+    def test_update_summary_full_ui_matches_fixture(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        update_summary_full_output: str,
+    ) -> None:
+        """Verify full Update Summary UI matches fixture exactly."""
+
+        # Arrange
+        update_infos = [
+            UpdateInfo(
+                app_name="qownnotes",
+                current_version="26.5.1",
+                latest_version="26.5.4",
+                prerelease=False,
+                error_reason=None,
+            ),
+            UpdateInfo(
+                app_name="ytmdesktop",
+                current_version=None,
+                latest_version=None,
+                prerelease=False,
+                error_reason=(
+                    "AppImage not found in release - may still be building"
+                ),
+            ),
+            UpdateInfo(
+                app_name="appflowy",
+                current_version="0.11.8",
+                latest_version="0.11.8",
+                prerelease=False,
+                error_reason=None,
+            ),
+        ]
+
+        results = {
+            "updated": ["qownnotes"],
+            "failed": ["ytmdesktop"],
+            "up_to_date": ["appflowy"],
+            "update_infos": update_infos,
+        }
+
+        # Act
+        output = _capture_log_output(
+            _display_update_results,
+            results,
+            caplog=caplog,
+        )
+
+        # Extract summary
+        summary = _extract_summary_section(
+            output,
+            "📦 Update Summary:",
+        )
+        assert summary != "", "Summary section not found"
+
+        # Normalize
+        normalized_summary = normalize_output_for_comparison(summary)
+        normalized_expected = normalize_output_for_comparison(
+            update_summary_full_output
+        )
+
+        # Assert
+        assert normalized_summary.strip() == normalized_expected.strip()
