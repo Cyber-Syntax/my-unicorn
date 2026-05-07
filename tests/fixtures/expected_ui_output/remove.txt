@@ -1,0 +1,6 @@
+✓ Removed AppImage(s): /home/developer/Applications/qownnotes.AppImage
+✓ Removed cache for pbek/QOwnNotes
+! No backups found at: /home/developer/Applications/backups/qownnotes
+✓ Removed desktop entry for qownnotes
+✓ Removed icon: /home/developer/Applications/icons/qownnotes.png
+✓ Removed config for qownnotes
