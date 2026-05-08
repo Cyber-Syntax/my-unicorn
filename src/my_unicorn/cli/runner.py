@@ -36,7 +36,7 @@ from my_unicorn.core.cache import ReleaseCacheManager
 from my_unicorn.core.locking import LockManager
 from my_unicorn.core.update import UpdateManager
 from my_unicorn.exceptions import LockError
-from my_unicorn.logger import get_logger, update_logger_from_config
+from my_unicorn.logger import get_logger, update_logger_from_config, get_state
 
 logger = get_logger(__name__)
 
@@ -108,7 +108,8 @@ class CLIRunner:
         )
 
         # Update logger with config-based log levels
-        update_logger_from_config()
+        logger_state = get_state()
+        update_logger_from_config(logger_state)
 
         # Create auth manager with default keyring storage
         self.auth_manager = GitHubAuthManager.create_default()

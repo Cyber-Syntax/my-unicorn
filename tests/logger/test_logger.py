@@ -357,7 +357,7 @@ def test_update_logger_from_config(monkeypatch):
     """Test that update_logger_from_config updates handler levels."""
     from unittest.mock import MagicMock
 
-    from my_unicorn.logger import update_logger_from_config
+    from my_unicorn.logger import update_logger_from_config, get_state
 
     # Setup root logger first
     _ = get_logger("my_unicorn", enable_file_logging=True)
@@ -376,7 +376,8 @@ def test_update_logger_from_config(monkeypatch):
     monkeypatch.setattr(config_module, "ConfigManager", mock_cfg_cls)
 
     # Update from config
-    update_logger_from_config()
+    logger_state = get_state()
+    update_logger_from_config(logger_state)
 
     # Verify handlers in QueueListener were updated
     assert _state.queue_listener is not None
