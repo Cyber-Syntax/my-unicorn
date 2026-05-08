@@ -93,6 +93,48 @@ from my_unicorn.constants import (
 from my_unicorn.exceptions import ConfigurationError
 
 
+class _LoggerState:
+    """Container for logger state (avoids module-level mutable globals).
+
+    Attributes:
+        lock: Thread lock for singleton initialization
+        root_initialized: Whether root logger has been set up
+        config_applied: Whether config file settings have been loaded
+        queue_listener: Background thread processing log records
+        log_queue: Queue for async-safe log record processing
+
+    This module provides the global logger state singleton used throughout
+    the my-unicorn application. The singleton pattern is critical for ensuring
+    a single root logger instance across the entire application.
+
+    CRITICAL: This module uses a module-level singleton pattern.
+    DO NOT modify without understanding threading and singleton implications.
+    """
+
+    def __init__(self) -> None:
+        """Initialize logger state."""
+        self.lock = threading.Lock()
+        self.root_initialized = False
+        self.config_applied = False
+        self.queue_listener: QueueListener | None = None
+        self.log_queue: queue.Queue | None = None
+
+
+# CRITICAL: Global logger state singleton
+# This is the single source of truth for logger state across the application
+_state = _LoggerState()
+
+
+def get_state() -> _LoggerState:
+    """Get the global logger state singleton.
+
+    Returns:
+        The global logger state instance
+
+    """
+    return _state
+
+
 def flush_all_handlers() -> None:
     """Flush all handlers in the QueueListener to ensure writes complete.
 
@@ -134,7 +176,7 @@ def _cleanup_logging() -> None:
 
 
 # Register cleanup handler
-_ = atexit.register(_cleanup_logging)
+atexit.register(_cleanup_logging)
 
 
 def setup_logging(
@@ -558,7 +600,7 @@ def _create_file_handler(
 
 
 def setup_root_logger(
-    state,
+    state: _LoggerState,
     console_level: str,
     file_level: str,
     log_file: Path,
@@ -670,7 +712,7 @@ def load_log_settings() -> tuple[str, str, Path]:
     return default_console_level, default_file_level, default_path
 
 
-def update_logger_from_config(state: "_LoggerState") -> None:
+def update_logger_from_config() -> None:
     """Update logger handler levels from global config.
 
     This should be called after both logger and config modules are
@@ -696,6 +738,7 @@ def update_logger_from_config(state: "_LoggerState") -> None:
         Sets state.config_applied = True on success.
 
     """
+    state = get_state()
     try:
         # Import here to avoid circular dependency
         from my_unicorn.config import ConfigManager  # noqa: PLC0415
@@ -744,45 +787,3 @@ def update_logger_from_config(state: "_LoggerState") -> None:
             f"[my-unicorn logger] Warning: could not apply config settings: {e}",
             file=sys.stderr,
         )
-
-
-class _LoggerState:
-    """Container for logger state (avoids module-level mutable globals).
-
-    Attributes:
-        lock: Thread lock for singleton initialization
-        root_initialized: Whether root logger has been set up
-        config_applied: Whether config file settings have been loaded
-        queue_listener: Background thread processing log records
-        log_queue: Queue for async-safe log record processing
-
-    This module provides the global logger state singleton used throughout
-    the my-unicorn application. The singleton pattern is critical for ensuring
-    a single root logger instance across the entire application.
-
-    CRITICAL: This module uses a module-level singleton pattern.
-    DO NOT modify without understanding threading and singleton implications.
-    """
-
-    def __init__(self) -> None:
-        """Initialize logger state."""
-        self.lock = threading.Lock()
-        self.root_initialized = False
-        self.config_applied = False
-        self.queue_listener: QueueListener | None = None
-        self.log_queue: queue.Queue | None = None
-
-
-# CRITICAL: Global logger state singleton
-# This is the single source of truth for logger state across the application
-_state = _LoggerState()
-
-
-def get_state() -> _LoggerState:
-    """Get the global logger state singleton.
-
-    Returns:
-        The global logger state instance
-
-    """
-    return _state
