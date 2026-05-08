@@ -26,33 +26,6 @@ def compute_display_name(task: TaskState) -> str:
     return name
 
 
-def format_api_task_status(task: TaskState) -> str:
-    """Return the status string for an API fetching task.
-
-    Args:
-        task: The task state to format.
-
-    Returns:
-        A formatted status string indicating the API task's state.
-    """
-    if task.total > 0:
-        completed = int(task.completed)
-        total = int(task.total)
-        if task.is_finished or completed >= total:
-            if "cached" in task.description.lower():
-                return f"{total}/{total}        Retrieved from cache"
-            return f"{total}/{total}        Retrieved"
-
-        return f"{completed}/{total}        Fetching..."
-
-    if task.is_finished:
-        if "cached" in task.description.lower():
-            return "Retrieved from cache"
-        return "Retrieved"
-
-    return "Fetching..."
-
-
 def compute_spinner(fps: int) -> str:
     """Compute the current spinner frame based on time and FPS.
 

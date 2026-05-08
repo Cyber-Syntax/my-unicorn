@@ -37,63 +37,6 @@ class TestComputeDisplayName:
         assert result == "plainname"
 
 
-class TestFormatApiTaskStatus:
-    """Test cases for format_api_task_status function."""
-
-    def test_format_api_task_status_cached(self) -> None:
-        """Test status string for cached API task."""
-        task = TaskState(
-            task_id="api_1",
-            name="test_app",
-            progress_type=ProgressType.API_FETCHING,
-            total=5.0,
-            completed=5.0,
-            is_finished=True,
-            description="Cached result",
-        )
-        from my_unicorn.core.progress.ascii_format import (
-            format_api_task_status,
-        )
-
-        result = format_api_task_status(task)
-        assert "Retrieved from cache" in result
-
-    def test_format_api_task_status_not_cached(self) -> None:
-        """Test status string for in-progress API task without cache."""
-        task = TaskState(
-            task_id="api_2",
-            name="test_app",
-            progress_type=ProgressType.API_FETCHING,
-            total=10.0,
-            completed=2.0,
-            is_finished=False,
-        )
-        from my_unicorn.core.progress.ascii_format import (
-            format_api_task_status,
-        )
-
-        result = format_api_task_status(task)
-        assert "Fetching..." in result
-
-    def test_format_api_task_status_finished(self) -> None:
-        """Test status string for finished API task."""
-        task = TaskState(
-            task_id="api_3",
-            name="test_app",
-            progress_type=ProgressType.API_FETCHING,
-            total=5.0,
-            completed=5.0,
-            is_finished=True,
-            description="Retrieved successfully",
-        )
-        from my_unicorn.core.progress.ascii_format import (
-            format_api_task_status,
-        )
-
-        result = format_api_task_status(task)
-        assert "Retrieved" in result
-
-
 class TestComputeSpinner:
     """Test cases for compute_spinner function."""
 
