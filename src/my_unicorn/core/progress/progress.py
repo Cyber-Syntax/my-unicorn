@@ -39,7 +39,7 @@ import time
 from collections import OrderedDict, defaultdict
 from contextlib import asynccontextmanager, suppress
 from logging.handlers import RotatingFileHandler
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from my_unicorn.core.progress.ascii import AsciiProgressBackend
 from my_unicorn.core.progress.progress_types import (
@@ -95,11 +95,6 @@ __all__ = [
 logger = get_logger(__name__)
 
 
-# ============================================================================
-# Progress Workflow Helpers (from utils/progress_helpers.py)
-# ============================================================================
-
-
 @asynccontextmanager
 async def github_api_progress_task(
     progress: ProgressDisplay | None,
@@ -142,7 +137,8 @@ async def github_api_progress_task(
     try:
         yield task_id
         await progress.finish_task(task_id, success=True)
-    except Exception:
+    except Exception as exc:
+        logger.debug("Failed to complete task: %s", exc)
         await progress.finish_task(task_id, success=False)
         raise
 
@@ -200,40 +196,6 @@ async def progress_session(
 
     async with service.session(total_operations):
         yield service
-
-
-"""Public API for progress display.
-
-This module is the canonical import path for ProgressDisplay.
-Core modules should not import from this module directly;
-they should depend on the ProgressReporter protocol from
-core.protocols.progress.
-
-Example:
-    from my_unicorn.core.progress import ProgressDisplay
-
-    progress = ProgressDisplay()
-    task_id = progress.add_task("Download", ProgressType.DOWNLOAD, total=1000)
-    progress.update_task(task_id, completed=500)
-    progress.finish_task(task_id, success=True)
-
-Implementation Details:
-    ProgressDisplay implements the ProgressReporter protocol defined in
-    my_unicorn.core.protocols.progress. It provides rich ASCII-based progress
-    display with session management and background rendering.
-
-Key features:
-- Task management: Add, update, and finish tasks with metadata.
-- Session handling: Context managers for progress sessions.
-- Workflow helpers: Convenience methods for common operations like
-    installation workflows.
-- Background rendering: Asynchronous loop for periodic UI updates.
-
-Note:
-    For internal progress.py module usage - that module contains helper
-    functions and type definitions used by this display implementation.
-    External consumers should only import from this module.
-"""
 
 
 class ProgressDisplay(ProgressReporter):
@@ -904,7 +866,7 @@ class TaskRegistry:
             self._task_sets[task_info.progress_type].add(task_id)
 
     async def update_task(
-        self, task_id: str, **updates: object
+        self, task_id: str, **updates: Any
     ) -> TaskInfo | None:
         """Update a task with new values.
 
@@ -922,10 +884,24 @@ class TaskRegistry:
 
             task_info = self._tasks[task_id]
 
-            # Apply updates to task info
-            for key, value in updates.items():
-                if hasattr(task_info, key):
-                    setattr(task_info, key, value)
+            if "completed" in updates:
+                task_info.completed = float(updates["completed"])
+
+            if "total" in updates:
+                task_info.total = float(updates["total"])
+
+            if "description" in updates:
+                task_info.description = str(updates["description"])
+
+            if "current_speed_mbps" in updates:
+                task_info.current_speed_mbps = float(
+                    updates["current_speed_mbps"]
+                )
+
+            if "last_speed_update" in updates:
+                task_info.last_speed_update = float(
+                    updates["last_speed_update"]
+                )
 
             task_info.last_update = time.monotonic()
 
@@ -944,14 +920,22 @@ class TaskRegistry:
             Returns empty defaults if task not found.
 
         """
-        task = self._tasks.get(task_id)
-        if task is None:
-            return {"completed": 0.0, "total": None, "description": ""}
-        return {
-            "completed": task.completed,
-            "total": task.total,
-            "description": task.description,
-        }
+        # lock guarantees reads and writes cannot happen at the same time.
+        async with self._task_lock:
+            task = self._tasks.get(task_id)
+
+            if task is None:
+                return {
+                    "completed": 0.0,
+                    "total": None,
+                    "description": "",
+                }
+
+            return {
+                "completed": task.completed,
+                "total": task.total,
+                "description": task.description,
+            }
 
     async def get_task_info_full(self, task_id: str) -> TaskInfo | None:
         """Get full task information by ID.
@@ -966,7 +950,8 @@ class TaskRegistry:
             Full TaskInfo object or None if not found
 
         """
-        return self._tasks.get(task_id)
+        async with self._task_lock:
+            return self._tasks.get(task_id)
 
     async def finish_task(
         self,
@@ -1095,6 +1080,7 @@ class SessionManager:
         self._active: bool = False
         self._render_task: asyncio.Task[None] | None = None
         self._stop_rendering: asyncio.Event = asyncio.Event()
+        self._logger_suppression_active = False
 
     async def start_session(self, total_operations: int = 0) -> None:
         """Start a progress display session.
@@ -1114,6 +1100,7 @@ class SessionManager:
 
         # Enter the context manager for logger suppression
         await self._logger_suppression.__aenter__()
+        self._logger_suppression_active = True
 
         # Start background rendering loop
         self._render_task = asyncio.create_task(self._render_loop())
@@ -1146,7 +1133,9 @@ class SessionManager:
         await self._backend.cleanup()
 
         # Exit the context manager for logger suppression
-        await self._logger_suppression.__aexit__(None, None, None)
+        if self._logger_suppression_active:
+            await self._logger_suppression.__aexit__(None, None, None)
+            self._logger_suppression_active = False
 
         # Clear cached state
         self._id_generator.clear_cache()
