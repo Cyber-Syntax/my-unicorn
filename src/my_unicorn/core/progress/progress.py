@@ -692,7 +692,10 @@ class IDGenerator:
             ProgressType.INSTALLATION: "in",
             ProgressType.UPDATE: "up",
         }
-        type_prefix = type_prefixes[progress_type]
+
+        # get type prefix for readable IDs, default to "task" if not found
+        # use .get() to guard against progress_type not in type_prefixes
+        type_prefix = type_prefixes.get(progress_type, "task")
 
         # Sanitize name: keep only alphanumeric chars and safe symbols
         clean_name = "".join(c for c in name if c.isalnum() or c in "-_.")[:20]

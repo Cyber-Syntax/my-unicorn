@@ -969,7 +969,11 @@ def render_downloads_section(
 
     """
     download_tasks = [
-        t for t in order if tasks[t].progress_type == ProgressType.DOWNLOAD
+        t
+        for t in order
+        # Use .get() to guard against order/tasks snapshot divergence,
+        if (task := tasks.get(t))
+        and task.progress_type == ProgressType.DOWNLOAD
     ]
 
     if not download_tasks:
@@ -1017,7 +1021,9 @@ def render_processing_section(
     post_tasks = [
         t
         for t in order
-        if tasks[t].progress_type
+        # Use .get() to guard against order/tasks snapshot divergence,
+        if (task := tasks.get(t))
+        and task.progress_type
         in (
             ProgressType.VERIFICATION,
             ProgressType.ICON_EXTRACTION,
