@@ -262,11 +262,7 @@ class ProgressDisplay(ProgressReporter):
             Default description string
 
         """
-        return (
-            f"{name}"
-            if progress_type == ProgressType.DOWNLOAD
-            else f"⚙️ {name}"
-        )
+        return name if progress_type == ProgressType.DOWNLOAD else f"{name}"
 
     def _create_task_info(
         self, namespaced_id: str, config: TaskConfig, current_time: float
@@ -360,6 +356,12 @@ class ProgressDisplay(ProgressReporter):
             ui_progress_type = _CORE_TO_UI_PROGRESS_TYPE.get(
                 progress_type, ProgressType.DOWNLOAD
             )
+            if ui_progress_type is None:
+                # a new CoreProgressType was added without updating the mapping.
+                # fail loudly so it's caught during development, not in production.
+                msg = f"No UI mapping found for CoreProgressType.{progress_type.name}. "
+                msg += "Add it to _CORE_TO_UI_PROGRESS_TYPE."
+                raise ValueError(msg)
         else:
             ui_progress_type = progress_type
 
@@ -411,11 +413,14 @@ class ProgressDisplay(ProgressReporter):
         )
 
         # Perform an immediate render to make short-lived phases visible.
-        # Awaiting the render here ensures the UI is updated before callers
-        # may immediately finish the next phase (common in fast unit tests
-        # or synchronous flows).
-        with suppress(Exception):
+        # Only suppress expected rendering transients; log anything else for
+        # visibility during debugging.
+        try:
             await self._backend.render_once()
+        except Exception as e:
+            logger.debug(
+                "Initial render skipped for task %s: %s", namespaced_id, e
+            )
 
         logger.debug(
             "Added %s task: %s (total: %.1f)",
@@ -997,9 +1002,10 @@ class TaskRegistry:
     def get_task_info_sync(self, task_id: str) -> ProgressTaskInfo:
         """Get task info in protocol-compliant dict format (thread-safe sync).
 
-        This is a synchronous accessor for use by protocol methods that
-        cannot be async. Reading task state is safe without async lock
-        due to Python's GIL, though updates may occur concurrently.
+        Intended for use by protocol methods that cannot be async.
+        Note: reads are not lock-protected. A concurrent async writer may
+        produce a stale or partially-updated result. Acceptable for display
+        purposes; do not rely on this for correctness-critical decisions.
 
         Args:
             task_id: Task identifier
@@ -1020,8 +1026,9 @@ class TaskRegistry:
     def get_task_info_full_sync(self, task_id: str) -> TaskInfo | None:
         """Get full TaskInfo object (thread-safe sync read).
 
-        This is a synchronous accessor for internal use. Reading task
-        state is safe without async lock due to Python's GIL.
+        Same caveats as get_task_info_sync: unprotected read, suitable
+        for display/introspection only.
+
 
         Args:
             task_id: Task identifier
