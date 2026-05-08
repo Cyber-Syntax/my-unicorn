@@ -69,27 +69,21 @@ class TestComputeDownloadHeader:
 
     def test_compute_download_header_single(self) -> None:
         """Test header text for single download."""
-        from my_unicorn.core.progress.ascii import (
-            compute_download_header,
-        )
+        from my_unicorn.core.progress.ascii import compute_download_header
 
         result = compute_download_header(download_count=1)
         assert result == "Downloading:"
 
     def test_compute_download_header_multiple(self) -> None:
         """Test header text for multiple downloads."""
-        from my_unicorn.core.progress.ascii import (
-            compute_download_header,
-        )
+        from my_unicorn.core.progress.ascii import compute_download_header
 
         result = compute_download_header(download_count=3)
         assert result == "Downloading (3):"
 
     def test_compute_download_header_zero(self) -> None:
         """Test header text for zero downloads."""
-        from my_unicorn.core.progress.ascii import (
-            compute_download_header,
-        )
+        from my_unicorn.core.progress.ascii import compute_download_header
 
         result = compute_download_header(download_count=0)
         assert result == "Downloading:"
