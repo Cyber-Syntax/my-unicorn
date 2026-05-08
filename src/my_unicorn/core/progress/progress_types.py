@@ -32,6 +32,7 @@ OPERATION_NAMES: dict[ProgressType, str] = {
 # Small tunables exposed for easier testing
 DEFAULT_MIN_NAME_WIDTH: int = 15
 DEFAULT_SPINNER_FPS: int = 4
+DEFAULT_MAX_SPEED_HISTORY: int = 10
 
 # Spinner frames for in-progress tasks
 SPINNER_FRAMES: list[str] = [
@@ -97,7 +98,7 @@ class ProgressConfig:
     speed_calculation_interval: float = (
         0.5  # Minimum interval for speed recalculation
     )
-    max_speed_history: int = 10  # Number of speed measurements to retain
+    max_speed_history: int = DEFAULT_MAX_SPEED_HISTORY
 
     # Display tuning
     bar_width: int = 30
@@ -107,16 +108,18 @@ class ProgressConfig:
 
     def __post_init__(self) -> None:
         """Validate config fields to prevent invalid runtime values."""
-        # Basic validation to catch obviously invalid configs early.
-        msg = "refresh_per_second must be >= 1"
         if self.refresh_per_second < 1:
-            raise ValueError(msg)
-        msg = "bar_width must be >= 1"
+            raise ValueError("refresh_per_second must be >= 1")
         if self.bar_width < 1:
-            raise ValueError(msg)
-        msg = "spinner_fps must be >= 1"
+            raise ValueError("bar_width must be >= 1")
         if self.spinner_fps < 1:
-            raise ValueError(msg)
+            raise ValueError("spinner_fps must be >= 1")
+        if self.ui_update_interval <= 0:
+            raise ValueError("ui_update_interval must be > 0")
+        if self.speed_calculation_interval <= 0:
+            raise ValueError("speed_calculation_interval must be > 0")
+        if self.max_speed_history < 1:
+            raise ValueError("max_speed_history must be >= 1")
 
 
 @dataclass(slots=True)
@@ -151,7 +154,9 @@ class TaskInfo:
 
     def __post_init__(self) -> None:
         """Initialize speed history deque."""
+        if self.completed < 0:
+            raise ValueError("completed must be >= 0")
+        if self.total < 0:
+            raise ValueError("total must be >= 0")
         if self.speed_history is None:
-            # Use configured max history length (no magic number)
-            maxlen = ProgressConfig().max_speed_history
-            self.speed_history = deque(maxlen=maxlen)
+            self.speed_history = deque(maxlen=DEFAULT_MAX_SPEED_HISTORY)
