@@ -24,6 +24,7 @@ import time
 from dataclasses import dataclass
 from typing import TextIO
 
+from my_unicorn.constants import APPIMAGE_SUFFIX
 from my_unicorn.logger import get_logger
 from my_unicorn.utils.progress_utils import (
     format_eta,
@@ -57,8 +58,9 @@ def compute_display_name(task: TaskState) -> str:
         The task name with .AppImage extension stripped if present.
     """
     name = task.name
-    if name.endswith(".AppImage"):
-        return name[:-9]
+
+    if name.endswith(APPIMAGE_SUFFIX):
+        return name[: -len(APPIMAGE_SUFFIX)]
     return name
 
 
@@ -121,7 +123,8 @@ class AsciiProgressBackend:
         is_tty = False
         try:
             is_tty = bool(getattr(self.output, "isatty", lambda: False)())
-        except Exception:  # noqa: BLE001
+        except Exception as exc:
+            logger.debug("Failed to detect TTY: %s", exc)
             is_tty = False
 
         if interactive is not None:
@@ -320,7 +323,8 @@ class AsciiProgressBackend:
             with self._sync_lock:
                 tasks_snapshot = dict(self.tasks)
                 order_snapshot = list(self._task_order)
-        except Exception:  # noqa: BLE001
+        except Exception as exc:
+            logger.debug("Failed to snapshot tasks: %s", exc)
             tasks_snapshot = dict(self.tasks)
             order_snapshot = list(self._task_order)
 
@@ -523,8 +527,8 @@ class TerminalWriter:
         try:
             self.output.write(text)
             self.output.flush()
-        except Exception:  # noqa: BLE001, S110
-            pass
+        except Exception as exc:
+            logger.debug("Failed to write output: %s", exc)
 
     @staticmethod
     def _find_new_sections(
@@ -575,9 +579,8 @@ class TerminalWriter:
             try:
                 self.output.write(output_text)
                 self.output.flush()
-            except Exception:  # noqa: BLE001, S110
-                # swallow IO errors
-                pass
+            except Exception as exc:
+                logger.debug("Failed to write output: %s", exc)
 
             # Return number of lines written and update writer state
             lines_written = len(lines)
@@ -909,7 +912,11 @@ def render_api_section(
 
     """
     api_tasks = [
-        t for t in order if tasks[t].progress_type == ProgressType.API_FETCHING
+        t
+        for t in order
+        # using .get() prevents crashes if task state changes during rendering.
+        if (task := tasks.get(t))
+        and task.progress_type == ProgressType.API_FETCHING
     ]
 
     if not api_tasks:
