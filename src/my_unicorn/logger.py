@@ -733,10 +733,17 @@ def update_logger_from_config(state: "_LoggerState") -> None:
         # Mark config as applied
         state.config_applied = True
 
-    except (ImportError, KeyError, AttributeError):
-        # Config module not fully initialized yet - use bootstrap defaults
-        # This happens during initial import before config is ready
+    except ImportError:
+        # Config module not yet available during bootstrap — this is expected
+        # on first import before config is initialized.
         pass
+    except (KeyError, AttributeError) as e:
+        # Unexpected config structure issue — log it so it can be diagnosed.
+        # Use print() here instead of logger to avoid infinite recursion.
+        print(  # noqa: T201
+            f"[my-unicorn logger] Warning: could not apply config settings: {e}",
+            file=sys.stderr,
+        )
 
 
 class _LoggerState:
