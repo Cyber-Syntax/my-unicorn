@@ -76,7 +76,6 @@ import os
 import queue
 import sys
 import threading
-import time
 from logging.handlers import QueueHandler, QueueListener, RotatingFileHandler
 from pathlib import Path
 
@@ -91,54 +90,35 @@ from my_unicorn.constants import (
     LOG_FILE_FORMAT,
     LOG_ROTATION_THRESHOLD_BYTES,
 )
+from my_unicorn.exceptions import ConfigurationError
 
 
 def flush_all_handlers() -> None:
     """Flush all handlers in the QueueListener to ensure writes complete.
 
-    This function ensures that all pending log records in the queue are
-    processed and all file handlers have written their buffers to disk.
-    Critical for tests and scenarios where immediate file persistence is
-    required.
+    Stops and restarts the QueueListener, which guarantees all queued
+    records are fully processed before handlers are flushed.
 
-    The function:
-    1. Waits for queue to be empty (all records dequeued)
-    2. Explicitly flushes each handler's buffer to disk
-    3. Gives queue listener thread time to process final records
-
-    Thread Safety:
-        Safe to call from any thread. No lock required as it only
-        reads state.queue_listener and calls thread-safe methods.
-
-    Example:
-        >>> logger.info("Important message")
-        >>> flush_all_handlers()  # Ensure message is on disk
-        >>> # Now safe to read log file
-
-    Note:
-        This is particularly important when using QueueListener because
-        records may be dequeued but not yet written to disk.
-
+    QueueListener.stop() internally calls queue.join()
+    (it waits for the queue to be fully drained), which is the correct and
+    thread-safe way to wait. After stopping, restarting it keeps
+    the system functional.
     """
     state = get_state()
-    if state.queue_listener is not None and state.log_queue is not None:
-        # Wait for queue to be empty (all records dequeued)
-        # QueueListener doesn't use task_done(), so poll the queue
-        timeout = 5.0  # Maximum wait time
-        start_time = time.time()
-        while not state.log_queue.empty():
-            if time.time() - start_time > timeout:
-                break
-            time.sleep(0.01)  # Small sleep to avoid busy-waiting
+    if state.queue_listener is None or state.log_queue is None:
+        return
 
-        # Give queue listener thread time to process final records
-        time.sleep(0.1)
+    # Stopping QueueListener drains the queue completely before returning.
+    # This is the only safe way to guarantee all records are processed.
+    state.queue_listener.stop()
 
-        # Flush all handlers to ensure writes complete
-        for handler in state.queue_listener.handlers:
-            with contextlib.suppress(OSError, ValueError):
-                # Ignore flush errors (handler closed/unavailable)
-                handler.flush()
+    # Flush every handler to push buffered data to disk.
+    for handler in state.queue_listener.handlers:
+        with contextlib.suppress(OSError, ValueError):
+            handler.flush()
+
+    # Restart listener so logging continues to work after flush.
+    state.queue_listener.start()
 
 
 def _cleanup_logging() -> None:
@@ -688,7 +668,6 @@ def load_log_settings() -> tuple[str, str, Path]:
         )
 
     return default_console_level, default_file_level, default_path
-
 
 
 def update_logger_from_config(state: "_LoggerState") -> None:
