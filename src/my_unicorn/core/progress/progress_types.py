@@ -33,6 +33,7 @@ OPERATION_NAMES: dict[ProgressType, str] = {
 DEFAULT_MIN_NAME_WIDTH: int = 15
 DEFAULT_SPINNER_FPS: int = 4
 DEFAULT_MAX_SPEED_HISTORY: int = 10
+DEFAULT_BAR_WIDTH: int = 30
 
 # Spinner frames for in-progress tasks
 SPINNER_FRAMES: list[str] = [

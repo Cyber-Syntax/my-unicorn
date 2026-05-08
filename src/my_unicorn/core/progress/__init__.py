@@ -12,17 +12,18 @@ from my_unicorn.core.progress.progress import (
     TaskInfo,
     TaskRegistry,
     TaskState,
-    TaskConfig,
     create_api_fetching_task,
     create_installation_workflow,
     create_verification_task,
 )
+from my_unicorn.core.progress.progress_types import TaskConfig
 
 __all__ = [
     "IDGenerator",
     "LoggerSuppression",
     "ProgressDisplay",
     "SessionManager",
+    "TaskConfig",
     "TaskInfo",
     "TaskRegistry",
     "TaskState",

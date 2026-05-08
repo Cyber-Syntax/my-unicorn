@@ -36,6 +36,7 @@ from my_unicorn.utils.progress_utils import (
 )
 
 from .progress_types import (
+    DEFAULT_BAR_WIDTH,
     DEFAULT_MIN_NAME_WIDTH,
     DEFAULT_SPINNER_FPS,
     OPERATION_NAMES,
@@ -134,7 +135,7 @@ class AsciiProgressBackend:
             self.interactive = is_tty and term != "dumb"
 
         cfg = config or ProgressConfig()
-        self.bar_width = getattr(cfg, "bar_width", 30)
+        self.bar_width = getattr(cfg, "bar_width", DEFAULT_BAR_WIDTH)
         # Preserve `max_name_width` attribute for backward compatibility
         # (tests and external callers may inspect this private-ish attribute).
         self.max_name_width = getattr(cfg, "max_name_width", 20)
@@ -644,10 +645,10 @@ class SectionRenderConfig:
     section rendering functions.
     """
 
-    bar_width: int
-    min_name_width: int
-    spinner_fps: int
-    interactive: bool
+    bar_width: int = DEFAULT_BAR_WIDTH
+    min_name_width: int = DEFAULT_MIN_NAME_WIDTH
+    spinner_fps: int = DEFAULT_SPINNER_FPS
+    interactive: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -761,7 +762,7 @@ def calculate_dynamic_name_width(
 def compute_max_name_width(
     display_names: list[str],
     interactive: bool,  # noqa: FBT001
-    min_name_width: int,
+    min_name_width: int = DEFAULT_MIN_NAME_WIDTH,
 ) -> int:
     """Compute maximum name width across items for alignment.
 
