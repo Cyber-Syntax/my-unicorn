@@ -336,11 +336,11 @@ ERROR_CONFIGURATION_MISSING: Final[str] = (
     "No configuration found for app: {app_name}"
 )
 ERROR_CATALOG_MISSING: Final[str] = (
-    "App '{app_name}' references catalog '{catalog_ref}', "
+    "App '{app_name}' references catalog '{catalog_ref}',\n"
     "but catalog entry is missing or invalid. Please reinstall."
 )
 ERROR_UNKNOWN_APPS_OR_URLS: Final[str] = (
-    "Unknown applications or invalid URLs: {targets}. "
+    "Unknown applications or invalid URLs: {targets}.\n"
     "Use 'my-unicorn catalog --available' to see available apps."
 )
 ERROR_DESKTOP_ENTRY_FAILED: Final[str] = "Desktop entry creation failed"
