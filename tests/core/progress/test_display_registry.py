@@ -8,7 +8,7 @@ import time
 
 import pytest
 
-from my_unicorn.core.progress.display_registry import TaskRegistry
+from my_unicorn.core.progress import TaskRegistry
 from my_unicorn.core.progress.progress_types import (
     ProgressType,
     TaskConfig,

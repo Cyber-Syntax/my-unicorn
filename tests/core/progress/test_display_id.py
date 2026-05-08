@@ -5,7 +5,7 @@ Tests cover ID generation, caching, and cache clearing functionality.
 
 from __future__ import annotations
 
-from my_unicorn.core.progress.display_id import IDGenerator
+from my_unicorn.core.progress import IDGenerator
 from my_unicorn.core.progress.progress_types import (
     ID_CACHE_LIMIT,
     ProgressType,

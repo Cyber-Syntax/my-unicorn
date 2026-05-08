@@ -125,7 +125,7 @@ class TestErrorScenarios:
         self, progress_service: ProgressDisplay
     ) -> None:
         """Test different progress update methods."""
-        from my_unicorn.core.progress.display_workflows import (
+        from my_unicorn.core.progress import (
             create_verification_task,
         )
 
@@ -266,7 +266,7 @@ class TestErrorScenarios:
             total=1000.0,
         )
 
-        from my_unicorn.core.progress.display_workflows import (
+        from my_unicorn.core.progress import (
             create_api_fetching_task,
         )
 

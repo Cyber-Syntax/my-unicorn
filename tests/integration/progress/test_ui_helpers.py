@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from my_unicorn.core.progress.ascii_sections import (
+from my_unicorn.core.progress.ascii import (
     SectionRenderConfig,
     render_api_section,
     render_downloads_section,

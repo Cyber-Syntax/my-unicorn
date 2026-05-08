@@ -19,7 +19,7 @@ class TestComputeDisplayName:
             progress_type=ProgressType.DOWNLOAD,
         )
         # Import will fail until we create the function
-        from my_unicorn.core.progress.ascii_format import compute_display_name
+        from my_unicorn.core.progress.ascii import compute_display_name
 
         result = compute_display_name(task)
         assert result == "qownnotes"
@@ -31,7 +31,7 @@ class TestComputeDisplayName:
             name="plainname",
             progress_type=ProgressType.DOWNLOAD,
         )
-        from my_unicorn.core.progress.ascii_format import compute_display_name
+        from my_unicorn.core.progress.ascii import compute_display_name
 
         result = compute_display_name(task)
         assert result == "plainname"
@@ -42,7 +42,7 @@ class TestComputeSpinner:
 
     def test_compute_spinner_returns_valid_frame(self) -> None:
         """Test that compute_spinner returns a valid spinner frame."""
-        from my_unicorn.core.progress.ascii_format import compute_spinner
+        from my_unicorn.core.progress.ascii import compute_spinner
         from my_unicorn.core.progress.progress_types import SPINNER_FRAMES
 
         result = compute_spinner(fps=4)
@@ -50,7 +50,7 @@ class TestComputeSpinner:
 
     def test_compute_spinner_changes_over_time(self) -> None:
         """Test that spinner frame changes as time progresses."""
-        from my_unicorn.core.progress.ascii_format import compute_spinner
+        from my_unicorn.core.progress.ascii import compute_spinner
 
         with patch("time.monotonic") as mock_time:
             mock_time.return_value = 0.0
@@ -69,7 +69,7 @@ class TestComputeDownloadHeader:
 
     def test_compute_download_header_single(self) -> None:
         """Test header text for single download."""
-        from my_unicorn.core.progress.ascii_format import (
+        from my_unicorn.core.progress.ascii import (
             compute_download_header,
         )
 
@@ -78,7 +78,7 @@ class TestComputeDownloadHeader:
 
     def test_compute_download_header_multiple(self) -> None:
         """Test header text for multiple downloads."""
-        from my_unicorn.core.progress.ascii_format import (
+        from my_unicorn.core.progress.ascii import (
             compute_download_header,
         )
 
@@ -87,7 +87,7 @@ class TestComputeDownloadHeader:
 
     def test_compute_download_header_zero(self) -> None:
         """Test header text for zero downloads."""
-        from my_unicorn.core.progress.ascii_format import (
+        from my_unicorn.core.progress.ascii import (
             compute_download_header,
         )
 

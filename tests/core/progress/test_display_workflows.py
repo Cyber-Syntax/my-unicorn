@@ -6,8 +6,8 @@ multi-phase progress tasks for common workflows like installation.
 
 import pytest
 
-from my_unicorn.core.progress.display import ProgressDisplay
-from my_unicorn.core.progress.display_workflows import (
+from my_unicorn.core.progress import ProgressDisplay
+from my_unicorn.core.progress import (
     create_api_fetching_task,
     create_installation_workflow,
     create_verification_task,

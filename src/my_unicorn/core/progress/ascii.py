@@ -17,29 +17,77 @@ from __future__ import annotations
 
 import asyncio
 import os
+import shutil
 import sys
 import threading
 import time
+from dataclasses import dataclass
 from typing import TextIO
 
 from my_unicorn.logger import get_logger
-
-from .ascii_output import TerminalWriter
-from .ascii_sections import (
-    SectionRenderConfig,
-    render_api_section,
-    render_downloads_section,
-    render_processing_section,
+from my_unicorn.utils.progress_utils import (
+    format_eta,
+    format_percentage,
+    human_mib,
+    human_speed_bps,
+    render_bar,
+    truncate_text,
 )
+
 from .progress_types import (
     DEFAULT_MIN_NAME_WIDTH,
     DEFAULT_SPINNER_FPS,
+    OPERATION_NAMES,
+    SPINNER_FRAMES,
     ProgressConfig,
     ProgressType,
     TaskState,
 )
 
 logger = get_logger(__name__)
+
+
+def compute_display_name(task: TaskState) -> str:
+    """Return a condensed display name for a task (strip extension).
+
+    Args:
+        task: The task state containing the name.
+
+    Returns:
+        The task name with .AppImage extension stripped if present.
+    """
+    name = task.name
+    if name.endswith(".AppImage"):
+        return name[:-9]
+    return name
+
+
+def compute_spinner(fps: int) -> str:
+    """Compute the current spinner frame based on time and FPS.
+
+    Args:
+        fps: Frames per second for spinner animation.
+
+    Returns:
+        The current spinner frame character.
+    """
+    current_time = time.monotonic()
+    spinner_idx = int(current_time * fps) % len(SPINNER_FRAMES)
+    return SPINNER_FRAMES[spinner_idx]
+
+
+def compute_download_header(download_count: int) -> str:
+    """Return the downloads section header string.
+
+    Args:
+        download_count: The total number of downloads.
+
+    Returns:
+        A formatted header string for the downloads section.
+    """
+    if download_count > 1:
+        return f"Downloading ({download_count}):"
+    return "Downloading:"
 
 
 class AsciiProgressBackend:
@@ -53,7 +101,7 @@ class AsciiProgressBackend:
     def __init__(
         self,
         output: TextIO | None = None,
-        interactive: bool | None = None,  # noqa: FBT001
+        interactive: bool | None = None,
         config: ProgressConfig | None = None,
     ) -> None:
         """Initialize ASCII progress backend.
@@ -420,3 +468,594 @@ class AsciiProgressBackend:
             )
         )
         return "\n".join(lines)
+
+
+class TerminalWriter:
+    """Manages terminal output for progress display.
+
+    Handles both interactive (with cursor control) and non-interactive
+    (with section deduplication) output modes. Tracks output state to
+    enable proper clearing and avoid duplicate section headers.
+
+    Attributes:
+        output: Output stream (typically sys.stdout or StringIO for tests)
+        interactive: Whether to use interactive mode with cursor control
+        _last_output_lines: Number of lines written (interactive mode)
+        _written_sections: Set of section signatures written (non-interactive)
+        _last_noninteractive_output: Cached output (non-interactive)
+        _last_noninteractive_write_time: Last write timestamp (non-interactive)
+    """
+
+    def __init__(self, output: TextIO, interactive: bool) -> None:  # noqa: FBT001
+        """Initialize terminal writer.
+
+        Args:
+            output: Output stream for writing
+            interactive: Whether to use interactive mode
+
+        """
+        self.output = output
+        self.interactive = interactive
+
+        # State for interactive mode
+        self._last_output_lines = 0
+
+        # State for non-interactive mode
+        self._written_sections: set[str] = set()
+        self._last_noninteractive_output = ""
+        self._last_noninteractive_write_time = 0.0
+
+    def _clear_previous_output(self) -> None:
+        """Clear previously written lines in interactive mode."""
+        if not self.interactive or self._last_output_lines == 0:
+            return
+
+        # Move cursor up to start of previous output
+        self.output.write(f"\033[{self._last_output_lines}A")
+        # Clear from cursor to end of screen
+        self.output.write("\033[J")
+
+        # Ensure output is written immediately
+        self.output.flush()
+
+    def _write_output_safe(self, text: str) -> None:
+        """Write text to output stream, suppressing IO errors."""
+        try:
+            self.output.write(text)
+            self.output.flush()
+        except Exception:  # noqa: BLE001, S110
+            pass
+
+    @staticmethod
+    def _find_new_sections(
+        output: str, known_sections: set[str]
+    ) -> tuple[list[str], set[str]]:
+        """Parse output and find sections not in known_sections.
+
+        Args:
+            output: Output string containing sections separated by blank lines
+            known_sections: Set of section signatures already written
+
+        Returns:
+            Tuple of (new_sections_list, new_signatures_set)
+
+        """
+        sections = output.split("\n\n")
+        new_sections: list[str] = []
+        new_signatures: set[str] = set()
+
+        for section in sections:
+            section_sig = section.strip()
+            if section_sig and section_sig not in known_sections:
+                new_sections.append(section)
+                new_signatures.add(section_sig)
+
+        return new_sections, new_signatures
+
+    def write_interactive(self, output: str) -> int:
+        """Write output in interactive mode with cursor control.
+
+        Args:
+            output: Output string to write
+
+        Returns:
+            Number of lines written
+
+        """
+        self._clear_previous_output()
+
+        if output:
+            lines = output.split("\n")
+            # Filter out trailing empty string from split to get accurate count
+            if lines and lines[-1] == "":
+                lines = lines[:-1]
+
+            # Write all lines at once to minimize flickering
+            output_text = "\n".join(lines) + "\n"
+            try:
+                self.output.write(output_text)
+                self.output.flush()
+            except Exception:  # noqa: BLE001, S110
+                # swallow IO errors
+                pass
+
+            # Return number of lines written and update writer state
+            lines_written = len(lines)
+            self._last_output_lines = lines_written
+
+            return lines_written
+
+        # Ensure last output lines is zero when nothing was written
+        self._last_output_lines = 0
+        return 0
+
+    def write_noninteractive(
+        self, output: str, known_sections: set[str] | None = None
+    ) -> set[str]:
+        """Write output in non-interactive mode (minimal output).
+
+        Args:
+            output: Output string to write
+            known_sections: Optional set of already-written section signatures
+                used to detect new/updated sections. If ``None``, the
+                internal `_written_sections` set is used.
+
+        Returns:
+            Set of section signatures that were written
+
+        """
+        if not hasattr(self.output, "write"):
+            return set()
+
+        if "Summary:" in output:
+            self._write_output_safe(output + "\n")
+            return {output.strip()}
+
+        if not output.strip():
+            return set()
+
+        if known_sections is None:
+            known_sections = set(self._written_sections)
+
+        new_sections, added_signatures = self._find_new_sections(
+            output, known_sections
+        )
+
+        if new_sections:
+            self._write_output_safe("\n\n".join(new_sections) + "\n")
+
+        return added_signatures
+
+
+# ASCII section rendering module.
+# Pure functions for rendering progress sections (API, downloads, processing).
+# These functions were extracted from AsciiProgressBackend to improve separation
+# of concerns and testability.
+
+
+@dataclass(frozen=True, slots=True)
+class SectionRenderConfig:
+    """Configuration for section rendering.
+
+    Groups shared settings to reduce parameter sprawl across
+    section rendering functions.
+    """
+
+    bar_width: int
+    min_name_width: int
+    spinner_fps: int
+    interactive: bool
+
+
+@dataclass(frozen=True, slots=True)
+class TaskStatusInfo:
+    """Information for determining task status."""
+
+    is_finished: bool
+    success: bool | None
+    description: str
+    error_message: str
+
+
+def determine_task_status_symbol(
+    status_info: TaskStatusInfo,
+    spinner: str,
+) -> str:
+    """Determine the status symbol for a task.
+
+    Args:
+        status_info: Task status information.
+        spinner: Spinner character to use for in-progress tasks.
+
+    Returns:
+        Status symbol: ✓ (success), ✖ (error), ! (warning), or spinner.
+
+    """
+    if not status_info.is_finished:
+        return spinner
+
+    # Warning case: success but "not verified"
+    if (
+        status_info.success
+        and status_info.description
+        and "not verified" in status_info.description.lower()
+    ):
+        return "!"
+
+    return "✓" if status_info.success else "✖"
+
+
+def should_show_warning_message(status_info: TaskStatusInfo) -> bool:
+    """Check if a warning message should be displayed.
+
+    Args:
+        status_info: Task status information.
+
+    Returns:
+        True if warning message should be shown.
+
+    """
+    return bool(
+        status_info.is_finished
+        and status_info.success
+        and status_info.description
+        and "not verified" in status_info.description.lower()
+    )
+
+
+def should_show_error_message(status_info: TaskStatusInfo) -> bool:
+    """Check if an error message should be displayed.
+
+    Args:
+        status_info: Task status information.
+
+    Returns:
+        True if error message should be shown.
+
+    """
+    return bool(
+        status_info.is_finished
+        and not status_info.success
+        and status_info.error_message
+    )
+
+
+def calculate_dynamic_name_width(
+    interactive: bool,  # noqa: FBT001
+    min_name_width: int,
+) -> int:
+    """Calculate dynamic name width based on terminal size.
+
+    Args:
+        interactive: Whether in interactive mode
+        min_name_width: Minimum width for name field
+
+    Returns:
+        Width to use for name (either full length or truncated)
+
+    """
+    # Fixed width for: size + speed + eta + bar + pct + status
+    fixed_width = 10 + 10 + 5 + 32 + 6 + 1 + 6
+
+    if interactive:
+        try:
+            terminal_width = shutil.get_terminal_size().columns
+        except (AttributeError, ValueError, OSError):
+            # Fallback if terminal size cannot be determined
+            terminal_width = 80
+    else:
+        # Use fixed width in non-interactive mode for consistent rendering
+        terminal_width = 80
+
+    # Calculate available space for name
+    available_width = terminal_width - fixed_width
+
+    # Use the smaller of: available width or actual name length
+    # But ensure a minimum for readability
+    return max(min_name_width, available_width)
+
+
+def compute_max_name_width(
+    display_names: list[str],
+    interactive: bool,  # noqa: FBT001
+    min_name_width: int,
+) -> int:
+    """Compute maximum name width across items for alignment.
+
+    Args:
+        display_names: List of display names to measure
+        interactive: Whether in interactive mode
+        min_name_width: Minimum width for name field
+
+    Returns:
+        Maximum width needed for alignment
+
+    """
+    max_name_width = 0
+    for display_name in display_names:
+        name_width = calculate_dynamic_name_width(interactive, min_name_width)
+        max_name_width = max(
+            max_name_width, min(name_width, len(display_name))
+        )
+    return max_name_width
+
+
+def format_download_lines(
+    task: TaskState,
+    max_name_width: int,
+    bar_width: int,
+) -> list[str]:
+    """Format lines for a single download task (main + optional error).
+
+    Args:
+        task: TaskState to format
+        max_name_width: Maximum width for task name
+        bar_width: Width of progress bar
+
+    Returns:
+        List of formatted output lines
+
+    """
+    lines: list[str] = []
+    display_name = compute_display_name(task)
+    name = truncate_text(display_name, max_name_width)
+
+    if task.total > 0:
+        size_str = f"{human_mib(task.total):>10}"
+    else:
+        size_str = "    --    "
+
+    if task.speed > 0:
+        speed_str = f"{human_speed_bps(task.speed):>10}"
+    else:
+        speed_str = "   --     "
+
+    if task.speed > 0 and task.total > task.completed:
+        remaining_bytes = task.total - task.completed
+        eta_seconds = remaining_bytes / task.speed
+        eta_str = format_eta(eta_seconds)
+    else:
+        eta_str = "00:00"
+
+    bar = render_bar(task.completed, task.total, bar_width)
+    pct = format_percentage(task.completed, task.total)
+
+    # Create status info for status determination
+    status_info = TaskStatusInfo(
+        is_finished=task.is_finished,
+        success=task.success,
+        description=task.description,
+        error_message=task.error_message,
+    )
+
+    # Use status symbol, but show empty space for in-progress downloads
+    status = (
+        ("✓" if status_info.success else "✖")
+        if status_info.is_finished
+        else " "
+    )
+
+    lines.append(
+        f"{name:<{max_name_width}} {size_str} {speed_str} "
+        f"{eta_str:>5} {bar} {pct:>6} {status}"
+    )
+
+    # Show error message if applicable
+    if should_show_error_message(status_info):
+        error_msg = truncate_text(task.error_message, 60)
+        lines.append(f"    Error: {error_msg}")
+
+    return lines
+
+
+def format_processing_task_lines(
+    task: TaskState,
+    name_width: int,
+    spinner: str,
+) -> list[str]:
+    """Format the main and optional error lines for a processing task.
+
+    Args:
+        task: TaskState to format
+        name_width: Width for task name
+        spinner: Spinner character to display
+
+    Returns:
+        List of formatted output lines
+
+    """
+    lines: list[str] = []
+    phase_str = f"({task.phase}/{task.total_phases})"
+    operation = OPERATION_NAMES.get(task.progress_type, "Processing")
+
+    # Create status info for status determination
+    status_info = TaskStatusInfo(
+        is_finished=task.is_finished,
+        success=task.success,
+        description=task.description,
+        error_message=task.error_message,
+    )
+
+    # Determine status symbol using helper function
+    status = determine_task_status_symbol(status_info, spinner)
+
+    name = truncate_text(task.name, name_width)
+    lines.append(f"{phase_str} {operation} {name} {status}")
+
+    # Show warning message if applicable
+    if should_show_warning_message(status_info):
+        msg = truncate_text(task.description, 60)
+        lines.append(f"    {msg}")
+    # Show error message if applicable
+    elif should_show_error_message(status_info):
+        error_msg = truncate_text(task.error_message, 60)
+        lines.append(f"    Error: {error_msg}")
+
+    return lines
+
+
+def render_api_section(
+    tasks: dict[str, TaskState],
+    order: list[str],
+) -> list[str]:
+    """Render API fetching section.
+
+    Args:
+        tasks: Dictionary of all tasks
+        order: List of task IDs in order
+
+    Returns:
+        List of formatted output lines for API section
+
+    """
+    api_tasks = [
+        t for t in order if tasks[t].progress_type == ProgressType.API_FETCHING
+    ]
+
+    if not api_tasks:
+        return []
+
+    lines = ["Fetching from API:"]
+    for task_id in api_tasks:
+        task = tasks[task_id]
+        name = truncate_text(task.name, 18)
+
+        if task.total > 0:
+            completed = int(task.completed)
+            total = int(task.total)
+            if task.is_finished or completed >= total:
+                if "cached" in task.description.lower():
+                    status = f"{total}/{total} Retrieved from cache"
+                else:
+                    status = f"{total}/{total} Retrieved"
+            else:
+                status = f"{completed}/{total} Fetching..."
+        elif task.is_finished:
+            if "cached" in task.description.lower():
+                status = "Retrieved from cache"
+            else:
+                status = "Retrieved"
+        else:
+            status = "Fetching..."
+
+        lines.append(f"{name:20} {status}")
+
+    lines.append("")
+    return lines
+
+
+def render_downloads_section(
+    tasks: dict[str, TaskState],
+    order: list[str],
+    config: SectionRenderConfig,
+) -> list[str]:
+    """Render downloads section with progress bars.
+
+    Args:
+        tasks: Dictionary of all tasks
+        order: List of task IDs in order
+        config: SectionRenderConfig with rendering options
+
+    Returns:
+        List of formatted output lines for downloads section
+
+    """
+    download_tasks = [
+        t for t in order if tasks[t].progress_type == ProgressType.DOWNLOAD
+    ]
+
+    if not download_tasks:
+        return []
+
+    display_names = {t: compute_display_name(tasks[t]) for t in download_tasks}
+
+    max_name_width = compute_max_name_width(
+        list(display_names.values()),
+        config.interactive,
+        config.min_name_width,
+    )
+
+    total_downloads = len(download_tasks)
+
+    header = compute_download_header(total_downloads)
+
+    lines = [header]
+    for task_id in download_tasks:
+        task = tasks[task_id]
+        lines.extend(
+            format_download_lines(task, max_name_width, config.bar_width)
+        )
+
+    lines.append("")
+    return lines
+
+
+def render_processing_section(
+    tasks: dict[str, TaskState],
+    order: list[str],
+    config: SectionRenderConfig,
+) -> list[str]:
+    """Render installation/verification/post-processing section.
+
+    Args:
+        tasks: Dictionary of all tasks
+        order: List of task IDs in order
+        config: SectionRenderConfig with rendering options
+
+    Returns:
+        List of formatted output lines for processing section
+
+    """
+    post_tasks = [
+        t
+        for t in order
+        if tasks[t].progress_type
+        in (
+            ProgressType.VERIFICATION,
+            ProgressType.ICON_EXTRACTION,
+            ProgressType.INSTALLATION,
+            ProgressType.UPDATE,
+        )
+    ]
+
+    if not post_tasks:
+        return []
+
+    has_verification = any(
+        tasks[t].progress_type == ProgressType.VERIFICATION for t in post_tasks
+    )
+    has_installation = any(
+        tasks[t].progress_type == ProgressType.INSTALLATION for t in post_tasks
+    )
+
+    if has_verification and not has_installation:
+        section_header = "Verifying:"
+    elif has_installation:
+        section_header = "Installing:"
+    else:
+        section_header = "Processing:"
+
+    lines = [section_header]
+
+    spinner = compute_spinner(config.spinner_fps)
+
+    app_tasks: dict[str, list[TaskState]] = {}
+    for task_id in post_tasks:
+        task = tasks[task_id]
+        app_name = task.name
+        app_tasks.setdefault(app_name, []).append(task)
+
+    for app_task_list in app_tasks.values():
+        tasks_sorted = sorted(app_task_list, key=lambda t: t.phase)
+
+        name_width = calculate_dynamic_name_width(
+            config.interactive, config.min_name_width
+        )
+
+        for task in tasks_sorted:
+            lines.extend(
+                format_processing_task_lines(task, name_width, spinner)
+            )
+
+    lines.append("")
+    return lines

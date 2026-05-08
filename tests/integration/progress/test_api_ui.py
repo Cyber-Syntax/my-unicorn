@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from my_unicorn.core.progress.ascii_sections import render_api_section
+from my_unicorn.core.progress.ascii import render_api_section
 from my_unicorn.core.progress.progress_types import ProgressType, TaskState
 
 from .test_ui_helpers import parse_output_sections

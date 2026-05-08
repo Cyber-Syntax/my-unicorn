@@ -311,8 +311,8 @@ class PostDownloadProcessor:
 
         # Use standalone workflow helper if available
         # This requires the reporter to be a ProgressDisplay instance
-        from my_unicorn.core.progress.display import ProgressDisplay
-        from my_unicorn.core.progress.display_workflows import (
+        from my_unicorn.core.progress import ProgressDisplay
+        from my_unicorn.core.progress import (
             create_installation_workflow,
         )
 
