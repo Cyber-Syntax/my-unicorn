@@ -148,6 +148,10 @@ class TaskInfo:
     # (timestamp, speed) pairs
     speed_history: deque[tuple[float, float]] | None = None
 
+    # Carries the max number of speed history size from the ProgressConfig
+    # so the deque is created with the correct maxlen in __post_init__
+    max_speed_history: int = DEFAULT_MAX_SPEED_HISTORY
+
     # Multi-phase task tracking
     parent_task_id: str | None = None
     phase: int = 1
@@ -160,4 +164,6 @@ class TaskInfo:
         if self.total < 0:
             raise ValueError("total must be >= 0")
         if self.speed_history is None:
-            self.speed_history = deque(maxlen=DEFAULT_MAX_SPEED_HISTORY)
+            # use the instance-level value so ProgressConfig.max_speed_history
+            # is actually respected at runtime.
+            self.speed_history = deque(maxlen=self.max_speed_history)

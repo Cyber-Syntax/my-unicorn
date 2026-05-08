@@ -300,6 +300,8 @@ class ProgressDisplay(ProgressReporter):
             parent_task_id=config.parent_task_id,
             phase=config.phase,
             total_phases=config.total_phases,
+            # pass configured history size so the deque is sized correctly
+            max_speed_history=self.config.max_speed_history,
         )
 
     async def _render_loop(self) -> None:
@@ -847,14 +849,9 @@ class TaskRegistry:
         self._task_lock = asyncio.Lock()
 
         # Task sets for fast lookup by type
-        self._task_sets: dict[ProgressType, set[str]] = {
-            ProgressType.API_FETCHING: set(),
-            ProgressType.DOWNLOAD: set(),
-            ProgressType.VERIFICATION: set(),
-            ProgressType.ICON_EXTRACTION: set(),
-            ProgressType.INSTALLATION: set(),
-            ProgressType.UPDATE: set(),
-        }
+        # use defaultdict so any future ProgressType values work
+        # automatically without requiring manual initialization
+        self._task_sets: dict[ProgressType, set[str]] = defaultdict(set)
 
     async def add_task_info(self, task_id: str, task_info: TaskInfo) -> None:
         """Add a task to the registry.
