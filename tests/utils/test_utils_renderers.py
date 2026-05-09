@@ -1,5 +1,4 @@
 from my_unicorn.core.install import print_install_summary
-import pytest
 
 
 def test_print_installation_summary_all_already_installed(caplog):

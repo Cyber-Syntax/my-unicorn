@@ -9,8 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from my_unicorn.core.progress.display_id import IDGenerator
-from my_unicorn.core.progress.display_session import SessionManager
+from my_unicorn.core.progress import IDGenerator, SessionManager
 from my_unicorn.core.progress.progress_types import (
     ProgressConfig,
     ProgressType,

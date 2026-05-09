@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from my_unicorn.core.progress.ascii_sections import (
+from my_unicorn.core.progress.ascii import (
     SectionRenderConfig,
     render_downloads_section,
 )

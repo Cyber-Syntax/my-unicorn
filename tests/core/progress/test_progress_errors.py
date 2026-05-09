@@ -125,9 +125,7 @@ class TestErrorScenarios:
         self, progress_service: ProgressDisplay
     ) -> None:
         """Test different progress update methods."""
-        from my_unicorn.core.progress.display_workflows import (
-            create_verification_task,
-        )
+        from my_unicorn.core.progress import create_verification_task
 
         await progress_service.start_session()
 
@@ -266,9 +264,7 @@ class TestErrorScenarios:
             total=1000.0,
         )
 
-        from my_unicorn.core.progress.display_workflows import (
-            create_api_fetching_task,
-        )
+        from my_unicorn.core.progress import create_api_fetching_task
 
         api_task = await create_api_fetching_task(service, "GitHub API")
 

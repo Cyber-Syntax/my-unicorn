@@ -9,11 +9,11 @@ from unittest.mock import patch
 
 import pytest
 
+from my_unicorn.core.progress import TaskInfo
 from my_unicorn.core.progress.progress import (
     ProgressConfig,
     ProgressDisplay,
     ProgressType,
-    TaskInfo,
 )
 
 # 'progress_service' fixture is provided by tests/core/progress/conftest.py
@@ -399,9 +399,7 @@ class TestProgressDisplay:
         self, progress_service: ProgressDisplay
     ) -> None:
         """Test handling verification error."""
-        from my_unicorn.core.progress.display_workflows import (
-            create_verification_task,
-        )
+        from my_unicorn.core.progress import create_verification_task
 
         await progress_service.start_session()
 

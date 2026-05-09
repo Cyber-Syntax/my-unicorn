@@ -12,6 +12,7 @@ import io
 
 import pytest
 
+from my_unicorn.core.progress.ascii import TerminalWriter
 from my_unicorn.core.progress.progress import (
     AsciiProgressBackend,
     ProgressDisplay,
@@ -51,26 +52,26 @@ class TestAsciiProgressBackendClearAndWrite:
         """Exercise clearing and interactive/non-interactive writes."""
         # interactive clear
         out = io.StringIO()
-        backend = AsciiProgressBackend(output=out, interactive=True)
-        backend._last_output_lines = 2
-        backend._clear_previous_output()
+        writer = TerminalWriter(output=out, interactive=True)
+        writer._last_output_lines = 2
+        writer._clear_previous_output()
         assert "\033[" in out.getvalue()
 
         # write_interactive empty
-        backend._write_interactive("")
-        assert backend._last_output_lines == 0
+        writer.write_interactive("")
+        assert writer._last_output_lines == 0
 
         # noninteractive summary write
         out2 = io.StringIO()
-        backend2 = AsciiProgressBackend(output=out2, interactive=False)
-        backend2._write_noninteractive("Summary: All done")
+        writer2 = TerminalWriter(output=out2, interactive=False)
+        writer2.write_noninteractive("Summary: All done")
         assert "Summary: All done" in out2.getvalue()
 
     def test_clear_previous_output_early_return(self) -> None:
         """_clear_previous_output should return early when non-interactive."""
-        backend = AsciiProgressBackend(output=io.StringIO(), interactive=False)
         # With non-interactive, _clear_previous_output should do nothing
-        backend._clear_previous_output()
+        writer = TerminalWriter(output=io.StringIO(), interactive=False)
+        writer._clear_previous_output()
 
     def test_write_noninteractive_ioerror_is_swallowed(self) -> None:
         """Ensure write errors in noninteractive mode are swallowed."""
@@ -82,9 +83,9 @@ class TestAsciiProgressBackendClearAndWrite:
             def flush(self) -> None:
                 raise OSError("broken")
 
-        backend = AsciiProgressBackend(output=BadOut(), interactive=False)
+        writer = TerminalWriter(output=BadOut(), interactive=False)
         # Should not raise
-        backend._write_noninteractive("Some content")
+        writer.write_noninteractive("Some content")
 
     def test_write_interactive_swallow_ioerror(self) -> None:
         """Ensure _write_interactive swallows IO errors from output."""
@@ -110,16 +111,16 @@ class TestAsciiProgressBackendClearAndWrite:
                 raise OSError("broken")
 
         out = BadOut()
-        backend = AsciiProgressBackend(output=out, interactive=True)
-        backend._last_output_lines = 1
+        writer = TerminalWriter(output=out, interactive=True)
+        writer._last_output_lines = 1
         # Should not raise
-        backend._write_interactive("line1\n")
+        writer.write_interactive("line1\n")
 
     def test_write_interactive_sync_lock_exception_handled(self) -> None:
         """Ensure _write_interactive handles sync-lock exceptions."""
-        backend = AsciiProgressBackend(output=io.StringIO(), interactive=True)
+        writer = TerminalWriter(output=io.StringIO(), interactive=True)
         # Ensure clear_previous_output returns early (no previous lines)
-        backend._last_output_lines = 0
+        writer._last_output_lines = 0
 
         class BadLock:
             def __enter__(self):
@@ -128,20 +129,20 @@ class TestAsciiProgressBackendClearAndWrite:
             def __exit__(self, exc_type, exc, tb):
                 return False
 
-        backend._sync_lock = BadLock()  # type: ignore[assignment]
+        writer._sync_lock = BadLock()  # type: ignore[assignment]
         # Should not raise even though setting _last_output_lines will fail
-        backend._write_interactive("hello\n")
+        writer.write_interactive("hello\n")
 
     def test_write_noninteractive_no_write_attr_and_empty(self) -> None:
         """_write_noninteractive should handle missing write attribute."""
         # Output without a write attribute
-        backend = AsciiProgressBackend(output=object(), interactive=False)
-        assert backend._write_noninteractive("anything") == set()
+        writer = TerminalWriter(output=object(), interactive=False)
+        assert writer.write_noninteractive("anything") == set()
 
         # Empty/whitespace-only output returns empty set
         out = io.StringIO()
-        backend2 = AsciiProgressBackend(output=out, interactive=False)
-        assert backend2._write_noninteractive("   ") == set()
+        writer2 = TerminalWriter(output=out, interactive=False)
+        assert writer2.write_noninteractive("   ") == set()
 
     def test_write_noninteractive_writer_raises_is_handled(self) -> None:
         """Writer exceptions are swallowed in non-interactive mode."""
@@ -153,10 +154,10 @@ class TestAsciiProgressBackendClearAndWrite:
             def flush(self):
                 pass
 
-        backend = AsciiProgressBackend(output=BadWriter(), interactive=False)
+        writer = TerminalWriter(output=BadWriter(), interactive=False)
         content = "A\n\nB"
         # Should not raise; returns signatures for sections
-        sigs = backend._write_noninteractive(content)
+        sigs = writer.write_noninteractive(content)
         assert {s.strip() for s in sigs} == {"A", "B"}
 
     def test_write_noninteractive_summary_writer_raises(self) -> None:
@@ -169,15 +170,15 @@ class TestAsciiProgressBackendClearAndWrite:
             def flush(self):
                 pass
 
-        backend = AsciiProgressBackend(output=BadWriter2(), interactive=False)
-        sigs = backend._write_noninteractive("Summary:\nDone")
+        writer = TerminalWriter(output=BadWriter2(), interactive=False)
+        sigs = writer.write_noninteractive("Summary:\nDone")
         assert any("Summary:" in s for s in sigs)
 
     def test_write_interactive_empty_output_sync_lock_exception_handled(
         self,
     ) -> None:
         """Sync-lock exceptions are swallowed when writing empty output."""
-        backend = AsciiProgressBackend(output=io.StringIO(), interactive=True)
+        writer = TerminalWriter(output=io.StringIO(), interactive=True)
 
         class BadLock:
             def __enter__(self):
@@ -186,38 +187,38 @@ class TestAsciiProgressBackendClearAndWrite:
             def __exit__(self, exc_type, exc, tb):
                 return False
 
-        backend._sync_lock = BadLock()  # type: ignore[assignment]
+        writer._sync_lock = BadLock()  # type: ignore[assignment]
         # Should return 0 and not raise
-        assert backend._write_interactive("") == 0
+        assert writer.write_interactive("") == 0
 
     def test_write_noninteractive_skip_empty_section(self) -> None:
         """Empty sections should be skipped in non-interactive write."""
         out = io.StringIO()
-        backend = AsciiProgressBackend(output=out, interactive=False)
-        sigs = backend._write_noninteractive("\n\nOnly\n\n")
+        writer = TerminalWriter(output=out, interactive=False)
+        sigs = writer.write_noninteractive("\n\nOnly\n\n")
         assert {s.strip() for s in sigs} == {"Only"}
 
     def test_write_noninteractive_summary_and_section_tracking(self) -> None:
         """Test Summary write and section tracking in non-interactive mode."""
         out = io.StringIO()
-        backend = AsciiProgressBackend(output=out, interactive=False)
+        writer = TerminalWriter(output=out, interactive=False)
 
-        sigs = backend._write_noninteractive("Summary:\nAll done")
+        sigs = writer.write_noninteractive("Summary:\nAll done")
         assert any("Summary:" in s for s in sigs)
 
         # New sections should be returned
         out2 = io.StringIO()
-        backend2 = AsciiProgressBackend(output=out2, interactive=False)
+        writer2 = TerminalWriter(output=out2, interactive=False)
         content = "First section\n\nSecond section"
-        added = backend2._write_noninteractive(content)
+        added = writer2.write_noninteractive(content)
         assert {s.strip() for s in added} == {
             "First section",
             "Second section",
         }
 
         # Known sections should produce no additions
-        backend2._written_sections.update({"First section", "Second section"})
-        assert backend2._write_noninteractive(content) == set()
+        writer2._written_sections.update({"First section", "Second section"})
+        assert writer2.write_noninteractive(content) == set()
 
 
 class TestAsciiProgressBackendBuildOutput:
@@ -436,9 +437,9 @@ class TestAsciiProgressBackendAsync:
         backend.add_task("t1", "app", ProgressType.DOWNLOAD, total=10.0)
         backend.finish_task("t1", success=True)
         # Should write final output without error
-        backend._last_output_lines = 2
+        backend._writer._last_output_lines = 2
         await backend.cleanup()
-        assert backend._last_output_lines == 0
+        assert backend._writer._last_output_lines == 0
 
     @pytest.mark.asyncio
     async def test_render_once_interactive_branch(self) -> None:

@@ -200,7 +200,7 @@ def test_print_install_summary_mixed_results(
     assert "Download failed: Connection timeout" in output
 
     # Verify already installed indicators
-    assert "Already installed" in output  # noqa: RUF001
+    assert "Already installed" in output
     assert "brave" in output
 
     # Verify warning indicators
@@ -371,7 +371,7 @@ def test_print_result_line_already_installed(
     output = caplog.text
 
     assert "brave" in output
-    assert "Already installed" in output  # noqa: RUF001
+    assert "Already installed" in output
 
 
 def test_print_result_line_failed(

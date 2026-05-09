@@ -7,7 +7,7 @@ with the backend.
 
 import pytest
 
-from my_unicorn.core.progress.display import ProgressDisplay
+from my_unicorn.core.progress import ProgressDisplay
 from my_unicorn.core.progress.progress import ProgressType, progress_session
 
 
