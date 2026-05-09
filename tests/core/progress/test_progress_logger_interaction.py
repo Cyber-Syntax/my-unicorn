@@ -21,7 +21,7 @@ from logging.handlers import RotatingFileHandler
 
 import pytest
 
-from my_unicorn.core.progress import ProgressDisplay
+from my_unicorn.core.progress import ProgressDisplay, SubProgressType
 from my_unicorn.core.progress.progress_types import ProgressType
 from my_unicorn.logger import _state, get_logger
 
@@ -202,7 +202,8 @@ async def test_multiple_progress_sessions(caplog):
     async with progress.session(1):
         await progress.add_task(
             name="test2",
-            progress_type=SubProgressType.VERIFICATION,
+            progress_type=ProgressType.PROCESSING,
+            sub_type=SubProgressType.VERIFICATION,
             total=100,
         )
 

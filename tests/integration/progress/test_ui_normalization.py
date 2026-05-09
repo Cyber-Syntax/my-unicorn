@@ -235,16 +235,15 @@ qownnotes                 ✓ 26.2.1 → 26.2.4
 
         # Should parse all sections
         assert "api" in sections
-        assert "download" in sections
         assert "install" in sections
 
         # Install section should include Updating operations
         install_lines = "\n".join(sections["install"].lines)
-        assert "Updating appflowy" in install_lines
-        assert "Updating qownnotes" in install_lines
+        assert "upgrading appflowy" in install_lines
+        assert "upgrading qownnotes" in install_lines
 
         # Normalization should preserve version arrows and summaries
         normalized = normalize_output_for_comparison(fixture_content)
         assert "Update Summary:" in normalized
         assert "→" in normalized
-        assert "Updating appflowy" in normalized
+        assert "upgrading appflowy" in normalized

@@ -10,7 +10,10 @@ import pytest
 
 from my_unicorn.core.api import Asset, Release
 from my_unicorn.core.post_download import OperationType, PostDownloadResult
-from my_unicorn.core.progress.progress_types import ProgressType
+from my_unicorn.core.progress.progress_types import (
+    ProgressType,
+    SubProgressType,
+)
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,
     ProgressReporter,
@@ -1044,7 +1047,10 @@ class TestUpdateWorkflowProtocolUsage:
             )
 
             task_id = await manager.progress_reporter.add_task(
-                "Test Task", ProgressType.UPDATE, total=100.0
+                "Test Task",
+                ProgressType.PROCESSING,
+                sub_type=SubProgressType.UPDATE,
+                total=100.0,
             )
             assert task_id == "null-task"
 

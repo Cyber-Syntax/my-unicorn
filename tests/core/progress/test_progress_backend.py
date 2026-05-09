@@ -17,6 +17,7 @@ from my_unicorn.core.progress.progress import (
     AsciiProgressBackend,
     ProgressDisplay,
     ProgressType,
+    SubProgressType,
     TaskInfo,
     TaskState,
 )
@@ -285,7 +286,8 @@ class TestAsciiProgressBackendBuildOutput:
         vf = TaskState(
             task_id="vf1",
             name="MyApp",
-            progress_type=SubProgressType.VERIFICATION,
+            progress_type=ProgressType.PROCESSING,
+            sub_type=SubProgressType.VERIFICATION,
             phase=1,
             total_phases=2,
         )
@@ -293,6 +295,7 @@ class TestAsciiProgressBackendBuildOutput:
             task_id="in1",
             name="MyApp",
             progress_type=ProgressType.PROCESSING,
+            sub_type=SubProgressType.INSTALLATION,
             phase=2,
             total_phases=2,
         )
@@ -313,7 +316,8 @@ class TestAsciiProgressBackendBuildOutput:
         )
         # Check that all major section headers exist
         assert ":: Querying upstream releases..." in out
-        assert "Downloading" in out
+        assert ":: Retrieving appimages..." in out
+        assert ":: Processing package changes..." in out
 
     def test_build_output_snapshot_api_retrieved_no_cached(self) -> None:
         """Snapshot builder shows 'Retrieved' for finished API tasks."""

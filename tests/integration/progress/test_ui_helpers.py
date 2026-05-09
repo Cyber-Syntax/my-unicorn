@@ -273,14 +273,14 @@ app-2  20 MB  8.0 MB/s 00:02 [========] 75%
             ":: Querying upstream releases...\n"
             "GitHub Releases      2/2 Retrieved\n"
             "\n"
-            "Downloading (2):\n"
+            ":: Retrieving appimages... (2)\n"
             "AppFlowy-0.11.1-linux-x86_64   77.6 MiB  10.8 MB/s 00:00 "
             "[==============================]   100% ✓\n"
             "QOwnNotes-x86_64               41.6 MiB   3.6 MB/s 00:00 "
             "[==============================]   100% ✓\n"
             "\n"
             ":: Processing package changes...\n"
-            "(1/2) Installing qownnotes ✓\n"
+            "(1/2) installing qownnotes ✓\n"
             "\n"
         )
 

@@ -53,13 +53,24 @@ class TestProgressType:
         expected_types = {
             "API_FETCHING",
             "DOWNLOAD",
+            "PROCESSING",
+        }
+
+        actual_types = {pt.name for pt in ProgressType}
+
+        assert actual_types == expected_types
+
+    def test_all_sub_progress_types_exist(self) -> None:
+        """Test that all expected sub-progress types are defined."""
+        expected_types = {
             "VERIFICATION",
             "ICON_EXTRACTION",
             "INSTALLATION",
             "UPDATE",
+            "DESKTOP_ENTRY_CREATION",
         }
 
-        actual_types = {pt.name for pt in ProgressType}
+        actual_types = {pt.name for pt in SubProgressType}
 
         assert actual_types == expected_types
 

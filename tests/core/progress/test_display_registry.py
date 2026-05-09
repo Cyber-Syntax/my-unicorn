@@ -11,6 +11,7 @@ import pytest
 from my_unicorn.core.progress import TaskRegistry
 from my_unicorn.core.progress.progress_types import (
     ProgressType,
+    SubProgressType,
     TaskConfig,
     TaskInfo,
 )
@@ -97,7 +98,8 @@ async def test_get_task_info_full_existing() -> None:
         task_id="task_2",
         namespaced_id="task_2",
         name="Full Info Task",
-        progress_type=SubProgressType.VERIFICATION,
+        progress_type=ProgressType.PROCESSING,
+        sub_type=SubProgressType.VERIFICATION,
         total=100.0,
         completed=50.0,
         phase=2,
@@ -240,7 +242,8 @@ async def test_finish_task_with_failure() -> None:
         task_id="task_6",
         namespaced_id="task_6",
         name="Fail Test",
-        progress_type=SubProgressType.VERIFICATION,
+        progress_type=ProgressType.PROCESSING,
+        sub_type=SubProgressType.VERIFICATION,
         total=500.0,
         created_at=time.monotonic(),
     )

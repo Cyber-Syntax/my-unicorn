@@ -182,7 +182,7 @@ class TestFormatProcessingTaskLines:
 
         assert len(lines) >= 1
         assert "(1/2)" in lines[0]
-        assert "Verifying" in lines[0]
+        assert "verifying" in lines[0]
 
     def test_format_processing_task_lines_with_error(self) -> None:
         """Test formatting processing task with error."""
@@ -225,7 +225,7 @@ class TestFormatProcessingTaskLines:
 
         assert len(lines) >= 1
         assert "(2/2)" in lines[0]
-        assert "Installing" in lines[0]
+        assert "installing" in lines[0]
 
 
 class TestRenderApiSection:
@@ -378,6 +378,7 @@ class TestRenderProcessingSection:
             task_id="i1",
             name="test.AppImage",
             progress_type=ProgressType.PROCESSING,
+            sub_type=SubProgressType.INSTALLATION,
             phase=2,
             total_phases=2,
             is_finished=False,

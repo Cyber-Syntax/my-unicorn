@@ -207,7 +207,7 @@ class TestApiFetchingUI:
         lines = [
             line
             for line in output_lines
-            if line and "Fetching from API" not in line
+            if line and ":: Querying upstream releases..." not in line
         ]
         assert len(lines) >= 2
 

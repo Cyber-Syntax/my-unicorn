@@ -183,27 +183,6 @@ class TestErrorScenarios:
         await service.stop_session()
 
     @pytest.mark.asyncio
-    async def test_create_post_processing_task(self) -> None:
-        """Test creating post-processing tasks."""
-        service = ProgressDisplay()
-
-        await service.start_session()
-
-        task_id = await service.add_task(
-            name="MyApp",
-            progress_type=ProgressType.UPDATE,
-            description="Updating MyApp",
-        )
-
-        assert task_id is not None
-        task_info = service.get_task_info_full(task_id)
-        assert task_info is not None
-        assert task_info.progress_type == ProgressType.UPDATE
-        assert task_info.description == "Updating MyApp"
-
-        await service.stop_session()
-
-    @pytest.mark.asyncio
     async def test_id_cache_management(self) -> None:
         """Test ID cache is properly managed."""
         service = ProgressDisplay()

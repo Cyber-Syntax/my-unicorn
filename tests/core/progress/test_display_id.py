@@ -9,6 +9,7 @@ from my_unicorn.core.progress import IDGenerator
 from my_unicorn.core.progress.progress_types import (
     ID_CACHE_LIMIT,
     ProgressType,
+    SubProgressType,
 )
 
 
@@ -250,8 +251,10 @@ class TestIDTypePrefix:
             (ProgressType.DOWNLOAD, "dl"),
             (SubProgressType.VERIFICATION, "vf"),
             (SubProgressType.ICON_EXTRACTION, "ic"),
-            (ProgressType.PROCESSING, "in"),
-            (ProgressType.UPDATE, "up"),
+            (ProgressType.PROCESSING, "pc"),
+            (SubProgressType.UPDATE, "up"),
+            (SubProgressType.INSTALLATION, "in"),
+            (SubProgressType.DESKTOP_ENTRY_CREATION, "de"),
         ]
 
         for ptype, expected_prefix in test_cases:

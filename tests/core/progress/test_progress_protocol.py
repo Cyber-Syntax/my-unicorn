@@ -26,17 +26,25 @@ class TestProgressType:
 
     def test_progress_type_values_exist(self) -> None:
         """All expected progress types are defined."""
-        assert ProgressType.API is not None
+        assert ProgressType.API_FETCHING is not None
         assert ProgressType.DOWNLOAD is not None
+        assert ProgressType.PROCESSING is not None
+
+    def test_sub_progress_type_values_exist(self) -> None:
+        """All expected sub-progress types are defined."""
         assert SubProgressType.VERIFICATION is not None
-        assert ProgressType.EXTRACTION is not None
-        assert ProgressType.PROCESSING is not None
-        assert ProgressType.PROCESSING is not None
-        assert ProgressType.UPDATE is not None
+        assert SubProgressType.ICON_EXTRACTION is not None
+        assert SubProgressType.INSTALLATION is not None
+        assert SubProgressType.UPDATE is not None
+        assert SubProgressType.DESKTOP_ENTRY_CREATION is not None
 
     def test_progress_type_count(self) -> None:
         """Expected number of progress types."""
-        assert len(ProgressType) == 7
+        assert len(ProgressType) == 3
+
+    def test_sub_progress_type_count(self) -> None:
+        """Expected number of sub-progress types."""
+        assert len(SubProgressType) == 5
 
     def test_progress_types_are_unique(self) -> None:
         """All progress type values are unique."""
@@ -88,7 +96,7 @@ class TestNullProgressReporter:
         self, reporter: NullProgressReporter
     ) -> None:
         """add_task() works without total (indeterminate progress)."""
-        task_id = await reporter.add_task("Test", ProgressType.API)
+        task_id = await reporter.add_task("Test", ProgressType.DOWNLOAD)
         assert task_id == "null-task"
 
     @pytest.mark.asyncio
