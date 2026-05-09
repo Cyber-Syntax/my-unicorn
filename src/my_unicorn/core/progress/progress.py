@@ -70,6 +70,14 @@ _CORE_TO_UI_PROGRESS_TYPE: dict[CoreProgressType, ProgressType] = {
     CoreProgressType.UPDATE: ProgressType.UPDATE,
 }
 
+_PROGRESS_TYPE_PREFIXES: dict[ProgressType, str] = {
+    ProgressType.API_FETCHING: "api",
+    ProgressType.DOWNLOAD: "dl",
+    ProgressType.VERIFICATION: "vf",
+    ProgressType.ICON_EXTRACTION: "ic",
+    ProgressType.INSTALLATION: "in",
+    ProgressType.UPDATE: "up",
+}
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, AsyncIterator
@@ -690,19 +698,9 @@ class IDGenerator:
         self._task_counters[progress_type] += 1
         counter = self._task_counters[progress_type]
 
-        # Get type prefix for readable IDs
-        type_prefixes = {
-            ProgressType.API_FETCHING: "api",
-            ProgressType.DOWNLOAD: "dl",
-            ProgressType.VERIFICATION: "vf",
-            ProgressType.ICON_EXTRACTION: "ic",
-            ProgressType.INSTALLATION: "in",
-            ProgressType.UPDATE: "up",
-        }
-
         # get type prefix for readable IDs, default to "task" if not found
         # use .get() to guard against progress_type not in type_prefixes
-        type_prefix = type_prefixes.get(progress_type, "task")
+        type_prefix = _PROGRESS_TYPE_PREFIXES.get(progress_type, "task")
 
         # Sanitize name: keep only alphanumeric chars and safe symbols
         clean_name = "".join(c for c in name if c.isalnum() or c in "-_.")[:20]
