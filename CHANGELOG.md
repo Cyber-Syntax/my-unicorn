@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Consolidated logger to one module for better maintenance and consistency.
+- Consolidate progress modules to two modules as progress/ascii.py and progress/progress.py for better organization and maintainability.
 
 ## [2.6.0-alpha] - 2026-05-08
 
