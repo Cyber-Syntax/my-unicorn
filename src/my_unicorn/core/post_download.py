@@ -252,14 +252,6 @@ class PostDownloadProcessor:
                     description=f"✓ {context.app_name}",
                 )
 
-            logger.info(
-                "Successfully %s %s",
-                "installed"
-                if context.operation_type == OperationType.INSTALL
-                else "updated",
-                context.app_name,
-            )
-
             return PostDownloadResult(
                 success=True,
                 install_path=install_path,
