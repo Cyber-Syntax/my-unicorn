@@ -162,47 +162,6 @@ class AsciiProgressBackend:
         # Terminal writer for managing output
         self._writer = TerminalWriter(self.output, self.interactive)
 
-    # Properties to expose writer state for backward compatibility with tests
-    @property
-    def _last_output_lines(self) -> int:
-        """Get number of lines last written (interactive mode)."""
-        return self._writer._last_output_lines  # noqa: SLF001
-
-    @_last_output_lines.setter
-    def _last_output_lines(self, value: int) -> None:
-        """Set number of lines last written (interactive mode)."""
-        self._writer._last_output_lines = value  # noqa: SLF001
-
-    @property
-    def _written_sections(self) -> set[str]:
-        """Get set of written section signatures (non-interactive mode)."""
-        return self._writer._written_sections  # noqa: SLF001
-
-    @_written_sections.setter
-    def _written_sections(self, value: set[str]) -> None:
-        """Set set of written section signatures (non-interactive mode)."""
-        self._writer._written_sections = value  # noqa: SLF001
-
-    @property
-    def _last_noninteractive_output(self) -> str:
-        """Get cached non-interactive output."""
-        return self._writer._last_noninteractive_output  # noqa: SLF001
-
-    @_last_noninteractive_output.setter
-    def _last_noninteractive_output(self, value: str) -> None:
-        """Set cached non-interactive output."""
-        self._writer._last_noninteractive_output = value  # noqa: SLF001
-
-    @property
-    def _last_noninteractive_write_time(self) -> float:
-        """Get timestamp of last non-interactive write."""
-        return self._writer._last_noninteractive_write_time  # noqa: SLF001
-
-    @_last_noninteractive_write_time.setter
-    def _last_noninteractive_write_time(self, value: float) -> None:
-        """Set timestamp of last non-interactive write."""
-        self._writer._last_noninteractive_write_time = value  # noqa: SLF001
-
     def add_task(  # noqa: PLR0913
         self,
         task_id: str,
@@ -330,67 +289,6 @@ class AsciiProgressBackend:
             order_snapshot = list(self._task_order)
 
         return self._build_output_from_snapshot(tasks_snapshot, order_snapshot)
-
-    def _clear_previous_output(self) -> None:
-        """Clear previously written lines in interactive mode.
-
-        Thin wrapper for backward compatibility; delegates to TerminalWriter.
-        """
-        self._writer._clear_previous_output()  # noqa: SLF001
-
-    def _write_interactive(self, output: str) -> int:
-        """Write output in interactive mode with cursor control.
-
-        Thin wrapper for backward compatibility; delegates to TerminalWriter.
-
-        Args:
-            output: Output string to write
-
-        Returns:
-            Number of lines written
-        """
-        return self._writer.write_interactive(output)
-
-    def _write_output_safe(self, text: str) -> None:
-        """Write text to output stream, suppressing IO errors.
-
-        Thin wrapper for backward compatibility; delegates to TerminalWriter.
-        """
-        self._writer._write_output_safe(text)  # noqa: SLF001
-
-    def _find_new_sections(
-        self, output: str, known_sections: set[str]
-    ) -> tuple[list[str], set[str]]:
-        """Parse output and find sections not in known_sections.
-
-        Thin wrapper for backward compatibility; delegates to TerminalWriter.
-
-        Args:
-            output: Output string containing sections separated by blank lines
-            known_sections: Set of section signatures already written
-
-        Returns:
-            Tuple of (new_sections_list, new_signatures_set)
-        """
-        return self._writer._find_new_sections(output, known_sections)  # noqa: SLF001
-
-    def _write_noninteractive(
-        self, output: str, known_sections: set[str] | None = None
-    ) -> set[str]:
-        """Write output in non-interactive mode (minimal output).
-
-        Thin wrapper for backward compatibility; delegates to TerminalWriter.
-
-        Args:
-            output: Output string to write
-            known_sections: Optional set of already-written section signatures
-                used to detect new/updated sections. If ``None``, the
-                backend's internal `_written_sections` set is used.
-
-        Returns:
-            Set of section signatures that were written
-        """
-        return self._writer.write_noninteractive(output, known_sections)
 
     async def render_once(self) -> None:
         """Render current state once.
