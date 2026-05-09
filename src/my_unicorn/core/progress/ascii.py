@@ -570,7 +570,12 @@ def determine_task_status_symbol(
         spinner: Spinner character to use for in-progress tasks.
 
     Returns:
-        Status symbol: ✓ (success), ✖ (error), ! (warning), or spinner.
+        Status symbol:
+            ✓ = success
+            ✖ = error
+            ! = warning
+            ? = unknown
+            spinner = in-progress
 
     """
     if not status_info.is_finished:
@@ -584,7 +589,14 @@ def determine_task_status_symbol(
     ):
         return "!"
 
-    return "✓" if status_info.success else "✖"
+    if status_info.success is True:
+        return "✓"
+
+    if status_info.success is False:
+        return "✖"
+
+    # success is None or unknown
+    return "?"
 
 
 def should_show_warning_message(status_info: TaskStatusInfo) -> bool:
@@ -731,11 +743,17 @@ def format_download_lines(
     )
 
     # Use status symbol, but show empty space for in-progress downloads
-    status = (
-        ("✓" if status_info.success else "✖")
-        if status_info.is_finished
-        else " "
-    )
+    if status_info.is_finished:
+        if status_info.success:
+            status = "✓"
+        elif status_info.success is False:
+            status = "✖"
+        else:
+            # success is None: finished but outcome not recorded
+            status = "?"
+    else:
+        # In-progress: show empty space
+        status = " "
 
     lines.append(
         f"{name:<{max_name_width}} {size_str} {speed_str} "
