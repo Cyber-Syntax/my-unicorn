@@ -29,6 +29,7 @@ from my_unicorn.core.post_download import (
     PostDownloadContext,
     PostDownloadProcessor,
 )
+from my_unicorn.core.progress.progress_types import TRANSACTION_SUMMARY_HEADER
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,
     ProgressReporter,
@@ -134,8 +135,7 @@ def print_install_summary(results: list[dict[str, Any]]) -> None:
         _print_all_already_installed(results)
         return
 
-    logger.info("Installation Summary:")
-    logger.info("-" * 50)
+    logger.info(TRANSACTION_SUMMARY_HEADER)
 
     for result in results:
         _print_result_line(result)

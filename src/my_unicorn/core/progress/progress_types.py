@@ -34,6 +34,8 @@ OPERATION_NAMES: dict[ProgressType, str] = {
     ProgressType.PROCESSING: ":: Processing package changes...",
 }
 
+TRANSACTION_SUMMARY_HEADER: str = ":: Creating transaction summary..."
+
 SUB_PROCESSING_NAMES: dict[SubProgressType, str] = {
     SubProgressType.VERIFICATION: "verifying",
     SubProgressType.INSTALLATION: "installing",

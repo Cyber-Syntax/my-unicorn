@@ -860,23 +860,7 @@ def render_api_section(
 
         lines.append(f"{name:20} {status}")
 
-    lines.append("")
     return lines
-
-
-def compute_download_header(download_count: int) -> str:
-    """Return the downloads section header string.
-
-    Args:
-        download_count: The total number of downloads.
-
-    Returns:
-        A formatted header string for the downloads section.
-    """
-    header = OPERATION_NAMES.get(ProgressType.DOWNLOAD)
-    if download_count > 1:
-        return f"{header} ({download_count})"
-    return f"{header}"
 
 
 def render_downloads_section(
@@ -916,7 +900,7 @@ def render_downloads_section(
 
     total_downloads = len(download_tasks)
 
-    header = compute_download_header(total_downloads)
+    header = OPERATION_NAMES.get(ProgressType.DOWNLOAD)
 
     lines = [header]
     for task_id in download_tasks:
@@ -925,7 +909,35 @@ def render_downloads_section(
             format_download_lines(task, max_name_width, config.bar_width)
         )
 
-    lines.append("")
+    # Add total summary line
+    total_completed = sum(tasks[t].completed for t in download_tasks)
+    total_size = sum(tasks[t].total for t in download_tasks)
+    completed_count = sum(
+        1 for t in download_tasks if tasks[t].is_finished and tasks[t].success
+    )
+    total_speed = (
+        sum(tasks[t].speed for t in download_tasks) / len(download_tasks)
+        if download_tasks
+        else 0.0
+    )
+
+    if total_size > total_completed:
+        remaining_bytes = total_size - total_completed
+        eta_seconds = remaining_bytes / total_speed if total_speed > 0 else 0
+        eta_str = format_eta(eta_seconds)
+    else:
+        eta_str = "00:00"
+
+    size_str = f"{human_mib(total_size):>10}"
+    speed_str = f"{human_speed_bps(total_speed):>10}"
+    bar = render_bar(total_completed, total_size, config.bar_width)
+    pct = format_percentage(total_completed, total_size)
+
+    total_line = (
+        f"Total ({completed_count}/{total_downloads})"
+        f" {size_str} {speed_str} {eta_str:>5} {bar} {pct:>6}"
+    )
+    lines.append(total_line)
     return lines
 
 
@@ -995,5 +1007,4 @@ def render_processing_section(
                 format_processing_task_lines(task, name_width, spinner)
             )
 
-    lines.append("")
     return lines
