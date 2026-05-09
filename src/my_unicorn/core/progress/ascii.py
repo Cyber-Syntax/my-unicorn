@@ -285,8 +285,8 @@ class AsciiProgressBackend:
                 order_snapshot = list(self._task_order)
         except Exception as exc:
             logger.debug("Failed to snapshot tasks: %s", exc)
-            tasks_snapshot = dict(self.tasks)
-            order_snapshot = list(self._task_order)
+            # skip one render frame, never read without lock
+            return ""
 
         return self._build_output_from_snapshot(tasks_snapshot, order_snapshot)
 
