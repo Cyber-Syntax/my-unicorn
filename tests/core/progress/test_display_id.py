@@ -82,9 +82,9 @@ class TestIDSequentialNumbering:
 
         types_and_names = [
             (ProgressType.DOWNLOAD, "d1"),
-            (ProgressType.VERIFICATION, "v1"),
+            (SubProgressType.VERIFICATION, "v1"),
             (ProgressType.API_FETCHING, "a1"),
-            (ProgressType.ICON_EXTRACTION, "i1"),
+            (SubProgressType.ICON_EXTRACTION, "i1"),
         ]
 
         ids = {}
@@ -92,9 +92,9 @@ class TestIDSequentialNumbering:
             ids[ptype] = generator.generate_namespaced_id(ptype, name)
 
         assert ids[ProgressType.DOWNLOAD].startswith("dl_1_")
-        assert ids[ProgressType.VERIFICATION].startswith("vf_1_")
+        assert ids[SubProgressType.VERIFICATION].startswith("vf_1_")
         assert ids[ProgressType.API_FETCHING].startswith("api_1_")
-        assert ids[ProgressType.ICON_EXTRACTION].startswith("ic_1_")
+        assert ids[SubProgressType.ICON_EXTRACTION].startswith("ic_1_")
 
 
 class TestIDCacheClear:
@@ -248,9 +248,9 @@ class TestIDTypePrefix:
         test_cases = [
             (ProgressType.API_FETCHING, "api"),
             (ProgressType.DOWNLOAD, "dl"),
-            (ProgressType.VERIFICATION, "vf"),
-            (ProgressType.ICON_EXTRACTION, "ic"),
-            (ProgressType.INSTALLATION, "in"),
+            (SubProgressType.VERIFICATION, "vf"),
+            (SubProgressType.ICON_EXTRACTION, "ic"),
+            (ProgressType.PROCESSING, "in"),
             (ProgressType.UPDATE, "up"),
         ]
 

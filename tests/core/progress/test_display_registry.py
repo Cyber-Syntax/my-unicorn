@@ -97,7 +97,7 @@ async def test_get_task_info_full_existing() -> None:
         task_id="task_2",
         namespaced_id="task_2",
         name="Full Info Task",
-        progress_type=ProgressType.VERIFICATION,
+        progress_type=SubProgressType.VERIFICATION,
         total=100.0,
         completed=50.0,
         phase=2,
@@ -240,7 +240,7 @@ async def test_finish_task_with_failure() -> None:
         task_id="task_6",
         namespaced_id="task_6",
         name="Fail Test",
-        progress_type=ProgressType.VERIFICATION,
+        progress_type=SubProgressType.VERIFICATION,
         total=500.0,
         created_at=time.monotonic(),
     )
@@ -311,8 +311,8 @@ async def test_task_registry_multiple_types() -> None:
     # Add tasks of different types
     types_and_names = [
         (ProgressType.DOWNLOAD, "Download 1"),
-        (ProgressType.VERIFICATION, "Verify 1"),
-        (ProgressType.INSTALLATION, "Install 1"),
+        (SubProgressType.VERIFICATION, "Verify 1"),
+        (ProgressType.PROCESSING, "Install 1"),
         (ProgressType.DOWNLOAD, "Download 2"),
     ]
 

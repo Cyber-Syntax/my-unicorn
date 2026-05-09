@@ -9,11 +9,12 @@ from unittest.mock import patch
 
 import pytest
 
-from my_unicorn.core.progress import TaskInfo
-from my_unicorn.core.progress.progress import (
+from my_unicorn.core.progress import (
     ProgressConfig,
     ProgressDisplay,
     ProgressType,
+    SubProgressType,
+    TaskInfo,
 )
 
 # 'progress_service' fixture is provided by tests/core/progress/conftest.py
@@ -265,13 +266,13 @@ class TestProgressDisplay:
 
         task_id = await progress_service.add_task(
             name="app_name",
-            progress_type=ProgressType.ICON_EXTRACTION,
+            progress_type=SubProgressType.ICON_EXTRACTION,
             description="Extracting icon for app_name",
         )
 
         assert task_id is not None
         task = progress_service._task_registry.get_task_info_full_sync(task_id)
-        assert task.progress_type == ProgressType.ICON_EXTRACTION
+        assert task.progress_type == SubProgressType.ICON_EXTRACTION
 
         await progress_service.stop_session()
 
@@ -395,30 +396,6 @@ class TestProgressDisplay:
         await progress_service.stop_session()
 
     @pytest.mark.asyncio
-    async def test_verification_error(
-        self, progress_service: ProgressDisplay
-    ) -> None:
-        """Test handling verification error."""
-        from my_unicorn.core.progress import create_verification_task
-
-        await progress_service.start_session()
-
-        task_id = await create_verification_task(progress_service, "file.zip")
-
-        # Simulate verification failure
-        await progress_service.finish_task(
-            task_id,
-            success=False,
-            description="Checksum mismatch",
-        )
-
-        task = progress_service._task_registry.get_task_info_full_sync(task_id)
-        assert task.success is False
-        assert "Checksum mismatch" in task.description
-
-        await progress_service.stop_session()
-
-    @pytest.mark.asyncio
     async def test_icon_extraction_error(
         self, progress_service: ProgressDisplay
     ) -> None:
@@ -427,7 +404,7 @@ class TestProgressDisplay:
 
         task_id = await progress_service.add_task(
             name="app_name",
-            progress_type=ProgressType.ICON_EXTRACTION,
+            progress_type=SubProgressType.ICON_EXTRACTION,
             description="Extracting icon for app_name",
         )
 

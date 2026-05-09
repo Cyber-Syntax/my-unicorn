@@ -1,6 +1,6 @@
 """Integration tests for installation/verification progress UI display.
 
-These tests verify that the "Installing:" or "Verifying:" sections render
+These tests verify that the ":: Processing package changes..." or "verifying" sections render
 correctly for various processing task states including verification success,
 warnings, partial verification, installation success, and error conditions.
 """
@@ -13,7 +13,11 @@ from my_unicorn.core.progress.ascii import (
     SectionRenderConfig,
     render_processing_section,
 )
-from my_unicorn.core.progress.progress_types import ProgressType, TaskState
+from my_unicorn.core.progress.progress_types import (
+    ProgressType,
+    SubProgressType,
+    TaskState,
+)
 
 from .test_ui_helpers import capture_progress_output, parse_output_sections
 
@@ -31,7 +35,7 @@ class TestVerificationSuccessUI:
         task = TaskState(
             task_id="v1",
             name="qownnotes",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=SubProgressType.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -52,7 +56,7 @@ class TestVerificationSuccessUI:
         output = "\n".join(output_lines)
 
         # Assert - should show verification in correct format
-        assert "Verifying:" in output
+        assert "verifying" in output
         assert "(1/2)" in output
         assert "Verifying" in output
         assert "qownnotes" in output
@@ -71,7 +75,7 @@ class TestVerificationWarningUI:
         task = TaskState(
             task_id="v1",
             name="weektodo",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=SubProgressType.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -93,7 +97,7 @@ class TestVerificationWarningUI:
         output = "\n".join(output_lines)
 
         # Assert - should show warning format
-        assert "Verifying:" in output
+        assert "verifying" in output
         assert "(1/2)" in output
         assert "Verifying" in output
         assert "weektodo" in output
@@ -111,7 +115,7 @@ class TestVerificationWarningUI:
         task1 = TaskState(
             task_id="v1",
             name="weektodo",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=SubProgressType.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -121,7 +125,7 @@ class TestVerificationWarningUI:
         task2 = TaskState(
             task_id="i1",
             name="weektodo",
-            progress_type=ProgressType.INSTALLATION,
+            progress_type=ProgressType.PROCESSING,
             phase=2,
             total_phases=2,
             is_finished=True,
@@ -142,7 +146,7 @@ class TestVerificationWarningUI:
         output = "\n".join(output_lines)
 
         # Assert - should show both phases
-        assert "Installing:" in output
+        assert ":: Processing package changes..." in output
         assert "(1/2) Verifying weektodo !" in output
         assert "(2/2) Installing weektodo ✓" in output
 
@@ -164,7 +168,7 @@ class TestInstallationSuccessUI:
         task = TaskState(
             task_id="i1",
             name="qownnotes",
-            progress_type=ProgressType.INSTALLATION,
+            progress_type=ProgressType.PROCESSING,
             phase=2,
             total_phases=2,
             is_finished=True,
@@ -185,7 +189,7 @@ class TestInstallationSuccessUI:
         output = "\n".join(output_lines)
 
         # Assert - should show installation in correct format
-        assert "Installing:" in output
+        assert ":: Processing package changes..." in output
         assert "(2/2)" in output
         assert "Installing" in output
         assert "qownnotes" in output
@@ -208,7 +212,7 @@ class TestProcessingPhasesSequentialUI:
         task1 = TaskState(
             task_id="v1",
             name="qownnotes",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=SubProgressType.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -217,7 +221,7 @@ class TestProcessingPhasesSequentialUI:
         task2 = TaskState(
             task_id="i1",
             name="qownnotes",
-            progress_type=ProgressType.INSTALLATION,
+            progress_type=ProgressType.PROCESSING,
             phase=2,
             total_phases=2,
             is_finished=True,
@@ -252,7 +256,7 @@ class TestProcessingPhasesSequentialUI:
         task1 = TaskState(
             task_id="v1",
             name="qownnotes",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=SubProgressType.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -261,7 +265,7 @@ class TestProcessingPhasesSequentialUI:
         task2 = TaskState(
             task_id="i1",
             name="qownnotes",
-            progress_type=ProgressType.INSTALLATION,
+            progress_type=ProgressType.PROCESSING,
             phase=2,
             total_phases=2,
             is_finished=True,
@@ -270,7 +274,7 @@ class TestProcessingPhasesSequentialUI:
         task3 = TaskState(
             task_id="v2",
             name="appflowy",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=SubProgressType.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -279,7 +283,7 @@ class TestProcessingPhasesSequentialUI:
         task4 = TaskState(
             task_id="i2",
             name="appflowy",
-            progress_type=ProgressType.INSTALLATION,
+            progress_type=ProgressType.PROCESSING,
             phase=2,
             total_phases=2,
             is_finished=True,
@@ -323,7 +327,7 @@ class TestProcessingErrorUI:
         task = TaskState(
             task_id="i1",
             name="broken-app",
-            progress_type=ProgressType.INSTALLATION,
+            progress_type=ProgressType.PROCESSING,
             phase=2,
             total_phases=2,
             is_finished=True,
@@ -345,7 +349,7 @@ class TestProcessingErrorUI:
         output = "\n".join(output_lines)
 
         # Assert - should show error format
-        assert "Installing:" in output
+        assert ":: Processing package changes..." in output
         assert "(2/2)" in output
         assert "Installing" in output
         assert "broken-app" in output
@@ -362,7 +366,7 @@ class TestProcessingErrorUI:
         task = TaskState(
             task_id="v1",
             name="bad-app",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=SubProgressType.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -384,7 +388,7 @@ class TestProcessingErrorUI:
         output = "\n".join(output_lines)
 
         # Assert - should show error format
-        assert "Verifying:" in output
+        assert "verifying" in output
         assert "(1/2)" in output
         assert "Verifying" in output
         assert "bad-app" in output
@@ -398,7 +402,7 @@ class TestProcessingHeaderSelection:
     """Test suite for processing section header selection."""
 
     def test_header_verifying_only(self) -> None:
-        """Verify header is 'Verifying:' when only verification tasks present.
+        """Verify header is 'verifying' when only verification tasks present.
 
         Tests that the section header is correctly selected based on
         what types of processing tasks are present.
@@ -407,7 +411,7 @@ class TestProcessingHeaderSelection:
         task = TaskState(
             task_id="v1",
             name="qownnotes",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=SubProgressType.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -426,21 +430,22 @@ class TestProcessingHeaderSelection:
         # Act - render processing section
         output_lines = render_processing_section(tasks, order, config)
 
-        # Assert - should have "Verifying:" header
+        # Assert - should have "verifying" header
         assert len(output_lines) > 0
-        assert output_lines[0] == "Verifying:"
+        assert output_lines[0] == "verifying"
 
     def test_header_installing_with_verification(self) -> None:
-        """Verify header is 'Installing:' when both types of tasks present.
+        """Verify header is ':: Processing package changes...' when both types of tasks present.
 
         Tests that when both verification and installation tasks are
-        present, the header is still 'Installing:'.
+        present, the header is still ':: Processing package changes...'.
         """
         # Arrange - create verification + installation tasks
         task1 = TaskState(
             task_id="v1",
             name="qownnotes",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=ProgressType.PROCESSING,
+            sub_type=SubProgressType.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -449,7 +454,8 @@ class TestProcessingHeaderSelection:
         task2 = TaskState(
             task_id="i1",
             name="qownnotes",
-            progress_type=ProgressType.INSTALLATION,
+            progress_type=ProgressType.PROCESSING,
+            sub_type=SubProgressType.INSTALLATION,
             phase=2,
             total_phases=2,
             is_finished=True,
@@ -468,41 +474,9 @@ class TestProcessingHeaderSelection:
         # Act - render processing section
         output_lines = render_processing_section(tasks, order, config)
 
-        # Assert - should have "Installing:" header
+        # Assert - should have ":: Processing package changes..." header
         assert len(output_lines) > 0
-        assert output_lines[0] == "Installing:"
-
-    def test_header_processing_with_update_only(self) -> None:
-        """Verify header is 'Processing:' when only update tasks present.
-
-        Tests that update operations alone use 'Processing:' as header.
-        """
-        # Arrange - create update tasks only
-        task = TaskState(
-            task_id="u1",
-            name="qownnotes",
-            progress_type=ProgressType.UPDATE,
-            phase=2,
-            total_phases=2,
-            is_finished=True,
-            success=True,
-        )
-
-        tasks = {"u1": task}
-        order = ["u1"]
-        config = SectionRenderConfig(
-            bar_width=30,
-            min_name_width=15,
-            spinner_fps=4,
-            interactive=False,
-        )
-
-        # Act - render processing section
-        output_lines = render_processing_section(tasks, order, config)
-
-        # Assert - should have "Processing:" header (for update-only)
-        assert len(output_lines) > 0
-        assert output_lines[0] == "Processing:"
+        assert output_lines[0] == ":: Processing package changes..."
 
     def test_processing_section_with_helper_and_fixture(
         self, install_success_output: str
@@ -511,7 +485,8 @@ class TestProcessingHeaderSelection:
         task1 = TaskState(
             task_id="v1",
             name="qownnotes",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=ProgressType.PROCESSING,
+            sub_type=SubProgressType.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -520,7 +495,8 @@ class TestProcessingHeaderSelection:
         task2 = TaskState(
             task_id="i1",
             name="qownnotes",
-            progress_type=ProgressType.INSTALLATION,
+            progress_type=ProgressType.PROCESSING,
+            sub_type=SubProgressType.INSTALLATION,
             phase=2,
             total_phases=2,
             is_finished=True,

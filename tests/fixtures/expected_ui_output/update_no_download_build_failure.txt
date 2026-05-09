@@ -1,4 +1,4 @@
-Fetching from API:
+:: Querying upstream releases...
 GitHub Releases      1/1 Retrieved from cache
 
 Update Summary:

@@ -1,8 +1,9 @@
 import pytest
 
-from my_unicorn.core.progress.progress import (
+from my_unicorn.core.progress import (
     ProgressConfig,
     ProgressType,
+    SubProgressType,
     TaskInfo,
     TaskState,
 )
@@ -32,7 +33,8 @@ class TestTaskState:
         state = TaskState(
             task_id="task_1",
             name="Multi-phase Task",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=ProgressType.PROCESSING,
+            sub_type=SubProgressType.VERIFICATION,
             parent_task_id="parent_task",
             phase=1,
             total_phases=2,
@@ -103,7 +105,8 @@ class TestTaskInfo:
             task_id="vf_1",
             namespaced_id="vf_1_app",
             name="MyApp",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=ProgressType.PROCESSING,
+            sub_type=SubProgressType.VERIFICATION,
             parent_task_id="parent_1",
             phase=1,
             total_phases=2,

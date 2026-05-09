@@ -41,8 +41,10 @@ from .progress_types import (
     DEFAULT_SPINNER_FPS,
     OPERATION_NAMES,
     SPINNER_FRAMES,
+    SUB_PROCESSING_NAMES,
     ProgressConfig,
     ProgressType,
+    SubProgressType,
     TaskState,
 )
 
@@ -77,20 +79,6 @@ def compute_spinner(fps: int) -> str:
     current_time = time.monotonic()
     spinner_idx = int(current_time * fps) % len(SPINNER_FRAMES)
     return SPINNER_FRAMES[spinner_idx]
-
-
-def compute_download_header(download_count: int) -> str:
-    """Return the downloads section header string.
-
-    Args:
-        download_count: The total number of downloads.
-
-    Returns:
-        A formatted header string for the downloads section.
-    """
-    if download_count > 1:
-        return f"Downloading ({download_count}):"
-    return "Downloading:"
 
 
 class AsciiProgressBackend:
@@ -167,6 +155,7 @@ class AsciiProgressBackend:
         task_id: str,
         name: str,
         progress_type: ProgressType,
+        sub_type: SubProgressType | None = None,
         total: float = 0.0,
         parent_task_id: str | None = None,
         phase: int = 1,
@@ -178,6 +167,7 @@ class AsciiProgressBackend:
             task_id: Unique task identifier
             name: Task name
             progress_type: Type of progress operation
+            sub_type: Type of sub-progress operation
             total: Total units for the task
             parent_task_id: Parent task ID for multi-phase operations
             phase: Current phase number
@@ -188,6 +178,7 @@ class AsciiProgressBackend:
             task_id=task_id,
             name=name,
             progress_type=progress_type,
+            sub_type=sub_type,
             total=total,
             created_at=time.time(),
             last_update=time.monotonic(),
@@ -786,7 +777,11 @@ def format_processing_task_lines(
     """
     lines: list[str] = []
     phase_str = f"({task.phase}/{task.total_phases})"
-    operation = OPERATION_NAMES.get(task.progress_type, "Processing")
+
+    operation = SUB_PROCESSING_NAMES.get(task.sub_type)
+    if operation is None:
+        operation = "processing"
+    operation_label = f"{operation[:1]}{operation[1:]}"
 
     # Create status info for status determination
     status_info = TaskStatusInfo(
@@ -800,7 +795,7 @@ def format_processing_task_lines(
     status = determine_task_status_symbol(status_info, spinner)
 
     name = truncate_text(task.name, name_width)
-    lines.append(f"{phase_str} {operation} {name} {status}")
+    lines.append(f"{phase_str} {operation_label} {name} {status}")
 
     # Show warning message if applicable
     if should_show_warning_message(status_info):
@@ -828,6 +823,7 @@ def render_api_section(
         List of formatted output lines for API section
 
     """
+    header = OPERATION_NAMES.get(ProgressType.API_FETCHING)
     api_tasks = [
         t
         for t in order
@@ -839,7 +835,7 @@ def render_api_section(
     if not api_tasks:
         return []
 
-    lines = ["Fetching from API:"]
+    lines = [header]
     for task_id in api_tasks:
         task = tasks[task_id]
         name = truncate_text(task.name, 18)
@@ -866,6 +862,21 @@ def render_api_section(
 
     lines.append("")
     return lines
+
+
+def compute_download_header(download_count: int) -> str:
+    """Return the downloads section header string.
+
+    Args:
+        download_count: The total number of downloads.
+
+    Returns:
+        A formatted header string for the downloads section.
+    """
+    header = OPERATION_NAMES.get(ProgressType.DOWNLOAD)
+    if download_count > 1:
+        return f"{header} ({download_count})"
+    return f"{header}"
 
 
 def render_downloads_section(
@@ -934,36 +945,33 @@ def render_processing_section(
         List of formatted output lines for processing section
 
     """
+    installing_header = OPERATION_NAMES.get(ProgressType.PROCESSING)
+    verifying_header = SUB_PROCESSING_NAMES.get(SubProgressType.VERIFICATION)
+
     post_tasks = [
         t
         for t in order
         # Use .get() to guard against order/tasks snapshot divergence,
         if (task := tasks.get(t))
-        and task.progress_type
-        in (
-            ProgressType.VERIFICATION,
-            ProgressType.ICON_EXTRACTION,
-            ProgressType.INSTALLATION,
-            ProgressType.UPDATE,
-        )
+        and task.progress_type == ProgressType.PROCESSING
     ]
 
     if not post_tasks:
         return []
 
-    has_verification = any(
-        tasks[t].progress_type == ProgressType.VERIFICATION for t in post_tasks
-    )
-    has_installation = any(
-        tasks[t].progress_type == ProgressType.INSTALLATION for t in post_tasks
-    )
+    sub_types = {
+        tasks[t].sub_type for t in post_tasks if tasks[t].sub_type is not None
+    }
+
+    has_installation = SubProgressType.INSTALLATION in sub_types
+    has_verification = SubProgressType.VERIFICATION in sub_types
 
     if has_verification and not has_installation:
-        section_header = "Verifying:"
+        section_header = verifying_header
     elif has_installation:
-        section_header = "Installing:"
+        section_header = installing_header
     else:
-        section_header = "Processing:"
+        section_header = "processing"
 
     lines = [section_header]
 

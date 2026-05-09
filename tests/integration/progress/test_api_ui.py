@@ -1,6 +1,6 @@
 """Integration tests for API fetching progress UI display.
 
-These tests verify that the "Fetching from API:" section renders correctly
+These tests verify that the ":: Querying upstream releases..." section renders correctly
 for various API task states including in-progress, retrieved, and cached
 states.
 """
@@ -40,7 +40,7 @@ class TestApiFetchingUI:
         output = "\n".join(output_lines)
 
         # Assert
-        assert "Fetching from API:" in output
+        assert ":: Querying upstream releases..." in output
         assert "GitHub Releases" in output
         assert "1/2 Fetching..." in output
         # Should not have "Retrieved" when still fetching
@@ -68,7 +68,7 @@ class TestApiFetchingUI:
         output = "\n".join(output_lines)
 
         # Assert
-        assert "Fetching from API:" in output
+        assert ":: Querying upstream releases..." in output
         assert "GitHub Releases" in output
         assert "2/2 Retrieved" in output
         # Should not have "cache" when retrieved from API
@@ -96,7 +96,7 @@ class TestApiFetchingUI:
         output = "\n".join(output_lines)
 
         # Assert
-        assert "Fetching from API:" in output
+        assert ":: Querying upstream releases..." in output
         assert "GitHub Releases" in output
         assert "Retrieved from cache" in output
 
@@ -149,7 +149,7 @@ class TestApiFetchingUI:
         output = "\n".join(output_lines)
 
         # Assert
-        assert "Fetching from API:" in output
+        assert ":: Querying upstream releases..." in output
         # Task 1 should show "Retrieved"
         assert "GitHub Releases" in output
         lines = output.split("\n")
@@ -264,7 +264,7 @@ class TestApiFetchingUI:
         output = "\n".join(output_lines)
 
         # Assert
-        assert "Fetching from API:" in output
+        assert ":: Querying upstream releases..." in output
         assert "GitHub Releases" in output
         # Should NOT include download task
         assert "test-app" not in output
@@ -290,7 +290,7 @@ class TestApiFetchingUI:
         output = "\n".join(output_lines)
 
         # Assert
-        assert "Fetching from API:" in output
+        assert ":: Querying upstream releases..." in output
         assert "GitHub Releases" in output
         # Should show "Retrieved" for finished task with zero total
         assert "Retrieved" in output
@@ -315,7 +315,7 @@ class TestApiFetchingUI:
         output = "\n".join(output_lines)
 
         # Assert
-        assert "Fetching from API:" in output
+        assert ":: Querying upstream releases..." in output
         assert "GitHub Releases" in output
         # Should show "Fetching..." for unfinished task
         assert "Fetching..." in output
@@ -379,7 +379,7 @@ class TestApiFetchingUI:
 
         # Assert
         # Name should be truncated to 18 chars
-        assert "Fetching from API:" in output
+        assert ":: Querying upstream releases..." in output
         # Should not have the full name since it's truncated
         assert long_name not in output
         # Should have truncated version or Retrieved status

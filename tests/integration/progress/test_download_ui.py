@@ -1,6 +1,6 @@
 """Integration tests for download progress UI display.
 
-These tests verify that the "Downloading:" section renders correctly
+These tests verify that the ":: Retrieving appimages..." section renders correctly
 for various download task states including in-progress, completed,
 error, and multi-file downloads.
 """
@@ -53,7 +53,7 @@ class TestDownloadProgressBarUI:
         output = "\n".join(output_lines)
 
         # Assert - should show progress bar
-        assert "Downloading:" in output
+        assert ":: Retrieving appimages..." in output
         assert "[" in output
         assert "]" in output
         # Progress bar should have equals signs
@@ -164,7 +164,7 @@ class TestDownloadProgressBarUI:
         assert "broken-app" in output
 
     def test_download_multiple_files_ui(self) -> None:
-        """Verify 'Downloading (N):' header for multiple downloads."""
+        """Verify header for multiple downloads."""
         # Arrange - create multiple download tasks
         task1 = TaskState(
             task_id="dl_1",
@@ -200,8 +200,6 @@ class TestDownloadProgressBarUI:
         output_lines = render_downloads_section(tasks, order, config)
         output = "\n".join(output_lines)
 
-        # Assert - should show count in header
-        assert "Downloading (2):" in output
         # Both files should be listed
         assert "AppFlowy" in output
         assert "QOwnNotes" in output
@@ -298,7 +296,7 @@ class TestDownloadProgressBarUI:
         assert "app" in output
 
     def test_download_single_file_header(self) -> None:
-        """Verify 'Downloading:' header (without count) for single file."""
+        """Verify ':: Retrieving appimages...' header (without count) for single file."""
         # Arrange - create single download task
         task = TaskState(
             task_id="dl_1",
@@ -323,9 +321,8 @@ class TestDownloadProgressBarUI:
         output_lines = render_downloads_section(tasks, order, config)
         output = "\n".join(output_lines)
 
-        # Assert - should show "Downloading:" without count
-        assert "Downloading:" in output
-        assert "Downloading (1):" not in output
+        # Assert - should show ":: Retrieving appimages..." without count
+        assert ":: Retrieving appimages..." in output
         assert "single-app" in output
 
     def test_download_no_tasks_returns_empty(self) -> None:

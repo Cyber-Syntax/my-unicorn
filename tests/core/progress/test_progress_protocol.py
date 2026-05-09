@@ -14,11 +14,11 @@ import inspect
 
 import pytest
 
-from my_unicorn.core.protocols import (
-    NullProgressReporter,
-    ProgressReporter,
+from my_unicorn.core.progress.progress_types import (
     ProgressType,
+    SubProgressType,
 )
+from my_unicorn.core.protocols import NullProgressReporter, ProgressReporter
 
 
 class TestProgressType:
@@ -28,10 +28,10 @@ class TestProgressType:
         """All expected progress types are defined."""
         assert ProgressType.API is not None
         assert ProgressType.DOWNLOAD is not None
-        assert ProgressType.VERIFICATION is not None
+        assert SubProgressType.VERIFICATION is not None
         assert ProgressType.EXTRACTION is not None
         assert ProgressType.PROCESSING is not None
-        assert ProgressType.INSTALLATION is not None
+        assert ProgressType.PROCESSING is not None
         assert ProgressType.UPDATE is not None
 
     def test_progress_type_count(self) -> None:

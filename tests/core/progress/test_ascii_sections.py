@@ -19,6 +19,7 @@ from my_unicorn.core.progress.ascii import (
 from my_unicorn.core.progress.progress_types import (
     DEFAULT_MIN_NAME_WIDTH,
     ProgressType,
+    SubProgressType,
     TaskState,
 )
 
@@ -167,7 +168,8 @@ class TestFormatProcessingTaskLines:
         task = TaskState(
             task_id="v1",
             name="test.AppImage",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=ProgressType.PROCESSING,
+            sub_type=SubProgressType.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=False,
@@ -187,7 +189,8 @@ class TestFormatProcessingTaskLines:
         task = TaskState(
             task_id="v1",
             name="test.AppImage",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=ProgressType.PROCESSING,
+            sub_type=SubProgressType.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -208,7 +211,8 @@ class TestFormatProcessingTaskLines:
         task = TaskState(
             task_id="i1",
             name="test.AppImage",
-            progress_type=ProgressType.INSTALLATION,
+            progress_type=ProgressType.PROCESSING,
+            sub_type=SubProgressType.INSTALLATION,
             phase=2,
             total_phases=2,
             is_finished=False,
@@ -251,7 +255,7 @@ class TestRenderApiSection:
         result = render_api_section(tasks=tasks, order=order)
 
         assert len(result) > 0
-        assert "Fetching from API:" in result[0]
+        assert ":: Querying upstream releases..." in result[0]
 
     def test_render_api_section_with_cached_response(self) -> None:
         """Test rendering API section with cached response."""
@@ -317,7 +321,10 @@ class TestRenderDownloadsSection:
         )
 
         assert len(result) > 0
-        assert "Downloads" in result[0] or "Download" in result[0]
+        assert (
+            ":: Retrieving appimages..." in result[0]
+            or ":: Retrieving appimages..." in result[0]
+        )
 
 
 class TestRenderProcessingSection:
@@ -341,7 +348,8 @@ class TestRenderProcessingSection:
         task = TaskState(
             task_id="v1",
             name="test.AppImage",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=ProgressType.PROCESSING,
+            sub_type=SubProgressType.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=False,
@@ -362,14 +370,14 @@ class TestRenderProcessingSection:
         )
 
         assert len(result) > 0
-        assert "Verifying:" in result[0]
+        assert "verifying" in result[0]
 
     def test_render_processing_section_installing(self) -> None:
         """Test rendering processing section with installation tasks."""
         task = TaskState(
             task_id="i1",
             name="test.AppImage",
-            progress_type=ProgressType.INSTALLATION,
+            progress_type=ProgressType.PROCESSING,
             phase=2,
             total_phases=2,
             is_finished=False,
@@ -390,4 +398,4 @@ class TestRenderProcessingSection:
         )
 
         assert len(result) > 0
-        assert "Installing:" in result[0]
+        assert ":: Processing package changes..." in result[0]

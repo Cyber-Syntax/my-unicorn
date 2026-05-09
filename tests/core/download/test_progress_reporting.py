@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from my_unicorn.core.download import DownloadService
-from my_unicorn.core.protocols import ProgressType
+from my_unicorn.core.progress.progress_types import ProgressType
 from tests.core.conftest import MockProgressReporter, async_chunk_gen
 
 

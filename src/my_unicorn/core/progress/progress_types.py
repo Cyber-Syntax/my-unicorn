@@ -15,18 +15,31 @@ class ProgressType(Enum):
 
     API_FETCHING = auto()
     DOWNLOAD = auto()
+    PROCESSING = auto()
+
+
+class SubProgressType(Enum):
+    """Types of sub-progress operations."""
+
     VERIFICATION = auto()
-    ICON_EXTRACTION = auto()
     INSTALLATION = auto()
     UPDATE = auto()
+    ICON_EXTRACTION = auto()
+    DESKTOP_ENTRY_CREATION = auto()
 
 
-# Mapping from progress type to human-friendly operation name
 OPERATION_NAMES: dict[ProgressType, str] = {
-    ProgressType.VERIFICATION: "Verifying",
-    ProgressType.INSTALLATION: "Installing",
-    ProgressType.ICON_EXTRACTION: "Extracting icon",
-    ProgressType.UPDATE: "Updating",
+    ProgressType.API_FETCHING: ":: Querying upstream releases...",
+    ProgressType.DOWNLOAD: ":: Retrieving appimages...",
+    ProgressType.PROCESSING: ":: Processing package changes...",
+}
+
+SUB_PROCESSING_NAMES: dict[SubProgressType, str] = {
+    SubProgressType.VERIFICATION: "verifying",
+    SubProgressType.INSTALLATION: "installing",
+    SubProgressType.UPDATE: "upgrading",
+    SubProgressType.ICON_EXTRACTION: "extracting icon",
+    SubProgressType.DESKTOP_ENTRY_CREATION: "creating desktop entry",
 }
 
 # Small tunables exposed for easier testing
@@ -57,6 +70,7 @@ class TaskState:
     task_id: str
     name: str
     progress_type: ProgressType
+    sub_type: SubProgressType | None = None
     total: float = 0.0
     completed: float = 0.0
     description: str = ""
@@ -78,6 +92,7 @@ class TaskConfig:
 
     name: str
     progress_type: ProgressType
+    sub_type: SubProgressType | None = None
     total: float = 0.0
     description: str | None = None
     parent_task_id: str | None = None
@@ -132,6 +147,7 @@ class TaskInfo:
     namespaced_id: str
     name: str
     progress_type: ProgressType
+    sub_type: SubProgressType | None = None
     total: float = 0.0
     completed: float = 0.0
     description: str = ""

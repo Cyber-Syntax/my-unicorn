@@ -24,10 +24,13 @@ from my_unicorn.core.api import Asset, Release
 from my_unicorn.core.download import HAS_AIOFILES, DownloadService
 from my_unicorn.core.install import InstallHandler
 from my_unicorn.core.post_download import PostDownloadResult
+from my_unicorn.core.progress.progress_types import (
+    ProgressType,
+    SubProgressType,
+)
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,
     ProgressReporter,
-    ProgressType,
 )
 from my_unicorn.core.update import UpdateManager
 from my_unicorn.core.verify import VerificationService
@@ -605,7 +608,7 @@ class TestCrossComponentIntegration:
             "Download", ProgressType.DOWNLOAD
         )
         task2 = await shared_progress_reporter.add_task(
-            "Verify", ProgressType.VERIFICATION
+            "Verify", SubProgressType.VERIFICATION
         )
 
         assert len(shared_progress_reporter.tasks) == 2

@@ -35,11 +35,14 @@ Usage in domain services::
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from enum import Enum, auto
 from typing import TYPE_CHECKING, Protocol, TypedDict, runtime_checkable
+
+from my_unicorn.core.progress.progress_types import ProgressType
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
+
+    from my_unicorn.core.progress.progress_types import SubProgressType
 
 
 class ProgressTaskInfo(TypedDict):
@@ -53,32 +56,6 @@ class ProgressTaskInfo(TypedDict):
     completed: float
     total: float | None
     description: str
-
-
-class ProgressType(Enum):
-    """Types of progress operations for categorizing tasks.
-
-    Progress types help UI implementations render appropriate visual feedback
-    for different operation categories (spinners, progress bars, etc.).
-
-    Attributes:
-        API: GitHub API or network API operations
-        DOWNLOAD: File download operations with byte-level progress
-        VERIFICATION: Hash verification operations
-        EXTRACTION: Icon or archive extraction operations
-        PROCESSING: General post-processing operations
-        INSTALLATION: AppImage installation workflow
-        UPDATE: AppImage update workflow
-
-    """
-
-    API = auto()
-    DOWNLOAD = auto()
-    VERIFICATION = auto()
-    EXTRACTION = auto()
-    PROCESSING = auto()
-    INSTALLATION = auto()
-    UPDATE = auto()
 
 
 @runtime_checkable
@@ -156,6 +133,7 @@ class ProgressReporter(Protocol):
         self,
         name: str,
         progress_type: ProgressType,
+        sub_type: SubProgressType | None = None,
         total: float | None = None,
         description: str | None = None,
         parent_task_id: str | None = None,
@@ -170,6 +148,7 @@ class ProgressReporter(Protocol):
         Args:
             name: Human-readable task name for display.
             progress_type: Category of progress operation.
+            sub_type: Sub-progress type (optional).
             total: Total units of work (bytes, items, etc.).
                 None indicates indeterminate progress.
             description: Optional task description for additional context.
@@ -277,6 +256,7 @@ class NullProgressReporter:
         self,
         name: str,  # noqa: ARG002
         progress_type: ProgressType,  # noqa: ARG002
+        sub_type: SubProgressType | None = None,  # noqa: ARG002
         total: float | None = None,  # noqa: ARG002
         description: str | None = None,  # noqa: ARG002
         parent_task_id: str | None = None,  # noqa: ARG002
@@ -288,6 +268,7 @@ class NullProgressReporter:
         Args:
             name: Task name (ignored).
             progress_type: Progress type (ignored).
+            sub_type: Sub-progress type (ignored).
             total: Total value (ignored).
             description: Description (ignored).
             parent_task_id: Parent task ID (ignored).
@@ -386,7 +367,7 @@ async def github_api_progress_task(
 
     task_id = await progress.add_task(
         name=task_name,
-        progress_type=ProgressType.API,
+        progress_type=ProgressType.API_FETCHING,
         total=float(total),
     )
 

@@ -74,7 +74,7 @@ class TestNormalizeOutputForComparison:
 
     def test_normalize_eta(self) -> None:
         """Test normalization of ETA values."""
-        output = "Downloading: 00:45 remaining"
+        output = ":: Retrieving appimages... 00:45 remaining"
 
         normalized = normalize_output_for_comparison(output)
 
@@ -123,7 +123,7 @@ class TestNormalizeOutputForComparison:
 
     def test_normalize_preserves_structure(self) -> None:
         """Test that normalization preserves output structure."""
-        output = """Downloading:
+        output = """:: Retrieving appimages...
 app-1  100 MB  12.5 MB/s 00:08 [=====] 50% ✓
 app-2  200 MB  8.0 MB/s 00:25 [===] 25%
 """
@@ -131,7 +131,7 @@ app-2  200 MB  8.0 MB/s 00:25 [===] 25%
         normalized = normalize_output_for_comparison(output)
 
         # Should still have section header
-        assert "Downloading:" in normalized
+        assert ":: Retrieving appimages..." in normalized
         # Should still have app names
         assert "app-1" in normalized
         assert "app-2" in normalized
@@ -149,9 +149,9 @@ app-2  200 MB  8.0 MB/s 00:25 [===] 25%
         normalized = normalize_output_for_comparison(output)
 
         # Structure should be preserved
-        assert "Fetching from API:" in normalized
-        assert "Downloading (" in normalized or "Downloading:" in normalized
-        assert "Installing:" in normalized
+        assert ":: Querying upstream releases..." in normalized
+        assert ":: Retrieving appimages..." in normalized
+        assert ":: Processing package changes..." in normalized
         # Dynamic values should be normalized
         assert "<SIZE>" in normalized
         assert "<SPEED>" in normalized
@@ -221,9 +221,8 @@ qownnotes                 ✓ 26.2.1 → 26.2.4
 
         # Normalization should preserve structure
         normalized = normalize_output_for_comparison(fixture_content)
-        assert "Fetching from API:" in normalized
-        assert "Downloading (3):" in normalized
-        assert "Installing:" in normalized
+        assert ":: Querying upstream releases..." in normalized
+        assert ":: Processing package changes..." in normalized
         assert "Installation Summary:" in normalized
 
     def test_normalize_update_summary_fixture(

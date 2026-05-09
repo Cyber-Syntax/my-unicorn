@@ -10,10 +10,10 @@ import pytest
 
 from my_unicorn.core.api import Asset, Release
 from my_unicorn.core.post_download import OperationType, PostDownloadResult
+from my_unicorn.core.progress.progress_types import ProgressType
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,
     ProgressReporter,
-    ProgressType,
 )
 from my_unicorn.core.update import (
     UpdateInfo,

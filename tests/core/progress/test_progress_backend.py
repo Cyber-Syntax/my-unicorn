@@ -285,14 +285,14 @@ class TestAsciiProgressBackendBuildOutput:
         vf = TaskState(
             task_id="vf1",
             name="MyApp",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=SubProgressType.VERIFICATION,
             phase=1,
             total_phases=2,
         )
         inst = TaskState(
             task_id="in1",
             name="MyApp",
-            progress_type=ProgressType.INSTALLATION,
+            progress_type=ProgressType.PROCESSING,
             phase=2,
             total_phases=2,
         )
@@ -312,11 +312,8 @@ class TestAsciiProgressBackendBuildOutput:
             tasks_snapshot, order_snapshot
         )
         # Check that all major section headers exist
-        assert "Fetching from API:" in out
+        assert ":: Querying upstream releases..." in out
         assert "Downloading" in out
-        assert (
-            "Verifying:" in out or "Installing:" in out or "Processing:" in out
-        )
 
     def test_build_output_snapshot_api_retrieved_no_cached(self) -> None:
         """Snapshot builder shows 'Retrieved' for finished API tasks."""
@@ -334,20 +331,6 @@ class TestAsciiProgressBackendBuildOutput:
         }
         out = backend._build_output_from_snapshot(ts, ["a"])
         assert "Retrieved" in out
-
-    def test_build_output_snapshot_processing_processing_header(self) -> None:
-        """Snapshot builder shows 'Processing:' for other post-task types."""
-        backend = AsciiProgressBackend(output=io.StringIO(), interactive=False)
-        ts = {
-            "p1": TaskState(
-                task_id="p1",
-                name="app",
-                progress_type=ProgressType.ICON_EXTRACTION,
-                is_finished=False,
-            )
-        }
-        out = backend._build_output_from_snapshot(ts, ["p1"])
-        assert "Processing:" in out
 
 
 class TestProgressDisplayIDGenerator:

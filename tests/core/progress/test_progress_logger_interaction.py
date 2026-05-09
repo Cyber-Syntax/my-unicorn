@@ -202,7 +202,7 @@ async def test_multiple_progress_sessions(caplog):
     async with progress.session(1):
         await progress.add_task(
             name="test2",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=SubProgressType.VERIFICATION,
             total=100,
         )
 

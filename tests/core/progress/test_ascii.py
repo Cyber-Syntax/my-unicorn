@@ -6,6 +6,7 @@ from my_unicorn.core.progress.progress import (
     AsciiProgressBackend,
     ProgressType,
 )
+from my_unicorn.core.progress.progress_types import SubProgressType
 
 
 @pytest.fixture
@@ -86,7 +87,7 @@ class TestAsciiProgressBackend:
         ascii_backend.add_task(
             task_id="vf_1",
             name="MyApp",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=SubProgressType.VERIFICATION,
             phase=1,
             total_phases=2,
         )
@@ -94,7 +95,7 @@ class TestAsciiProgressBackend:
         ascii_backend.add_task(
             task_id="in_1",
             name="MyApp",
-            progress_type=ProgressType.INSTALLATION,
+            progress_type=ProgressType.PROCESSING,
             parent_task_id="vf_1",
             phase=2,
             total_phases=2,

@@ -1020,7 +1020,7 @@ def select_asset_for_update(
     )
 
     if not appimage_asset:
-        # use debug level to avoid duplicate `Fetching from API:` log messages.
+        # use debug level to avoid duplicate `:: Querying upstream releases...` log messages.
         # see #294
         #
         # user can still see the no appimage error in the summary section.

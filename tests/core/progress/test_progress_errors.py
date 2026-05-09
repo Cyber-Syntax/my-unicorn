@@ -121,36 +121,6 @@ class TestErrorScenarios:
         assert api_id1.startswith("api_1_")
 
     @pytest.mark.asyncio
-    async def test_progress_update_methods_comprehensive(
-        self, progress_service: ProgressDisplay
-    ) -> None:
-        """Test different progress update methods."""
-        from my_unicorn.core.progress import create_verification_task
-
-        await progress_service.start_session()
-
-        task_id = await create_verification_task(
-            progress_service, "test.AppImage"
-        )
-
-        # Test absolute completion update
-        await progress_service.update_task(task_id, completed=25.0)
-
-        # Test description update with completion
-        await progress_service.update_task(
-            task_id, description="🔍 Checking integrity...", completed=75.0
-        )
-
-        task_info = progress_service.get_task_info_full(task_id)
-        assert task_info is not None
-        assert task_info.description == "🔍 Checking integrity..."
-        assert task_info.completed == 75.0
-
-        await progress_service.finish_task(task_id, success=True)
-
-        await progress_service.stop_session()
-
-    @pytest.mark.asyncio
     async def test_basic_progress_operations_with_session(self) -> None:
         """Test basic progress operations with proper session management."""
         service = ProgressDisplay()
