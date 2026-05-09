@@ -359,17 +359,14 @@ class ProgressDisplay(ProgressReporter):
 
         """
         # Convert core ProgressType to UI ProgressType if needed
-        ui_progress_type: ProgressType
         if isinstance(progress_type, CoreProgressType):
-            ui_progress_type = _CORE_TO_UI_PROGRESS_TYPE.get(
-                progress_type, ProgressType.DOWNLOAD
-            )
-            if ui_progress_type is None:
+            if progress_type not in _CORE_TO_UI_PROGRESS_TYPE:
                 # a new CoreProgressType was added without updating the mapping.
                 # fail loudly so it's caught during development, not in production.
                 msg = f"No UI mapping found for CoreProgressType.{progress_type.name}. "
                 msg += "Add it to _CORE_TO_UI_PROGRESS_TYPE."
                 raise ValueError(msg)
+            ui_progress_type = _CORE_TO_UI_PROGRESS_TYPE[progress_type]
         else:
             ui_progress_type = progress_type
 
