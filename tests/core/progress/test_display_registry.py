@@ -334,31 +334,6 @@ async def test_task_registry_multiple_types() -> None:
 
 
 @pytest.mark.asyncio
-async def test_task_registry_add_to_task_sets() -> None:
-    """Test that tasks are added to appropriate type sets."""
-
-    registry = TaskRegistry()
-
-    # Add tasks of same type
-    for i in range(3):
-        task_info = TaskInfo(
-            task_id=f"download_{i}",
-            namespaced_id=f"download_{i}",
-            name=f"Download {i}",
-            progress_type=ProgressType.DOWNLOAD,
-            created_at=time.monotonic(),
-        )
-        await registry.add_task_info(f"download_{i}", task_info)
-
-    # Verify all are in the download task set
-    download_set = await registry.get_task_set(ProgressType.DOWNLOAD)
-    assert len(download_set) == 3
-    assert "download_0" in download_set
-    assert "download_1" in download_set
-    assert "download_2" in download_set
-
-
-@pytest.mark.asyncio
 async def test_update_task_preserves_other_fields() -> None:
     """Test that updating one field doesn't affect others."""
 

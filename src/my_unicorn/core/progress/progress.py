@@ -853,11 +853,6 @@ class TaskRegistry:
         self._tasks: dict[str, TaskInfo] = {}
         self._task_lock = asyncio.Lock()
 
-        # Task sets for fast lookup by type
-        # use defaultdict so any future ProgressType values work
-        # automatically without requiring manual initialization
-        self._task_sets: dict[ProgressType, set[str]] = defaultdict(set)
-
     async def add_task_info(self, task_id: str, task_info: TaskInfo) -> None:
         """Add a task to the registry.
 
@@ -868,7 +863,6 @@ class TaskRegistry:
         """
         async with self._task_lock:
             self._tasks[task_id] = task_info
-            self._task_sets[task_info.progress_type].add(task_id)
 
     async def update_task(
         self, task_id: str, **updates: Any
@@ -986,18 +980,6 @@ class TaskRegistry:
             # Mark as completed if successful
             if success and task_info.total > 0:
                 task_info.completed = task_info.total
-
-    async def get_task_set(self, progress_type: ProgressType) -> set[str]:
-        """Get set of task IDs for a specific progress type.
-
-        Args:
-            progress_type: Type of progress operation
-
-        Returns:
-            Set of task IDs matching the progress type
-
-        """
-        return self._task_sets.get(progress_type, set()).copy()
 
     def get_task_info_sync(self, task_id: str) -> ProgressTaskInfo:
         """Get task info in protocol-compliant dict format (thread-safe sync).
