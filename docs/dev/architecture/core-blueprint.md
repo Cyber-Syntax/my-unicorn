@@ -1164,7 +1164,7 @@ async def install_from_url(github_url: str) -> InstallResult
 
 ```
 1. Workflow creates task
-   progress.add_task("Installing Firefox", ProgressType.INSTALLATION)
+   progress.add_task("Installing Firefox", ProgressType.PROCESSING)
    ↓ (returns task_id)
    
 2. Download service updates progress
