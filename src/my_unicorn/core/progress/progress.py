@@ -433,19 +433,19 @@ class ProgressDisplay(ProgressReporter):
     def _calculate_speed(
         self, task_info: TaskInfo, completed: float, current_time: float
     ) -> float:
-        """Calculate download speed using moving average.
+        """Calculate download speed using a moving average.
+
+        Delegates the pure calculation to `calculate_speed`, then persists
+        the updated history deque back onto `task_info` (intentional mutation).
 
         Args:
-            task_info: Task information
-            completed: Completed bytes
-            current_time: Current timestamp
+            task_info: Task information — speed_history is updated in place.
+            completed: Completed bytes at current moment.
+            current_time: Current monotonic timestamp.
 
         Returns:
-            Speed in bytes per second
-
+            Speed in bytes per second, or 0.0 if insufficient data.
         """
-        # Delegate calculation to the pure helper which returns an average
-        # speed (bytes/sec) and an updated history (does not mutate caller).
         avg_speed_bps, updated_history = calculate_speed(
             prev_completed=task_info.completed,
             prev_time=task_info.last_speed_update,
@@ -455,15 +455,16 @@ class ProgressDisplay(ProgressReporter):
             max_history=self.config.max_speed_history,
         )
 
-        # If helper returned 0 (no new data) fall back to previously
-        # recorded speed (stored in MB/s) to preserve previous behavior.
+        # Persist updated rolling history back to task_info.
+        # calculate_speed returns a new deque to keep the helper pure;
+        # we apply it here as the single point of mutation.
+        task_info.speed_history = updated_history
+
         if avg_speed_bps == 0.0:
+            # No new data — fall back to last recorded speed (stored in MB/s)
             if task_info.current_speed_mbps > 0:
                 return task_info.current_speed_mbps * (1024 * 1024)
             return 0.0
-
-        # Persist updated history back to task_info (caller expects mutation)
-        task_info.speed_history = updated_history
 
         return avg_speed_bps
 
