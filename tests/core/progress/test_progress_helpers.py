@@ -44,7 +44,9 @@ def test_format_download_lines_success_and_error():
     assert lines
     first = lines[0]
     assert "MiB" in first or "GiB" in first
-    assert "✓" in first
+    # Check for right-aligned format: progress bar and percentage
+    assert "[" in first and "]" in first
+    assert "100%" in first
 
     # Failed download with error message
     task_fail = TaskState(

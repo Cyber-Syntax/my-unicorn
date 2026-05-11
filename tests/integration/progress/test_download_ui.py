@@ -98,38 +98,6 @@ class TestDownloadProgressBarUI:
         assert ":" in output  # ETA should have colon (MM:SS format)
         assert "QOwnNotes" in output
 
-    def test_download_completed_success_ui(self) -> None:
-        """Verify checkmark '✓' appears for successful completed downloads."""
-        # Arrange - create a completed download task
-        task = TaskState(
-            task_id="dl_1",
-            name="AppFlowy-0.11.1-linux-x86_64",
-            progress_type=ProgressType.DOWNLOAD,
-            total=77.6 * 1024 * 1024,  # 77.6 MiB
-            completed=77.6 * 1024 * 1024,
-            is_finished=True,
-            success=True,
-            speed=10.8 * 1024 * 1024,  # 10.8 MB/s
-        )
-
-        tasks = {"dl_1": task}
-        order = ["dl_1"]
-        config = SectionRenderConfig(
-            bar_width=30,
-            min_name_width=15,
-            spinner_fps=4,
-            interactive=False,
-        )
-
-        # Act - render downloads section
-        output_lines = render_downloads_section(tasks, order, config)
-        output = "\n".join(output_lines)
-
-        # Assert - should show checkmark
-        assert "✓" in output
-        assert "100%" in output
-        assert "AppFlowy" in output
-
     def test_download_completed_error_ui(self) -> None:
         """Verify 'Error: message' appears for failed downloads."""
         # Arrange - create a failed download task

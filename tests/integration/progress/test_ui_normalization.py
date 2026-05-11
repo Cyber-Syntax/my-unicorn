@@ -177,7 +177,7 @@ app-2  200 MB  8.0 MB/s 00:25 [===] 25%
 
     def test_normalize_separator_lines(self) -> None:
         """Test normalization of separator lines."""
-        output = """Update Summary:
+        output = """:: Creating transaction summary...
 --------------------------------------------------
 qownnotes                 ✓ 26.2.1 → 26.2.4
 """
@@ -185,7 +185,7 @@ qownnotes                 ✓ 26.2.1 → 26.2.4
         normalized = normalize_output_for_comparison(output)
 
         # Separator line should be preserved but normalized
-        assert "Update Summary:" in normalized
+        assert ":: Creating transaction summary..." in normalized
         assert "qownnotes" in normalized
 
     def test_normalize_indented_warning_messages(self) -> None:
@@ -223,7 +223,7 @@ qownnotes                 ✓ 26.2.1 → 26.2.4
         normalized = normalize_output_for_comparison(fixture_content)
         assert ":: Querying upstream releases..." in normalized
         assert ":: Processing package changes..." in normalized
-        assert "Installation Summary:" in normalized
+        assert ":: Creating transaction summary..." in normalized
 
     def test_normalize_update_summary_fixture(
         self, update_success_output: str
@@ -244,6 +244,6 @@ qownnotes                 ✓ 26.2.1 → 26.2.4
 
         # Normalization should preserve version arrows and summaries
         normalized = normalize_output_for_comparison(fixture_content)
-        assert "Update Summary:" in normalized
+        assert ":: Creating transaction summary..." in normalized
         assert "→" in normalized
         assert "upgrading appflowy" in normalized

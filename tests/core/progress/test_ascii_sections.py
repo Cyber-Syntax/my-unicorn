@@ -157,7 +157,10 @@ class TestFormatDownloadLines:
         lines = format_download_lines(task, max_name_width=20, bar_width=30)
 
         assert len(lines) >= 1
-        assert "✓" in lines[0]
+        # Check that the line has size, speed, ETA, progress bar, and percentage
+        assert "KiB" in lines[0] or "MiB" in lines[0] or "GiB" in lines[0]
+        assert "[" in lines[0] and "]" in lines[0]  # Progress bar
+        assert "100%" in lines[0]  # Percentage
 
 
 class TestFormatProcessingTaskLines:

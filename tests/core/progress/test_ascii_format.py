@@ -62,21 +62,3 @@ class TestComputeSpinner:
             # Frames should potentially differ (depends on FPS and time delta)
             assert frame1 in ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
             assert frame2 in ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
-
-
-class TestComputeDownloadHeader:
-    """Test cases for compute_download_header function."""
-
-    def test_compute_download_header_single(self) -> None:
-        """Test header text for single download."""
-        from my_unicorn.core.progress.ascii import compute_download_header
-
-        result = compute_download_header(download_count=1)
-        assert result == ":: Retrieving appimages..."
-
-    def test_compute_download_header_zero(self) -> None:
-        """Test header text for zero downloads."""
-        from my_unicorn.core.progress.ascii import compute_download_header
-
-        result = compute_download_header(download_count=0)
-        assert result == ":: Retrieving appimages..."

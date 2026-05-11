@@ -72,7 +72,7 @@ def _extract_summary_section(output: str, header: str) -> str:
 
     Args:
         output: Full output string
-        header: Section header to search for (e.g., "Installation Summary:")
+        header: Section header to search for (e.g., ":: Creating transaction summary...")
 
     Returns:
         Extracted section from header to end, or empty string if not found
@@ -119,8 +119,7 @@ class TestInstallSummaryUI:
         )
 
         # Assert
-        assert "Installation Summary:" in output
-        assert "-" * 50 in output
+        assert ":: Creating transaction summary..." in output
         assert "qownnotes" in output
         assert "✓" in output
         assert "26.2.4" in output
@@ -152,7 +151,7 @@ class TestInstallSummaryUI:
         )
 
         # Assert
-        assert "Installation Summary:" in output
+        assert ":: Creating transaction summary..." in output
         assert "weektodo" in output
         assert "✓" in output
         assert "2.2.0" in output
@@ -190,7 +189,7 @@ class TestInstallSummaryUI:
         lines = output.split("\n")
 
         # Assert
-        assert "Installation Summary:" in output
+        assert ":: Creating transaction summary..." in output
         # Find the app lines (should be after the header and separator)
         app_lines = [
             line
@@ -233,8 +232,7 @@ class TestInstallSummaryUI:
         )
 
         # Assert
-        assert "Installation Summary:" in output
-        assert "-" * 50 in output
+        assert ":: Creating transaction summary..." in output
         assert "appflowy" in output
         assert "qownnotes" in output
 
@@ -264,8 +262,8 @@ class TestInstallSummaryUI:
         # Assert
         assert "✓ All 1 specified app(s) are already installed:" in output
         assert "- appflowy" in output
-        # Should not show "Installation Summary" header
-        assert "Installation Summary:" not in output
+        # Should not show ":: Creating transaction summary..." header
+        assert ":: Creating transaction summary..." not in output
 
 
 @pytest.mark.integration
@@ -303,8 +301,7 @@ class TestUpdateSummaryUI:
         )
 
         # Assert
-        assert "Update Summary:" in output
-        assert "-" * 50 in output
+        assert ":: Creating transaction summary..." in output
         assert "qownnotes" in output
         assert "✓" in output
         assert "26.2.1 → 26.2.4" in output
@@ -340,7 +337,7 @@ class TestUpdateSummaryUI:
         )
 
         # Assert
-        assert "Update Summary:" in output
+        assert ":: Creating transaction summary..." in output
         assert "appflowy" in output
         assert "Already up to date" in output
         assert "0.11.1" in output
@@ -382,8 +379,7 @@ class TestUpdateSummaryUI:
         )
 
         # Assert
-        assert "Update Summary:" in output
-        assert "-" * 50 in output
+        assert ":: Creating transaction summary..." in output
         assert "qownnotes" in output
         assert "appflowy" in output
         assert "26.2.1 → 26.2.4" in output
@@ -434,7 +430,7 @@ class TestUpdateSummaryUI:
         )
 
         # Assert
-        assert "Update Summary:" in output
+        assert ":: Creating transaction summary..." in output
         # Updated app should have checkmark
         assert "qownnotes" in output
         assert "26.2.1 → 26.2.4" in output
@@ -466,13 +462,12 @@ class TestSummaryUIFixtureValidation:
         """
         # Arrange - extract summary section from fixture
         fixture_summary = _extract_summary_section(
-            install_success_output, "Installation Summary:"
+            install_success_output, ":: Creating transaction summary..."
         )
 
         # Assert
         assert fixture_summary != "", "Fixture missing summary header"
-        assert "Installation Summary:" in fixture_summary
-        assert "-" * 50 in fixture_summary
+        assert ":: Creating transaction summary..." in fixture_summary
         assert "✓" in fixture_summary
 
     def test_update_success_matches_fixture_format(
@@ -485,7 +480,7 @@ class TestSummaryUIFixtureValidation:
         """
         # Arrange - extract summary section
         fixture_summary = _extract_summary_section(
-            update_success_output, "Update Summary:"
+            update_success_output, ":: Creating transaction summary..."
         )
         assert fixture_summary != "", "Fixture missing summary header"
 
@@ -493,8 +488,7 @@ class TestSummaryUIFixtureValidation:
         normalized_summary = normalize_output_for_comparison(fixture_summary)
 
         # Assert - verify formatting is preserved after normalization
-        assert "Update Summary:" in normalized_summary
-        assert "-" * 50 in normalized_summary
+        assert ":: Creating transaction summary..." in normalized_summary
         assert "→" in normalized_summary  # Version change arrow
         assert "✓" in normalized_summary
 
@@ -508,12 +502,12 @@ class TestSummaryUIFixtureValidation:
         """
         # Arrange - extract summary section using helper
         fixture_summary = _extract_summary_section(
-            install_warning_output, "Installation Summary:"
+            install_warning_output, ":: Creating transaction summary..."
         )
         assert fixture_summary != "", "Fixture missing summary header"
 
         # Assert - verify warning-specific elements
-        assert "Installation Summary:" in fixture_summary
+        assert ":: Creating transaction summary..." in fixture_summary
         assert "✓" in fixture_summary
         assert "!" in fixture_summary
 
@@ -534,9 +528,9 @@ class TestSummaryUIFixtureValidation:
         assert "install" in sections, "Missing install section from fixture"
 
         # Verify summary section also exists after progress sections
-        assert "Installation Summary:" in install_success_output
+        assert ":: Creating transaction summary..." in install_success_output
         fixture_summary = _extract_summary_section(
-            install_success_output, "Installation Summary:"
+            install_success_output, ":: Creating transaction summary..."
         )
         assert fixture_summary != "", "Summary section missing from fixture"
 
@@ -607,9 +601,9 @@ class TestUpdateSummaryFullUI:
         # Extract summary
         summary = _extract_summary_section(
             output,
-            "Update Summary:",
+            ":: Creating transaction summary...",
         )
-        assert summary != "", "Summary section not found"
+        assert summary != "Summary section not found"
 
         # Normalize
         normalized_summary = normalize_output_for_comparison(summary)

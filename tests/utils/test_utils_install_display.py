@@ -69,7 +69,7 @@ def test_print_install_summary_mixed(caplog):
     captured = caplog.text
 
     # Summary header
-    assert "Installation Summary" in captured
+    assert ":: Creating transaction summary..." in captured
     # Installed app with version
     assert "app1" in captured and "1.0.0" in captured
     # Failed app shows error message
