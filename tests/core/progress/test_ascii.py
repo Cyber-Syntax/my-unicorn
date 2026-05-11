@@ -2,11 +2,8 @@ import io
 
 import pytest
 
-from my_unicorn.core.progress.progress import (
-    AsciiProgressBackend,
-    ProgressType,
-)
-from my_unicorn.core.progress.progress_types import SubProgressType
+from my_unicorn.core.progress.progress import AsciiProgressBackend, Phase
+from my_unicorn.core.progress.progress_types import ProcessingPhase
 
 
 @pytest.fixture
@@ -37,7 +34,7 @@ class TestAsciiProgressBackend:
         ascii_backend.add_task(
             task_id="dl_1",
             name="test.AppImage",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=1000.0,
         )
 
@@ -53,7 +50,7 @@ class TestAsciiProgressBackend:
         ascii_backend.add_task(
             task_id="dl_1",
             name="test.AppImage",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=1000.0,
         )
 
@@ -70,7 +67,7 @@ class TestAsciiProgressBackend:
         ascii_backend.add_task(
             task_id="dl_1",
             name="test.AppImage",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
         )
 
         ascii_backend.finish_task("dl_1", success=True, description="Complete")
@@ -87,7 +84,7 @@ class TestAsciiProgressBackend:
         ascii_backend.add_task(
             task_id="vf_1",
             name="MyApp",
-            progress_type=SubProgressType.VERIFICATION,
+            progress_type=ProcessingPhase.VERIFICATION,
             phase=1,
             total_phases=2,
         )
@@ -95,7 +92,7 @@ class TestAsciiProgressBackend:
         ascii_backend.add_task(
             task_id="in_1",
             name="MyApp",
-            progress_type=ProgressType.PROCESSING,
+            progress_type=Phase.PROCESSING,
             parent_task_id="vf_1",
             phase=2,
             total_phases=2,
@@ -117,7 +114,7 @@ class TestAsciiProgressBackend:
         ascii_backend.add_task(
             task_id="dl_1",
             name="test.AppImage",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=1000.0,
         )
 

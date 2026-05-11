@@ -4,7 +4,7 @@ These tests verify that:
 1. NullProgressReporter implements all ProgressReporter protocol methods
 2. NullProgressReporter is runtime-checkable as a ProgressReporter
 3. NullProgressReporter methods behave correctly (no-ops, expected returns)
-4. ProgressType enum contains all expected values
+4. Phase enum contains all expected values
 
 """
 
@@ -14,41 +14,38 @@ import inspect
 
 import pytest
 
-from my_unicorn.core.progress.progress_types import (
-    ProgressType,
-    SubProgressType,
-)
+from my_unicorn.core.progress.progress_types import Phase, ProcessingPhase
 from my_unicorn.core.protocols import NullProgressReporter, ProgressReporter
 
 
 class TestProgressType:
-    """Tests for ProgressType enum."""
+    """Tests for Phase enum."""
 
     def test_progress_type_values_exist(self) -> None:
         """All expected progress types are defined."""
-        assert ProgressType.API_FETCHING is not None
-        assert ProgressType.DOWNLOAD is not None
-        assert ProgressType.PROCESSING is not None
+        assert Phase.API_FETCHING is not None
+        assert Phase.DOWNLOAD is not None
+        assert Phase.PROCESSING is not None
 
     def test_sub_progress_type_values_exist(self) -> None:
         """All expected sub-progress types are defined."""
-        assert SubProgressType.VERIFICATION is not None
-        assert SubProgressType.ICON_EXTRACTION is not None
-        assert SubProgressType.INSTALLATION is not None
-        assert SubProgressType.UPDATE is not None
-        assert SubProgressType.DESKTOP_ENTRY_CREATION is not None
+        assert ProcessingPhase.VERIFICATION is not None
+        assert ProcessingPhase.ICON_EXTRACTION is not None
+        assert ProcessingPhase.INSTALLATION is not None
+        assert ProcessingPhase.UPDATE is not None
+        assert ProcessingPhase.DESKTOP_ENTRY_CREATION is not None
 
     def test_progress_type_count(self) -> None:
         """Expected number of progress types."""
-        assert len(ProgressType) == 3
+        assert len(Phase) == 3
 
     def test_sub_progress_type_count(self) -> None:
         """Expected number of sub-progress types."""
-        assert len(SubProgressType) == 5
+        assert len(ProcessingPhase) == 5
 
     def test_progress_types_are_unique(self) -> None:
         """All progress type values are unique."""
-        values = [pt.value for pt in ProgressType]
+        values = [pt.value for pt in Phase]
         assert len(values) == len(set(values))
 
 
@@ -77,17 +74,15 @@ class TestNullProgressReporter:
         self, reporter: NullProgressReporter
     ) -> None:
         """add_task() returns placeholder task ID."""
-        task_id = await reporter.add_task(
-            "Test", ProgressType.DOWNLOAD, total=100.0
-        )
+        task_id = await reporter.add_task("Test", Phase.DOWNLOAD, total=100.0)
         assert task_id == "null-task"
 
     @pytest.mark.asyncio
     async def test_add_task_accepts_all_progress_types(
         self, reporter: NullProgressReporter
     ) -> None:
-        """add_task() accepts any ProgressType value."""
-        for pt in ProgressType:
+        """add_task() accepts any Phase value."""
+        for pt in Phase:
             task_id = await reporter.add_task("Test", pt)
             assert task_id == "null-task"
 
@@ -96,7 +91,7 @@ class TestNullProgressReporter:
         self, reporter: NullProgressReporter
     ) -> None:
         """add_task() works without total (indeterminate progress)."""
-        task_id = await reporter.add_task("Test", ProgressType.DOWNLOAD)
+        task_id = await reporter.add_task("Test", Phase.DOWNLOAD)
         assert task_id == "null-task"
 
     @pytest.mark.asyncio
@@ -191,7 +186,7 @@ class TestProgressReporterProtocol:
         # Test add_task with all optional parameters
         task_id = await reporter.add_task(
             name="Test",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=100.0,
             description="Test description",
             parent_task_id="parent-123",
@@ -226,7 +221,7 @@ class TestProgressReporterProtocol:
             async def add_task(  # noqa: PLR0913
                 self,
                 name: str,
-                progress_type: ProgressType,
+                progress_type: Phase,
                 total: float | None = None,
                 description: str | None = None,
                 parent_task_id: str | None = None,
@@ -278,7 +273,7 @@ class TestNullPatternIntegration:
 
         task_id = await reporter.add_task(
             name="Download file",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=1024.0,
         )
         assert task_id == "null-task"

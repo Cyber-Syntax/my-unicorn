@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 
 from my_unicorn.core.progress.ascii import render_api_section
-from my_unicorn.core.progress.progress_types import ProgressType, TaskState
+from my_unicorn.core.progress.progress_types import Phase, TaskState
 
 from .test_ui_helpers import parse_output_sections
 
@@ -25,7 +25,7 @@ class TestApiFetchingUI:
         task = TaskState(
             task_id="api_1",
             name="GitHub Releases",
-            progress_type=ProgressType.API_FETCHING,
+            progress_type=Phase.API_FETCHING,
             total=2,
             completed=1,
             is_finished=False,
@@ -52,7 +52,7 @@ class TestApiFetchingUI:
         task = TaskState(
             task_id="api_1",
             name="GitHub Releases",
-            progress_type=ProgressType.API_FETCHING,
+            progress_type=Phase.API_FETCHING,
             total=2,
             completed=2,
             is_finished=True,
@@ -80,7 +80,7 @@ class TestApiFetchingUI:
         task = TaskState(
             task_id="api_1",
             name="GitHub Releases",
-            progress_type=ProgressType.API_FETCHING,
+            progress_type=Phase.API_FETCHING,
             total=2,
             completed=2,
             is_finished=True,
@@ -110,7 +110,7 @@ class TestApiFetchingUI:
         task1 = TaskState(
             task_id="api_1",
             name="GitHub Releases",
-            progress_type=ProgressType.API_FETCHING,
+            progress_type=Phase.API_FETCHING,
             total=2,
             completed=2,
             is_finished=True,
@@ -120,7 +120,7 @@ class TestApiFetchingUI:
         task2 = TaskState(
             task_id="api_2",
             name="Zen Browser",
-            progress_type=ProgressType.API_FETCHING,
+            progress_type=Phase.API_FETCHING,
             total=3,
             completed=2,
             is_finished=False,
@@ -129,7 +129,7 @@ class TestApiFetchingUI:
         task3 = TaskState(
             task_id="api_3",
             name="QOwnNotes",
-            progress_type=ProgressType.API_FETCHING,
+            progress_type=Phase.API_FETCHING,
             total=1,
             completed=1,
             is_finished=True,
@@ -180,7 +180,7 @@ class TestApiFetchingUI:
         task1 = TaskState(
             task_id="api_1",
             name="A",
-            progress_type=ProgressType.API_FETCHING,
+            progress_type=Phase.API_FETCHING,
             total=1,
             completed=1,
             is_finished=True,
@@ -188,7 +188,7 @@ class TestApiFetchingUI:
         task2 = TaskState(
             task_id="api_2",
             name="AppFlowy-IO AppFlowy",  # Long name that gets truncated
-            progress_type=ProgressType.API_FETCHING,
+            progress_type=Phase.API_FETCHING,
             total=1,
             completed=1,
             is_finished=True,
@@ -239,7 +239,7 @@ class TestApiFetchingUI:
         api_task = TaskState(
             task_id="api_1",
             name="GitHub Releases",
-            progress_type=ProgressType.API_FETCHING,
+            progress_type=Phase.API_FETCHING,
             total=1,
             completed=1,
             is_finished=True,
@@ -247,7 +247,7 @@ class TestApiFetchingUI:
         download_task = TaskState(
             task_id="dl_1",
             name="test-app",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=1000.0,
             completed=500.0,
             is_finished=False,
@@ -275,7 +275,7 @@ class TestApiFetchingUI:
         task = TaskState(
             task_id="api_1",
             name="GitHub Releases",
-            progress_type=ProgressType.API_FETCHING,
+            progress_type=Phase.API_FETCHING,
             total=0,
             completed=0,
             is_finished=True,
@@ -301,7 +301,7 @@ class TestApiFetchingUI:
         task = TaskState(
             task_id="api_1",
             name="GitHub Releases",
-            progress_type=ProgressType.API_FETCHING,
+            progress_type=Phase.API_FETCHING,
             total=0,
             completed=0,
             is_finished=False,
@@ -326,7 +326,7 @@ class TestApiFetchingUI:
         task1 = TaskState(
             task_id="api_1",
             name="AppFlowy-IO AppFlowy",
-            progress_type=ProgressType.API_FETCHING,
+            progress_type=Phase.API_FETCHING,
             total=2,
             completed=2,
             is_finished=True,
@@ -334,7 +334,7 @@ class TestApiFetchingUI:
         task2 = TaskState(
             task_id="api_2",
             name="Zen Browser",
-            progress_type=ProgressType.API_FETCHING,
+            progress_type=Phase.API_FETCHING,
             total=2,
             completed=2,
             is_finished=True,
@@ -364,7 +364,7 @@ class TestApiFetchingUI:
         task = TaskState(
             task_id="api_1",
             name=long_name,
-            progress_type=ProgressType.API_FETCHING,
+            progress_type=Phase.API_FETCHING,
             total=1,
             completed=1,
             is_finished=True,

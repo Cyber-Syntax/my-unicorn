@@ -37,10 +37,7 @@ from my_unicorn.core.checksum_parser import (
     parse_all_checksums,
     parse_checksum_file,
 )
-from my_unicorn.core.progress.progress_types import (
-    ProgressType,
-    SubProgressType,
-)
+from my_unicorn.core.progress.progress_types import Phase, ProcessingPhase
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,
     ProgressReporter,
@@ -389,7 +386,7 @@ class VerificationService:
             len(context.assets) if context.assets else 0,
         )
 
-        header_verification = SubProgressType.VERIFICATION
+        header_verification = ProcessingPhase.VERIFICATION
         # Create a progress task when the reporter is active and no task was
         # injected by the caller.
         if (
@@ -398,7 +395,7 @@ class VerificationService:
         ):
             context.progress_task_id = await self.progress_reporter.add_task(
                 f"{header_verification} {context.app_name}",
-                progress_type=ProgressType.PROCESSING,
+                progress_type=Phase.PROCESSING,
                 sub_type=header_verification,
             )
 

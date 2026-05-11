@@ -14,8 +14,8 @@ from my_unicorn.core.progress.ascii import (
     render_processing_section,
 )
 from my_unicorn.core.progress.progress_types import (
-    ProgressType,
-    SubProgressType,
+    Phase,
+    ProcessingPhase,
     TaskState,
 )
 
@@ -35,8 +35,8 @@ class TestVerificationSuccessUI:
         task = TaskState(
             task_id="v1",
             name="qownnotes",
-            progress_type=ProgressType.PROCESSING,
-            sub_type=SubProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -76,8 +76,8 @@ class TestVerificationWarningUI:
         task = TaskState(
             task_id="v1",
             name="weektodo",
-            progress_type=ProgressType.PROCESSING,
-            sub_type=SubProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -117,8 +117,8 @@ class TestVerificationWarningUI:
         task1 = TaskState(
             task_id="v1",
             name="weektodo",
-            progress_type=ProgressType.PROCESSING,
-            sub_type=SubProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -128,8 +128,8 @@ class TestVerificationWarningUI:
         task2 = TaskState(
             task_id="i1",
             name="weektodo",
-            progress_type=ProgressType.PROCESSING,
-            sub_type=SubProgressType.INSTALLATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.INSTALLATION,
             phase=2,
             total_phases=2,
             is_finished=True,
@@ -172,8 +172,8 @@ class TestInstallationSuccessUI:
         task = TaskState(
             task_id="i1",
             name="qownnotes",
-            progress_type=ProgressType.PROCESSING,
-            sub_type=SubProgressType.INSTALLATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.INSTALLATION,
             phase=2,
             total_phases=2,
             is_finished=True,
@@ -217,8 +217,8 @@ class TestProcessingPhasesSequentialUI:
         task1 = TaskState(
             task_id="v1",
             name="qownnotes",
-            progress_type=ProgressType.PROCESSING,
-            sub_type=SubProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -227,8 +227,8 @@ class TestProcessingPhasesSequentialUI:
         task2 = TaskState(
             task_id="i1",
             name="qownnotes",
-            progress_type=ProgressType.PROCESSING,
-            sub_type=SubProgressType.INSTALLATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.INSTALLATION,
             phase=2,
             total_phases=2,
             is_finished=True,
@@ -263,8 +263,8 @@ class TestProcessingPhasesSequentialUI:
         task1 = TaskState(
             task_id="v1",
             name="qownnotes",
-            progress_type=ProgressType.PROCESSING,
-            sub_type=SubProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -273,8 +273,8 @@ class TestProcessingPhasesSequentialUI:
         task2 = TaskState(
             task_id="i1",
             name="qownnotes",
-            progress_type=ProgressType.PROCESSING,
-            sub_type=SubProgressType.INSTALLATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.INSTALLATION,
             phase=2,
             total_phases=2,
             is_finished=True,
@@ -283,8 +283,8 @@ class TestProcessingPhasesSequentialUI:
         task3 = TaskState(
             task_id="v2",
             name="appflowy",
-            progress_type=ProgressType.PROCESSING,
-            sub_type=SubProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -293,8 +293,8 @@ class TestProcessingPhasesSequentialUI:
         task4 = TaskState(
             task_id="i2",
             name="appflowy",
-            progress_type=ProgressType.PROCESSING,
-            sub_type=SubProgressType.INSTALLATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.INSTALLATION,
             phase=2,
             total_phases=2,
             is_finished=True,
@@ -338,8 +338,8 @@ class TestProcessingErrorUI:
         task = TaskState(
             task_id="i1",
             name="broken-app",
-            progress_type=ProgressType.PROCESSING,
-            sub_type=SubProgressType.INSTALLATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.INSTALLATION,
             phase=2,
             total_phases=2,
             is_finished=True,
@@ -378,8 +378,8 @@ class TestProcessingErrorUI:
         task = TaskState(
             task_id="v1",
             name="bad-app",
-            progress_type=ProgressType.PROCESSING,
-            sub_type=SubProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -424,8 +424,8 @@ class TestProcessingHeaderSelection:
         task = TaskState(
             task_id="v1",
             name="qownnotes",
-            progress_type=ProgressType.PROCESSING,
-            sub_type=SubProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -458,8 +458,8 @@ class TestProcessingHeaderSelection:
         task1 = TaskState(
             task_id="v1",
             name="qownnotes",
-            progress_type=ProgressType.PROCESSING,
-            sub_type=SubProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -468,8 +468,8 @@ class TestProcessingHeaderSelection:
         task2 = TaskState(
             task_id="i1",
             name="qownnotes",
-            progress_type=ProgressType.PROCESSING,
-            sub_type=SubProgressType.INSTALLATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.INSTALLATION,
             phase=2,
             total_phases=2,
             is_finished=True,
@@ -499,8 +499,8 @@ class TestProcessingHeaderSelection:
         task1 = TaskState(
             task_id="v1",
             name="qownnotes",
-            progress_type=ProgressType.PROCESSING,
-            sub_type=SubProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -509,8 +509,8 @@ class TestProcessingHeaderSelection:
         task2 = TaskState(
             task_id="i1",
             name="qownnotes",
-            progress_type=ProgressType.PROCESSING,
-            sub_type=SubProgressType.INSTALLATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.INSTALLATION,
             phase=2,
             total_phases=2,
             is_finished=True,

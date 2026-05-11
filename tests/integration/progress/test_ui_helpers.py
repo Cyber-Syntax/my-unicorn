@@ -16,7 +16,7 @@ from my_unicorn.core.progress.ascii import (
     render_downloads_section,
     render_processing_section,
 )
-from my_unicorn.core.progress.progress_types import ProgressType, TaskState
+from my_unicorn.core.progress.progress_types import Phase, TaskState
 
 
 @dataclass
@@ -142,7 +142,7 @@ class TestCaptureProgressOutput:
         task = TaskState(
             task_id="api_1",
             name="GitHub Releases",
-            progress_type=ProgressType.API_FETCHING,
+            progress_type=Phase.API_FETCHING,
             total=1,
             completed=1,
             is_finished=True,
@@ -163,7 +163,7 @@ class TestCaptureProgressOutput:
         task = TaskState(
             task_id="dl_1",
             name="test-app",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=1024.0,
             completed=512.0,
             is_finished=False,
@@ -183,7 +183,7 @@ class TestCaptureProgressOutput:
         task = TaskState(
             task_id="dl_1",
             name="test.AppImage",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=1000.0,
             completed=500.0,
         )

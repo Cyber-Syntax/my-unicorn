@@ -25,7 +25,7 @@ Usage in domain services::
 
         async def download(self, url: str) -> Path:
             task_id = await self.progress.add_task(
-                "Downloading", ProgressType.DOWNLOAD
+                "Downloading", Phase.DOWNLOAD
             )
             # ... perform download with progress updates ...
             await self.progress.finish_task(task_id)
@@ -37,12 +37,12 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Protocol, TypedDict, runtime_checkable
 
-from my_unicorn.core.progress.progress_types import ProgressType
+from my_unicorn.core.progress.progress_types import Phase
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
-    from my_unicorn.core.progress.progress_types import SubProgressType
+    from my_unicorn.core.progress.progress_types import ProcessingPhase
 
 
 class ProgressTaskInfo(TypedDict):
@@ -81,7 +81,7 @@ class ProgressReporter(Protocol):
             async def add_task(
                 self,
                 name: str,
-                progress_type: ProgressType,
+                progress_type: Phase,
                 total: float | None = None,
                 description: str | None = None,
                 parent_task_id: str | None = None,
@@ -132,8 +132,8 @@ class ProgressReporter(Protocol):
     async def add_task(
         self,
         name: str,
-        progress_type: ProgressType,
-        sub_type: SubProgressType | None = None,
+        progress_type: Phase,
+        sub_type: ProcessingPhase | None = None,
         total: float | None = None,
         description: str | None = None,
         parent_task_id: str | None = None,
@@ -237,7 +237,7 @@ class NullProgressReporter:
         self.progress = progress_reporter or NullProgressReporter()
 
         # Safe to call without None checks
-        task_id = self.progress.add_task("Operation", ProgressType.DOWNLOAD)
+        task_id = self.progress.add_task("Operation", Phase.DOWNLOAD)
         self.progress.update_task(task_id, completed=50.0)
         self.progress.finish_task(task_id)
 
@@ -255,8 +255,8 @@ class NullProgressReporter:
     async def add_task(
         self,
         name: str,  # noqa: ARG002
-        progress_type: ProgressType,  # noqa: ARG002
-        sub_type: SubProgressType | None = None,  # noqa: ARG002
+        progress_type: Phase,  # noqa: ARG002
+        sub_type: ProcessingPhase | None = None,  # noqa: ARG002
         total: float | None = None,  # noqa: ARG002
         description: str | None = None,  # noqa: ARG002
         parent_task_id: str | None = None,  # noqa: ARG002
@@ -367,7 +367,7 @@ async def github_api_progress_task(
 
     task_id = await progress.add_task(
         name=task_name,
-        progress_type=ProgressType.API_FETCHING,
+        progress_type=Phase.API_FETCHING,
         total=float(total),
     )
 

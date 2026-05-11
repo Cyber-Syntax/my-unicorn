@@ -5,7 +5,7 @@ Tests the pure formatting functions extracted from AsciiProgressBackend.
 
 from unittest.mock import patch
 
-from my_unicorn.core.progress.progress_types import ProgressType, TaskState
+from my_unicorn.core.progress.progress_types import Phase, TaskState
 
 
 class TestComputeDisplayName:
@@ -16,7 +16,7 @@ class TestComputeDisplayName:
         task = TaskState(
             task_id="test_1",
             name="qownnotes.AppImage",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
         )
         # Import will fail until we create the function
         from my_unicorn.core.progress.ascii import compute_display_name
@@ -29,7 +29,7 @@ class TestComputeDisplayName:
         task = TaskState(
             task_id="test_2",
             name="plainname",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
         )
         from my_unicorn.core.progress.ascii import compute_display_name
 

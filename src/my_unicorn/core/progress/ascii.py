@@ -39,12 +39,12 @@ from .progress_types import (
     DEFAULT_BAR_WIDTH,
     DEFAULT_MIN_NAME_WIDTH,
     DEFAULT_SPINNER_FPS,
-    OPERATION_NAMES,
+    PHASE_SECTION_LABELS,
+    PROCESSING_LABELS,
     SPINNER_FRAMES,
-    SUB_PROCESSING_NAMES,
+    Phase,
+    ProcessingPhase,
     ProgressConfig,
-    ProgressType,
-    SubProgressType,
     TaskState,
 )
 
@@ -154,8 +154,8 @@ class AsciiProgressBackend:
         self,
         task_id: str,
         name: str,
-        progress_type: ProgressType,
-        sub_type: SubProgressType | None = None,
+        progress_type: Phase,
+        sub_type: ProcessingPhase | None = None,
         total: float = 0.0,
         parent_task_id: str | None = None,
         phase: int = 1,
@@ -805,7 +805,7 @@ def format_processing_task_lines(
     lines: list[str] = []
     phase_str = f"({task.phase}/{task.total_phases})"
 
-    operation = SUB_PROCESSING_NAMES.get(task.sub_type)
+    operation = PROCESSING_LABELS.get(task.sub_type)
     if operation is None:
         operation = "processing"
     operation_label = f"{operation[:1]}{operation[1:]}"
@@ -850,13 +850,12 @@ def render_api_section(
         List of formatted output lines for API section
 
     """
-    header = OPERATION_NAMES.get(ProgressType.API_FETCHING)
+    header = PHASE_SECTION_LABELS.get(Phase.API_FETCHING)
     api_tasks = [
         t
         for t in order
         # using .get() prevents crashes if task state changes during rendering.
-        if (task := tasks.get(t))
-        and task.progress_type == ProgressType.API_FETCHING
+        if (task := tasks.get(t)) and task.progress_type == Phase.API_FETCHING
     ]
 
     if not api_tasks:
@@ -910,8 +909,7 @@ def render_downloads_section(
         t
         for t in order
         # Use .get() to guard against order/tasks snapshot divergence,
-        if (task := tasks.get(t))
-        and task.progress_type == ProgressType.DOWNLOAD
+        if (task := tasks.get(t)) and task.progress_type == Phase.DOWNLOAD
     ]
 
     if not download_tasks:
@@ -933,7 +931,7 @@ def render_downloads_section(
 
     total_downloads = len(download_tasks)
 
-    header = OPERATION_NAMES.get(ProgressType.DOWNLOAD)
+    header = PHASE_SECTION_LABELS.get(Phase.DOWNLOAD)
 
     lines = [header]
     for task_id in download_tasks:
@@ -1004,15 +1002,14 @@ def render_processing_section(
         List of formatted output lines for processing section
 
     """
-    installing_header = OPERATION_NAMES.get(ProgressType.PROCESSING)
-    verifying_header = SUB_PROCESSING_NAMES.get(SubProgressType.VERIFICATION)
+    installing_header = PHASE_SECTION_LABELS.get(Phase.PROCESSING)
+    verifying_header = PROCESSING_LABELS.get(ProcessingPhase.VERIFICATION)
 
     post_tasks = [
         t
         for t in order
         # Use .get() to guard against order/tasks snapshot divergence,
-        if (task := tasks.get(t))
-        and task.progress_type == ProgressType.PROCESSING
+        if (task := tasks.get(t)) and task.progress_type == Phase.PROCESSING
     ]
 
     if not post_tasks:
@@ -1022,8 +1019,8 @@ def render_processing_section(
         tasks[t].sub_type for t in post_tasks if tasks[t].sub_type is not None
     }
 
-    has_installation = SubProgressType.INSTALLATION in sub_types
-    has_verification = SubProgressType.VERIFICATION in sub_types
+    has_installation = ProcessingPhase.INSTALLATION in sub_types
+    has_verification = ProcessingPhase.VERIFICATION in sub_types
 
     if has_verification and not has_installation:
         section_header = verifying_header

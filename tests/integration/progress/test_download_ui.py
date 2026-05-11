@@ -13,7 +13,7 @@ from my_unicorn.core.progress.ascii import (
     SectionRenderConfig,
     render_downloads_section,
 )
-from my_unicorn.core.progress.progress_types import ProgressType, TaskState
+from my_unicorn.core.progress.progress_types import Phase, TaskState
 
 from .test_ui_helpers import parse_output_sections
 
@@ -32,7 +32,7 @@ class TestDownloadProgressBarUI:
         task = TaskState(
             task_id="dl_1",
             name="test-app.AppImage",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=1000.0,
             completed=500.0,
             is_finished=False,
@@ -72,7 +72,7 @@ class TestDownloadProgressBarUI:
         task = TaskState(
             task_id="dl_1",
             name="QOwnNotes-x86_64",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=41.6 * 1024 * 1024,  # 41.6 MiB in bytes
             completed=0.0,
             is_finished=False,
@@ -104,7 +104,7 @@ class TestDownloadProgressBarUI:
         task = TaskState(
             task_id="dl_1",
             name="broken-app.AppImage",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=100.0 * 1024 * 1024,
             completed=50.0 * 1024 * 1024,
             is_finished=True,
@@ -137,7 +137,7 @@ class TestDownloadProgressBarUI:
         task1 = TaskState(
             task_id="dl_1",
             name="AppFlowy-0.11.1-linux-x86_64",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=77.6 * 1024 * 1024,
             completed=77.6 * 1024 * 1024,
             is_finished=True,
@@ -147,7 +147,7 @@ class TestDownloadProgressBarUI:
         task2 = TaskState(
             task_id="dl_2",
             name="QOwnNotes-x86_64",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=41.6 * 1024 * 1024,
             completed=41.6 * 1024 * 1024,
             is_finished=True,
@@ -179,7 +179,7 @@ class TestDownloadProgressBarUI:
         task_mib = TaskState(
             task_id="dl_1",
             name="small-app",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=50.0 * 1024 * 1024,  # 50 MiB
             completed=50.0 * 1024 * 1024,
             is_finished=True,
@@ -190,7 +190,7 @@ class TestDownloadProgressBarUI:
         task_gib = TaskState(
             task_id="dl_2",
             name="large-app",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=1.5 * 1024 * 1024 * 1024,  # 1.5 GiB
             completed=1.5 * 1024 * 1024 * 1024,
             is_finished=True,
@@ -239,7 +239,7 @@ class TestDownloadProgressBarUI:
         task = TaskState(
             task_id="dl_1",
             name="app.AppImage",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=0.0,  # Unknown size
             completed=0.0,
             is_finished=False,
@@ -269,7 +269,7 @@ class TestDownloadProgressBarUI:
         task = TaskState(
             task_id="dl_1",
             name="single-app",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=50.0 * 1024 * 1024,
             completed=25.0 * 1024 * 1024,
             is_finished=False,
@@ -335,7 +335,7 @@ class TestDownloadProgressBarUI:
         task = TaskState(
             task_id="dl_1",
             name="partial-app",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=100.0 * 1024 * 1024,
             completed=75.0 * 1024 * 1024,
             is_finished=False,
@@ -365,7 +365,7 @@ class TestDownloadProgressBarUI:
         task = TaskState(
             task_id="dl_1",
             name="slow-start-app",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=50.0 * 1024 * 1024,
             completed=0.0,
             is_finished=False,

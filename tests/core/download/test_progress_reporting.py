@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from my_unicorn.core.download import DownloadService
-from my_unicorn.core.progress.progress_types import ProgressType
+from my_unicorn.core.progress.progress_types import Phase
 from tests.core.conftest import MockProgressReporter, async_chunk_gen
 
 
@@ -41,14 +41,14 @@ class TestDownloadServiceProgressReporting:
         await service.download_file(
             url="http://example.com/large.bin",
             dest=tmp_file,
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
         )
 
         assert len(reporter.tasks) == 1
         task_id = next(iter(reporter.tasks.keys()))
         assert reporter.tasks[task_id]["name"] == tmp_file.name
         task_progress_type = reporter.tasks[task_id]["progress_type"]
-        assert task_progress_type == ProgressType.DOWNLOAD
+        assert task_progress_type == Phase.DOWNLOAD
 
     @pytest.mark.asyncio
     async def test_download_with_progress_updates_task(
@@ -182,7 +182,7 @@ class TestSyncFallbackWithProgress:
         service = DownloadService(mock_session, progress_reporter=reporter)
 
         task_id = await reporter.add_task(
-            "test", ProgressType.DOWNLOAD, total=len(content)
+            "test", Phase.DOWNLOAD, total=len(content)
         )
 
         downloaded = await service._download_sync_fallback_with_progress(
@@ -208,7 +208,7 @@ class TestSyncFallbackWithProgress:
         service = DownloadService(mock_session, progress_reporter=reporter)
 
         task_id = await reporter.add_task(
-            "test", ProgressType.DOWNLOAD, total=len(content)
+            "test", Phase.DOWNLOAD, total=len(content)
         )
 
         downloaded = await service._download_sync_fallback_with_progress(
@@ -284,6 +284,6 @@ class TestHasAiofilesFlag:
                 mock_response,
                 tmp_file,
                 len(content),
-                ProgressType.DOWNLOAD,
+                Phase.DOWNLOAD,
             )
             mock_fallback.assert_called_once()

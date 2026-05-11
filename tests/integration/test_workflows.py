@@ -24,10 +24,7 @@ from my_unicorn.core.api import Asset, Release
 from my_unicorn.core.download import HAS_AIOFILES, DownloadService
 from my_unicorn.core.install import InstallHandler
 from my_unicorn.core.post_download import PostDownloadResult
-from my_unicorn.core.progress.progress_types import (
-    ProgressType,
-    SubProgressType,
-)
+from my_unicorn.core.progress.progress_types import Phase, ProcessingPhase
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,
     ProgressReporter,
@@ -63,7 +60,7 @@ class MockProgressReporter:
     async def add_task(
         self,
         name: str,
-        progress_type: ProgressType,
+        progress_type: Phase,
         total: float | None = None,
     ) -> str:
         """Add a new progress task (async).
@@ -501,7 +498,7 @@ class TestCoreModuleIndependence:
         assert isinstance(service.progress_reporter, NullProgressReporter)
         assert service.progress_reporter.is_active() is False
         task_id = await service.progress_reporter.add_task(
-            "test", ProgressType.DOWNLOAD
+            "test", Phase.DOWNLOAD
         )
         assert task_id == "null-task"
 
@@ -553,9 +550,7 @@ class TestCoreModuleIndependence:
         """Verify NullProgressReporter operations have no side effects."""
         reporter = NullProgressReporter()
 
-        task_id = await reporter.add_task(
-            "Test", ProgressType.DOWNLOAD, total=100.0
-        )
+        task_id = await reporter.add_task("Test", Phase.DOWNLOAD, total=100.0)
         assert task_id == "null-task"
 
         # These should not raise any exceptions
@@ -605,10 +600,10 @@ class TestCrossComponentIntegration:
 
         # Simulate operations from both services (async methods)
         task1 = await shared_progress_reporter.add_task(
-            "Download", ProgressType.DOWNLOAD
+            "Download", Phase.DOWNLOAD
         )
         task2 = await shared_progress_reporter.add_task(
-            "Verify", SubProgressType.VERIFICATION
+            "Verify", ProcessingPhase.VERIFICATION
         )
 
         assert len(shared_progress_reporter.tasks) == 2

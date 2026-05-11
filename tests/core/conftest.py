@@ -18,7 +18,7 @@ import pytest_asyncio
 
 from my_unicorn.core.api import Asset, Release
 from my_unicorn.core.backup import BackupService
-from my_unicorn.core.progress.progress_types import ProgressType
+from my_unicorn.core.progress.progress_types import Phase
 from my_unicorn.core.protocols import ProgressReporter
 
 # =============================================================================
@@ -74,7 +74,7 @@ class MockProgressReporter(ProgressReporter):
     async def add_task(
         self,
         name: str,
-        progress_type: ProgressType,
+        progress_type: Phase,
         total: float | None = None,
     ) -> str:
         """Add a task and return its ID.

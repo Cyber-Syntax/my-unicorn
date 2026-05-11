@@ -21,8 +21,8 @@ from logging.handlers import RotatingFileHandler
 
 import pytest
 
-from my_unicorn.core.progress import ProgressDisplay, SubProgressType
-from my_unicorn.core.progress.progress_types import ProgressType
+from my_unicorn.core.progress import ProcessingPhase, ProgressDisplay
+from my_unicorn.core.progress.progress_types import Phase
 from my_unicorn.logger import _state, get_logger
 
 
@@ -64,7 +64,7 @@ async def test_logger_info_suppressed_during_progress(caplog):
     async with progress.session(1):
         await progress.add_task(
             name="test",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=100,
         )
 
@@ -98,7 +98,7 @@ async def test_logger_warning_shown_during_progress(caplog):
         # Add a task
         await progress.add_task(
             name="test",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=100,
         )
 
@@ -119,7 +119,7 @@ async def test_logger_error_shown_during_progress(caplog):
         # Add a task
         await progress.add_task(
             name="test",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=100,
         )
 
@@ -140,7 +140,7 @@ async def test_logger_levels_restored_after_progress_error(caplog):
         async with progress.session(1):
             await progress.add_task(
                 name="test",
-                progress_type=ProgressType.DOWNLOAD,
+                progress_type=Phase.DOWNLOAD,
                 total=100,
             )
 
@@ -178,7 +178,7 @@ async def test_multiple_progress_sessions(caplog):
     async with progress.session(1):
         await progress.add_task(
             name="test1",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=100,
         )
 
@@ -202,8 +202,8 @@ async def test_multiple_progress_sessions(caplog):
     async with progress.session(1):
         await progress.add_task(
             name="test2",
-            progress_type=ProgressType.PROCESSING,
-            sub_type=SubProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             total=100,
         )
 
@@ -233,7 +233,7 @@ async def test_nested_progress_sessions_not_supported(caplog):
     async with progress.session(1):
         await progress.add_task(
             name="outer",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=100,
         )
 
@@ -255,7 +255,7 @@ async def test_logger_debug_not_affected(caplog):
     async with progress.session(1):
         await progress.add_task(
             name="test",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=100,
         )
 

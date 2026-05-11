@@ -10,10 +10,7 @@ import pytest
 
 from my_unicorn.core.api import Asset, Release
 from my_unicorn.core.post_download import OperationType, PostDownloadResult
-from my_unicorn.core.progress.progress_types import (
-    ProgressType,
-    SubProgressType,
-)
+from my_unicorn.core.progress.progress_types import Phase, ProcessingPhase
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,
     ProgressReporter,
@@ -894,7 +891,7 @@ class TestUpdateWorkflowProtocolUsage:
             def add_task(
                 self,
                 name: str,
-                progress_type: ProgressType,
+                progress_type: Phase,
                 total: float | None = None,
             ) -> str:
                 return "mock-task-id"
@@ -975,7 +972,7 @@ class TestUpdateWorkflowProtocolUsage:
             def add_task(
                 self,
                 name: str,
-                progress_type: ProgressType,
+                progress_type: Phase,
                 total: float | None = None,
             ) -> str:
                 return "test-id"
@@ -1048,8 +1045,8 @@ class TestUpdateWorkflowProtocolUsage:
 
             task_id = await manager.progress_reporter.add_task(
                 "Test Task",
-                ProgressType.PROCESSING,
-                sub_type=SubProgressType.UPDATE,
+                Phase.PROCESSING,
+                sub_type=ProcessingPhase.UPDATE,
                 total=100.0,
             )
             assert task_id == "null-task"

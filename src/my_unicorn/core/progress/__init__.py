@@ -7,9 +7,9 @@ and progress display logic for my-unicorn.
 from my_unicorn.core.progress.progress import (
     IDGenerator,
     LoggerSuppression,
+    Phase,
     ProgressConfig,
     ProgressDisplay,
-    ProgressType,
     SessionManager,
     TaskInfo,
     TaskRegistry,
@@ -17,16 +17,16 @@ from my_unicorn.core.progress.progress import (
     create_api_fetching_task,
     create_installation_workflow,
 )
-from my_unicorn.core.progress.progress_types import SubProgressType, TaskConfig
+from my_unicorn.core.progress.progress_types import ProcessingPhase, TaskConfig
 
 __all__ = [
     "IDGenerator",
     "LoggerSuppression",
+    "Phase",
+    "ProcessingPhase",
     "ProgressConfig",
     "ProgressDisplay",
-    "ProgressType",
     "SessionManager",
-    "SubProgressType",
     "TaskConfig",
     "TaskInfo",
     "TaskRegistry",

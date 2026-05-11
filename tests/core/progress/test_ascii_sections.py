@@ -18,8 +18,8 @@ from my_unicorn.core.progress.ascii import (
 )
 from my_unicorn.core.progress.progress_types import (
     DEFAULT_MIN_NAME_WIDTH,
-    ProgressType,
-    SubProgressType,
+    Phase,
+    ProcessingPhase,
     TaskState,
 )
 
@@ -110,7 +110,7 @@ class TestFormatDownloadLines:
         task = TaskState(
             task_id="dl1",
             name="test.AppImage",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=1000.0,
             completed=500.0,
             speed=100.0,
@@ -128,7 +128,7 @@ class TestFormatDownloadLines:
         task = TaskState(
             task_id="dl1",
             name="test.AppImage",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=1000.0,
             completed=0.0,
             is_finished=True,
@@ -147,7 +147,7 @@ class TestFormatDownloadLines:
         task = TaskState(
             task_id="dl1",
             name="test.AppImage",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=1000.0,
             completed=1000.0,
             is_finished=True,
@@ -171,8 +171,8 @@ class TestFormatProcessingTaskLines:
         task = TaskState(
             task_id="v1",
             name="test.AppImage",
-            progress_type=ProgressType.PROCESSING,
-            sub_type=SubProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=False,
@@ -192,8 +192,8 @@ class TestFormatProcessingTaskLines:
         task = TaskState(
             task_id="v1",
             name="test.AppImage",
-            progress_type=ProgressType.PROCESSING,
-            sub_type=SubProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -214,8 +214,8 @@ class TestFormatProcessingTaskLines:
         task = TaskState(
             task_id="i1",
             name="test.AppImage",
-            progress_type=ProgressType.PROCESSING,
-            sub_type=SubProgressType.INSTALLATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.INSTALLATION,
             phase=2,
             total_phases=2,
             is_finished=False,
@@ -244,7 +244,7 @@ class TestRenderApiSection:
         task = TaskState(
             task_id="api1",
             name="AppFlowy",
-            progress_type=ProgressType.API_FETCHING,
+            progress_type=Phase.API_FETCHING,
             total=1.0,
             completed=1.0,
             is_finished=True,
@@ -265,7 +265,7 @@ class TestRenderApiSection:
         task = TaskState(
             task_id="api1",
             name="ZenBrowser",
-            progress_type=ProgressType.API_FETCHING,
+            progress_type=Phase.API_FETCHING,
             total=1.0,
             completed=1.0,
             is_finished=True,
@@ -303,7 +303,7 @@ class TestRenderDownloadsSection:
         task = TaskState(
             task_id="dl1",
             name="test.AppImage",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=1000.0,
             completed=500.0,
             speed=100.0,
@@ -351,8 +351,8 @@ class TestRenderProcessingSection:
         task = TaskState(
             task_id="v1",
             name="test.AppImage",
-            progress_type=ProgressType.PROCESSING,
-            sub_type=SubProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=False,
@@ -380,8 +380,8 @@ class TestRenderProcessingSection:
         task = TaskState(
             task_id="i1",
             name="test.AppImage",
-            progress_type=ProgressType.PROCESSING,
-            sub_type=SubProgressType.INSTALLATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.INSTALLATION,
             phase=2,
             total_phases=2,
             is_finished=False,

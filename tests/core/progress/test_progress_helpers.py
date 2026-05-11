@@ -3,8 +3,8 @@ import io
 from my_unicorn.core.progress.ascii import format_download_lines
 from my_unicorn.core.progress.progress import (
     AsciiProgressBackend,
+    Phase,
     ProgressConfig,
-    ProgressType,
     TaskState,
 )
 
@@ -22,7 +22,7 @@ def test_compute_display_name_strips_appimage():
     task = TaskState(
         task_id="t1",
         name="example.AppImage",
-        progress_type=ProgressType.DOWNLOAD,
+        progress_type=Phase.DOWNLOAD,
     )
     assert compute_display_name(task) == "example"
 
@@ -33,7 +33,7 @@ def test_format_download_lines_success_and_error():
     task_ok = TaskState(
         task_id="t_ok",
         name="good.AppImage",
-        progress_type=ProgressType.DOWNLOAD,
+        progress_type=Phase.DOWNLOAD,
         total=total,
         completed=total,
         speed=1024 * 1024,
@@ -52,7 +52,7 @@ def test_format_download_lines_success_and_error():
     task_fail = TaskState(
         task_id="t_fail",
         name="bad.AppImage",
-        progress_type=ProgressType.DOWNLOAD,
+        progress_type=Phase.DOWNLOAD,
         total=1024,
         completed=512,
         speed=0,

@@ -10,8 +10,8 @@ import pytest
 
 from my_unicorn.core.progress import TaskRegistry
 from my_unicorn.core.progress.progress_types import (
-    ProgressType,
-    SubProgressType,
+    Phase,
+    ProcessingPhase,
     TaskConfig,
     TaskInfo,
 )
@@ -25,7 +25,7 @@ async def test_task_registry_add_task_info() -> None:
     # Create a task config and info
     config = TaskConfig(
         name="Download Task",
-        progress_type=ProgressType.DOWNLOAD,
+        progress_type=Phase.DOWNLOAD,
         total=1000.0,
     )
     task_info = TaskInfo(
@@ -58,7 +58,7 @@ async def test_get_task_info_existing() -> None:
         task_id="task_1",
         namespaced_id="task_1",
         name="Test Task",
-        progress_type=ProgressType.DOWNLOAD,
+        progress_type=Phase.DOWNLOAD,
         total=500.0,
         completed=250.0,
         description="Test description",
@@ -98,8 +98,8 @@ async def test_get_task_info_full_existing() -> None:
         task_id="task_2",
         namespaced_id="task_2",
         name="Full Info Task",
-        progress_type=ProgressType.PROCESSING,
-        sub_type=SubProgressType.VERIFICATION,
+        progress_type=Phase.PROCESSING,
+        sub_type=ProcessingPhase.VERIFICATION,
         total=100.0,
         completed=50.0,
         phase=2,
@@ -140,7 +140,7 @@ async def test_update_task() -> None:
         task_id="task_3",
         namespaced_id="task_3",
         name="Update Test",
-        progress_type=ProgressType.DOWNLOAD,
+        progress_type=Phase.DOWNLOAD,
         total=1000.0,
         completed=0.0,
         created_at=time.monotonic(),
@@ -183,7 +183,7 @@ async def test_update_task_multiple_fields() -> None:
         task_id="task_4",
         namespaced_id="task_4",
         name="Multi Update",
-        progress_type=ProgressType.DOWNLOAD,
+        progress_type=Phase.DOWNLOAD,
         total=1000.0,
         created_at=time.monotonic(),
     )
@@ -214,7 +214,7 @@ async def test_finish_task() -> None:
         task_id="task_5",
         namespaced_id="task_5",
         name="Finish Test",
-        progress_type=ProgressType.DOWNLOAD,
+        progress_type=Phase.DOWNLOAD,
         total=1000.0,
         completed=1000.0,
         created_at=time.monotonic(),
@@ -242,8 +242,8 @@ async def test_finish_task_with_failure() -> None:
         task_id="task_6",
         namespaced_id="task_6",
         name="Fail Test",
-        progress_type=ProgressType.PROCESSING,
-        sub_type=SubProgressType.VERIFICATION,
+        progress_type=Phase.PROCESSING,
+        sub_type=ProcessingPhase.VERIFICATION,
         total=500.0,
         created_at=time.monotonic(),
     )
@@ -280,7 +280,7 @@ async def test_concurrent_access() -> None:
         task_id="task_7",
         namespaced_id="task_7",
         name="Concurrent Test",
-        progress_type=ProgressType.DOWNLOAD,
+        progress_type=Phase.DOWNLOAD,
         total=1000.0,
         created_at=time.monotonic(),
     )
@@ -313,10 +313,10 @@ async def test_task_registry_multiple_types() -> None:
 
     # Add tasks of different types
     types_and_names = [
-        (ProgressType.DOWNLOAD, "Download 1"),
-        (SubProgressType.VERIFICATION, "Verify 1"),
-        (ProgressType.PROCESSING, "Install 1"),
-        (ProgressType.DOWNLOAD, "Download 2"),
+        (Phase.DOWNLOAD, "Download 1"),
+        (ProcessingPhase.VERIFICATION, "Verify 1"),
+        (Phase.PROCESSING, "Install 1"),
+        (Phase.DOWNLOAD, "Download 2"),
     ]
 
     for idx, (ptype, name) in enumerate(types_and_names):
@@ -347,7 +347,7 @@ async def test_update_task_preserves_other_fields() -> None:
         task_id="task_8",
         namespaced_id="task_8",
         name="Preserve Test",
-        progress_type=ProgressType.DOWNLOAD,
+        progress_type=Phase.DOWNLOAD,
         total=1000.0,
         completed=100.0,
         description="Original",

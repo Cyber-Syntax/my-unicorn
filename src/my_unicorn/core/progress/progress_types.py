@@ -1,4 +1,4 @@
-"""Shared types and constants for progress UI components."""
+"""Shared types and constants for progress tracking and display."""
 
 from __future__ import annotations
 
@@ -10,16 +10,30 @@ from enum import Enum, auto
 ID_CACHE_LIMIT = 1000
 
 
-class ProgressType(Enum):
-    """Types of progress operations."""
+class Phase(Enum):
+    """Main operation types for progress tracking.
+
+    Example:
+    - API_FETCHING: Querying upstream releases for all apps.
+    - DOWNLOAD: Downloading appimages for all apps.
+    - PROCESSING: Verifying, installing, and performing post-processing for all apps.
+    """
 
     API_FETCHING = auto()
     DOWNLOAD = auto()
     PROCESSING = auto()
 
 
-class SubProgressType(Enum):
-    """Types of sub-progress operations."""
+class ProcessingPhase(Enum):
+    """Sub processing types for PROCESSING phase.
+
+    Example:
+    - VERIFICATION: Verifying the integrity of a downloaded appimage.
+    - INSTALLATION: Installing an appimage to the system.
+    - UPDATE: Updating an already installed appimage to a new version.
+    - ICON_EXTRACTION: Extracting the app icon from the appimage.
+    - DESKTOP_ENTRY_CREATION: Creating a .desktop entry for the installed app.
+    """
 
     VERIFICATION = auto()
     INSTALLATION = auto()
@@ -28,20 +42,22 @@ class SubProgressType(Enum):
     DESKTOP_ENTRY_CREATION = auto()
 
 
-OPERATION_NAMES: dict[ProgressType, str] = {
-    ProgressType.API_FETCHING: ":: Querying upstream releases...",
-    ProgressType.DOWNLOAD: ":: Retrieving appimages...",
-    ProgressType.PROCESSING: ":: Processing package changes...",
+# Section headers for each main operation type
+PHASE_SECTION_LABELS: dict[Phase, str] = {
+    Phase.API_FETCHING: ":: Querying upstream releases...",
+    Phase.DOWNLOAD: ":: Retrieving appimages...",
+    Phase.PROCESSING: ":: Processing package changes...",
 }
 
 TRANSACTION_SUMMARY_HEADER: str = ":: Creating transaction summary..."
 
-SUB_PROCESSING_NAMES: dict[SubProgressType, str] = {
-    SubProgressType.VERIFICATION: "verifying",
-    SubProgressType.INSTALLATION: "installing",
-    SubProgressType.UPDATE: "upgrading",
-    SubProgressType.ICON_EXTRACTION: "extracting icon",
-    SubProgressType.DESKTOP_ENTRY_CREATION: "creating desktop entry",
+# Per-task verbs
+PROCESSING_LABELS: dict[ProcessingPhase, str] = {
+    ProcessingPhase.VERIFICATION: "verifying",
+    ProcessingPhase.INSTALLATION: "installing",
+    ProcessingPhase.UPDATE: "upgrading",
+    ProcessingPhase.ICON_EXTRACTION: "extracting icon",
+    ProcessingPhase.DESKTOP_ENTRY_CREATION: "creating desktop entry",
 }
 
 # Small tunables exposed for easier testing
@@ -71,8 +87,8 @@ class TaskState:
 
     task_id: str
     name: str
-    progress_type: ProgressType
-    sub_type: SubProgressType | None = None
+    progress_type: Phase
+    sub_type: ProcessingPhase | None = None
     total: float = 0.0
     completed: float = 0.0
     description: str = ""
@@ -93,8 +109,8 @@ class TaskConfig:
     """Configuration for creating a new progress task."""
 
     name: str
-    progress_type: ProgressType
-    sub_type: SubProgressType | None = None
+    progress_type: Phase
+    sub_type: ProcessingPhase | None = None
     total: float = 0.0
     description: str | None = None
     parent_task_id: str | None = None
@@ -148,8 +164,8 @@ class TaskInfo:
     task_id: str
     namespaced_id: str
     name: str
-    progress_type: ProgressType
-    sub_type: SubProgressType | None = None
+    progress_type: Phase
+    sub_type: ProcessingPhase | None = None
     total: float = 0.0
     completed: float = 0.0
     description: str = ""

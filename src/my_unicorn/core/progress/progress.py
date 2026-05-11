@@ -44,11 +44,11 @@ from typing import TYPE_CHECKING, Any
 from my_unicorn.core.progress.ascii import AsciiProgressBackend
 from my_unicorn.core.progress.progress_types import (
     ID_CACHE_LIMIT,
-    OPERATION_NAMES,
-    SUB_PROCESSING_NAMES,
+    PHASE_SECTION_LABELS,
+    PROCESSING_LABELS,
+    Phase,
+    ProcessingPhase,
     ProgressConfig,
-    ProgressType,
-    SubProgressType,
     TaskConfig,
     TaskInfo,
     TaskState,
@@ -57,15 +57,15 @@ from my_unicorn.core.protocols.progress import ProgressReporter
 from my_unicorn.logger import get_logger
 from my_unicorn.utils.progress_utils import calculate_speed
 
-_PROGRESS_TYPE_PREFIXES: dict[ProgressType | SubProgressType, str] = {
-    ProgressType.API_FETCHING: "api",
-    ProgressType.DOWNLOAD: "dl",
-    ProgressType.PROCESSING: "pc",
-    SubProgressType.VERIFICATION: "vf",
-    SubProgressType.INSTALLATION: "in",
-    SubProgressType.UPDATE: "up",
-    SubProgressType.ICON_EXTRACTION: "ic",
-    SubProgressType.DESKTOP_ENTRY_CREATION: "de",
+_PROGRESS_TYPE_PREFIXES: dict[Phase | ProcessingPhase, str] = {
+    Phase.API_FETCHING: "api",
+    Phase.DOWNLOAD: "dl",
+    Phase.PROCESSING: "pc",
+    ProcessingPhase.VERIFICATION: "vf",
+    ProcessingPhase.INSTALLATION: "in",
+    ProcessingPhase.UPDATE: "up",
+    ProcessingPhase.ICON_EXTRACTION: "ic",
+    ProcessingPhase.DESKTOP_ENTRY_CREATION: "de",
 }
 
 if TYPE_CHECKING:
@@ -76,11 +76,11 @@ if TYPE_CHECKING:
 
 __all__ = [
     "ID_CACHE_LIMIT",
-    "OPERATION_NAMES",
+    "PHASE_SECTION_LABELS",
     "AsciiProgressBackend",
+    "Phase",
     "ProgressConfig",
     "ProgressDisplay",
-    "ProgressType",
     "TaskInfo",
     "TaskState",
     "github_api_progress_task",
@@ -249,8 +249,8 @@ class ProgressDisplay(ProgressReporter):
     def _generate_default_description(
         self,
         name: str,
-        progress_type: ProgressType,
-        sub_type: SubProgressType | None = None,
+        progress_type: Phase,
+        sub_type: ProcessingPhase | None = None,
     ) -> str:
         """Generate default description based on progress type.
 
@@ -262,15 +262,15 @@ class ProgressDisplay(ProgressReporter):
             Default description string appropriate for the operation type.
         """
         if sub_type is not None:
-            action = SUB_PROCESSING_NAMES.get(
+            action = PROCESSING_LABELS.get(
                 sub_type, sub_type.name.lower().replace("_", " ")
             )
             return f"{action[:1].upper()}{action[1:]} {name}"
 
-        descriptions: dict[ProgressType, str] = {
-            ProgressType.API_FETCHING: f"Fetching {name}",
-            ProgressType.DOWNLOAD: f"Downloading {name}",
-            ProgressType.PROCESSING: f"Processing {name}",
+        descriptions: dict[Phase, str] = {
+            Phase.API_FETCHING: f"Fetching {name}",
+            Phase.DOWNLOAD: f"Downloading {name}",
+            Phase.PROCESSING: f"Processing {name}",
         }
         return descriptions.get(progress_type, name)
 
@@ -338,8 +338,8 @@ class ProgressDisplay(ProgressReporter):
     async def add_task(
         self,
         name: str,
-        progress_type: ProgressType,
-        sub_type: SubProgressType | None = None,
+        progress_type: Phase,
+        sub_type: ProcessingPhase | None = None,
         total: float | None = None,
         description: str | None = None,
         parent_task_id: str | None = None,
@@ -494,10 +494,7 @@ class ProgressDisplay(ProgressReporter):
 
         # Calculate speed for download tasks
         speed_bps = 0.0
-        if (
-            completed is not None
-            and task_info.progress_type == ProgressType.DOWNLOAD
-        ):
+        if completed is not None and task_info.progress_type == Phase.DOWNLOAD:
             speed_bps = self._calculate_speed(
                 task_info, completed, current_time
             )
@@ -650,18 +647,18 @@ class IDGenerator:
 
     def __init__(self) -> None:
         """Initialize ID generator with empty cache and counters."""
-        self._task_counters: dict[ProgressType | SubProgressType, int] = (
-            defaultdict(int)
+        self._task_counters: dict[Phase | ProcessingPhase, int] = defaultdict(
+            int
         )
         self._id_cache: OrderedDict[
-            tuple[ProgressType | SubProgressType, str], str
+            tuple[Phase | ProcessingPhase, str], str
         ] = OrderedDict()
 
     def generate_namespaced_id(
         self,
-        progress_type: ProgressType | SubProgressType,
+        progress_type: Phase | ProcessingPhase,
         name: str,
-        sub_type: SubProgressType | None = None,
+        sub_type: ProcessingPhase | None = None,
     ) -> str:
         """Generate a unique namespaced ID for a task with optimized caching.
 
@@ -678,12 +675,12 @@ class IDGenerator:
 
         Example:
             >>> gen = IDGenerator()
-            >>> gen.generate_namespaced_id(ProgressType.DOWNLOAD, "file.zip")
+            >>> gen.generate_namespaced_id(Phase.DOWNLOAD, "file.zip")
             'dl_1_file.zip'
-            >>> gen.generate_namespaced_id(ProgressType.DOWNLOAD, "file.zip")
+            >>> gen.generate_namespaced_id(Phase.DOWNLOAD, "file.zip")
             'dl_1_file.zip'  # Returns cached value
         """
-        if isinstance(progress_type, SubProgressType):
+        if isinstance(progress_type, ProcessingPhase):
             type_key = progress_type
         else:
             type_key = sub_type or progress_type
@@ -727,12 +724,12 @@ class IDGenerator:
 
         Example:
             >>> gen = IDGenerator()
-            >>> id1 = gen.generate_namespaced_id(ProgressType.DOWNLOAD, "file")
-            >>> id2 = gen.generate_namespaced_id(ProgressType.DOWNLOAD, "file")
+            >>> id1 = gen.generate_namespaced_id(Phase.DOWNLOAD, "file")
+            >>> id2 = gen.generate_namespaced_id(Phase.DOWNLOAD, "file")
             >>> id1 == id2
             True
             >>> gen.clear_cache()
-            >>> id3 = gen.generate_namespaced_id(ProgressType.DOWNLOAD, "file")
+            >>> id3 = gen.generate_namespaced_id(Phase.DOWNLOAD, "file")
             >>> id1 == id3
             False
         """
@@ -845,7 +842,7 @@ class TaskRegistry:
     Provides thread-safe access to task information using async locks.
     Stores tasks in two ways:
     - Primary storage: _tasks dict for full TaskInfo objects
-    - Index storage: _task_sets dicts by ProgressType for fast lookups
+    - Index storage: _task_sets dicts by Phase for fast lookups
     """
 
     def __init__(self) -> None:
@@ -1205,7 +1202,7 @@ async def create_api_fetching_task(
     """
     return await progress_display.add_task(
         name=name,
-        progress_type=ProgressType.API_FETCHING,
+        progress_type=Phase.API_FETCHING,
         description=description or f"Fetching {name}",
     )
 
@@ -1240,10 +1237,10 @@ async def create_installation_workflow(
         # Now can update both tasks in sequence as phases complete
     """
     verification_task_id = None
-    header_processing = ProgressType.PROCESSING
+    header_processing = Phase.PROCESSING
     # sub processing headers
-    header_verification = SubProgressType.VERIFICATION
-    header_installation = SubProgressType.INSTALLATION
+    header_verification = ProcessingPhase.VERIFICATION
+    header_installation = ProcessingPhase.INSTALLATION
 
     if with_verification:
         # Create verification task as phase 1/2

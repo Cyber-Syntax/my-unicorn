@@ -11,10 +11,7 @@ from my_unicorn.core.progress import (
     create_api_fetching_task,
     create_installation_workflow,
 )
-from my_unicorn.core.progress.progress_types import (
-    ProgressType,
-    SubProgressType,
-)
+from my_unicorn.core.progress.progress_types import Phase, ProcessingPhase
 
 
 @pytest.mark.asyncio
@@ -28,7 +25,7 @@ async def test_workflow_helper_api_fetching() -> None:
     assert task_id is not None
     task = progress.get_task_info_full(task_id)
     assert task is not None
-    assert task.progress_type == ProgressType.API_FETCHING
+    assert task.progress_type == Phase.API_FETCHING
     assert task.name == "GitHub API"
     assert task.description == "Fetching GitHub API"
 
@@ -69,8 +66,8 @@ async def test_workflow_helper_installation_with_verification() -> None:
     # Check verification task
     verify_task = progress.get_task_info_full(verify_id)
     assert verify_task is not None
-    assert verify_task.progress_type == ProgressType.PROCESSING
-    assert verify_task.sub_type == SubProgressType.VERIFICATION
+    assert verify_task.progress_type == Phase.PROCESSING
+    assert verify_task.sub_type == ProcessingPhase.VERIFICATION
     assert verify_task.name == "MyApp"
     assert verify_task.description == "Verifying MyApp"
     assert verify_task.phase == 1
@@ -79,8 +76,8 @@ async def test_workflow_helper_installation_with_verification() -> None:
     # Check installation task
     install_task = progress.get_task_info_full(install_id)
     assert install_task is not None
-    assert install_task.progress_type == ProgressType.PROCESSING
-    assert install_task.sub_type == SubProgressType.INSTALLATION
+    assert install_task.progress_type == Phase.PROCESSING
+    assert install_task.sub_type == ProcessingPhase.INSTALLATION
     assert install_task.name == "MyApp"
     assert install_task.description == "Installing MyApp"
     assert install_task.phase == 2
@@ -106,8 +103,8 @@ async def test_workflow_helper_installation_without_verification() -> None:
     # Check installation task is single phase
     install_task = progress.get_task_info_full(install_id)
     assert install_task is not None
-    assert install_task.progress_type == ProgressType.PROCESSING
-    assert install_task.sub_type == SubProgressType.INSTALLATION
+    assert install_task.progress_type == Phase.PROCESSING
+    assert install_task.sub_type == ProcessingPhase.INSTALLATION
     assert install_task.phase == 1
     assert install_task.total_phases == 1
     assert install_task.parent_task_id is None

@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
-from my_unicorn.core.progress.progress import ProgressDisplay, ProgressType
+from my_unicorn.core.progress.progress import Phase, ProgressDisplay
 
 
 class TestErrorScenarios:
@@ -50,7 +50,7 @@ class TestErrorScenarios:
         with pytest.raises(RuntimeError, match="Progress session not active"):
             await progress_service.add_task(
                 name="test_file",
-                progress_type=ProgressType.DOWNLOAD,
+                progress_type=Phase.DOWNLOAD,
                 total=100.0,
             )
 
@@ -63,7 +63,7 @@ class TestErrorScenarios:
 
         task_id = await progress_service.add_task(
             name="test_file",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=100.0,
         )
 
@@ -88,7 +88,7 @@ class TestErrorScenarios:
 
         task_id = await progress_service.add_task(
             name="test_file",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=100.0,
         )
 
@@ -106,13 +106,13 @@ class TestErrorScenarios:
         """Test that task counters are isolated per progress type."""
         # Generate IDs for different types
         download_id1 = progress_service._id_generator.generate_namespaced_id(
-            ProgressType.DOWNLOAD, "file1"
+            Phase.DOWNLOAD, "file1"
         )
         download_id2 = progress_service._id_generator.generate_namespaced_id(
-            ProgressType.DOWNLOAD, "file2"
+            Phase.DOWNLOAD, "file2"
         )
         api_id1 = progress_service._id_generator.generate_namespaced_id(
-            ProgressType.API_FETCHING, "api1"
+            Phase.API_FETCHING, "api1"
         )
 
         # Each type should have its own counter
@@ -132,7 +132,7 @@ class TestErrorScenarios:
         # Test task creation
         task_id = await service.add_task(
             "test_task",
-            ProgressType.DOWNLOAD,
+            Phase.DOWNLOAD,
             total=100.0,
         )
 
@@ -143,7 +143,7 @@ class TestErrorScenarios:
         task_info = service.get_task_info_full(task_id)
         assert task_info is not None
         assert task_info.name == "test_task"
-        assert task_info.progress_type == ProgressType.DOWNLOAD
+        assert task_info.progress_type == Phase.DOWNLOAD
 
         # Test task completion
         await service.finish_task(task_id, success=True)
@@ -161,7 +161,7 @@ class TestErrorScenarios:
 
         task_id = await service.add_task(
             "speed_test.AppImage",
-            ProgressType.DOWNLOAD,
+            Phase.DOWNLOAD,
             total=10000.0,
         )
 
@@ -193,7 +193,7 @@ class TestErrorScenarios:
         for i in range(10):
             await service.add_task(
                 f"task_{i}",
-                ProgressType.DOWNLOAD,
+                Phase.DOWNLOAD,
                 total=100.0,
             )
 
@@ -209,7 +209,7 @@ class TestErrorScenarios:
 
         dl_task = await service.add_task(
             "download.AppImage",
-            ProgressType.DOWNLOAD,
+            Phase.DOWNLOAD,
             total=1000.0,
         )
 
@@ -247,7 +247,7 @@ class TestErrorScenarios:
 
         task_id = await service.add_task(
             "test.AppImage",
-            ProgressType.DOWNLOAD,
+            Phase.DOWNLOAD,
             total=100.0,
         )
 

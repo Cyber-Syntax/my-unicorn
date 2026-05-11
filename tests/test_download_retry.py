@@ -15,7 +15,7 @@ import aiohttp
 import pytest
 
 from my_unicorn.core.download import DownloadService
-from my_unicorn.core.progress.progress import ProgressType
+from my_unicorn.core.progress.progress import Phase
 
 # Test constants
 DEFAULT_RETRY_ATTEMPTS = 3
@@ -395,7 +395,7 @@ class TestDownloadRetryLogic:
 
         # Execute download with progress
         await download_service.download_file(
-            url, dest, progress_type=ProgressType.DOWNLOAD
+            url, dest, progress_type=Phase.DOWNLOAD
         )
 
         # File is too small (< 1MB), so no progress task is created
