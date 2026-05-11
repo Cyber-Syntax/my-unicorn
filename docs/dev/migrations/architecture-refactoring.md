@@ -64,7 +64,7 @@ class DownloadService:
 # In core services (protocol dependency)
 from my_unicorn.core.protocols.progress import (
     ProgressReporter,
-    ProgressType,
+    Phase,
     NullProgressReporter,
 )
 
@@ -82,7 +82,7 @@ class DownloadService:
         # No None checks needed - NullProgressReporter handles inactive state
         task_id = self.progress_reporter.add_task(
             name="Downloading file",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=content_length,
         )
         # Download logic with progress updates
@@ -100,7 +100,7 @@ class DownloadService:
    # Add protocol imports
    from my_unicorn.core.protocols.progress import (
        ProgressReporter,
-       ProgressType,
+       Phase,
        NullProgressReporter,
    )
    ```
@@ -125,12 +125,12 @@ class DownloadService:
    self.progress_reporter.add_task(...)  # NullProgressReporter is a no-op
    ```
 
-4. **Use ProgressType enum** for task categorization:
+4. **Use Phase enum** for task categorization:
 
    ```python
    self.progress_reporter.add_task(
        name="Downloading",
-       progress_type=ProgressType.DOWNLOAD,  # Not a string
+       progress_type=Phase.DOWNLOAD,  # Not a string
        total=file_size,
    )
    ```
@@ -626,7 +626,7 @@ The following changes are internal implementation details and do not affect exte
 # Protocols
 from my_unicorn.core.protocols.progress import (
     ProgressReporter,
-    ProgressType,
+    Phase,
     NullProgressReporter,
 )
 
