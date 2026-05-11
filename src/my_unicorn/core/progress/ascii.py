@@ -522,8 +522,8 @@ class TerminalWriter:
 
 # ASCII section rendering module.
 # Pure functions for rendering progress sections (API, downloads, processing).
-# These functions were extracted from AsciiProgressBackend to improve separation
-# of concerns and testability.
+# These functions were extracted from AsciiProgressBackend for better
+# separation of concerns and testability.
 
 
 @dataclass(frozen=True, slots=True)
@@ -639,8 +639,9 @@ def calculate_dynamic_name_width(
         Width to use for name (either full length or truncated)
 
     """
-    # Fixed width for: size + speed + eta + bar + pct + status
-    fixed_width = 10 + 10 + 5 + 32 + 6 + 1 + 6
+    # Width of right-aligned section: size + speed + eta + bar + pct
+    # Formatted as: "    10.5 MiB    2.3 MB/s 2m 30s [======>     ] 100%"
+    right_section_width = 10 + 1 + 10 + 1 + 7 + 1 + 32 + 1 + 4
 
     if interactive:
         try:
@@ -653,7 +654,7 @@ def calculate_dynamic_name_width(
         terminal_width = 80
 
     # Calculate available space for name
-    available_width = terminal_width - fixed_width
+    available_width = terminal_width - right_section_width
 
     # Use the smaller of: available width or actual name length
     # But ensure a minimum for readability
@@ -685,10 +686,35 @@ def compute_max_name_width(
     return max_name_width
 
 
+def _format_right_section(
+    size: str,
+    speed: str,
+    eta: str,
+    bar: str,
+    pct: str,
+) -> str:
+    """Format the right-aligned section with size, speed, ETA, bar, percentage.
+
+    Args:
+        size: Formatted size string
+        speed: Formatted speed string
+        eta: Formatted ETA string
+        bar: Progress bar string
+        pct: Formatted percentage string
+
+    Returns:
+        Formatted right-aligned section
+
+    """
+    # Build the right section string
+    return f"{size:>10}  {speed:>10} {eta:>7} {bar} {pct:>4}"
+
+
 def format_download_lines(
     task: TaskState,
     max_name_width: int,
     bar_width: int,
+    terminal_width: int | None = None,
 ) -> list[str]:
     """Format lines for a single download task (main + optional error).
 
@@ -696,6 +722,7 @@ def format_download_lines(
         task: TaskState to format
         max_name_width: Maximum width for task name
         bar_width: Width of progress bar
+        terminal_width: Terminal width (auto-detect if None)
 
     Returns:
         List of formatted output lines
@@ -705,50 +732,50 @@ def format_download_lines(
     display_name = compute_display_name(task)
     name = truncate_text(display_name, max_name_width)
 
-    if task.total > 0:
-        size_str = f"{human_mib(task.total):>10}"
-    else:
-        size_str = "    --    "
+    if terminal_width is None:
+        try:
+            terminal_width = shutil.get_terminal_size().columns
+        except (AttributeError, ValueError, OSError):
+            terminal_width = 80
 
-    if task.speed > 0:
-        speed_str = f"{human_speed_bps(task.speed):>10}"
-    else:
-        speed_str = "   --     "
+    size_str = human_mib(task.total) if task.total > 0 else "--"
+    speed_str = human_speed_bps(task.speed) if task.speed > 0 else "--"
 
     if task.speed > 0 and task.total > task.completed:
         remaining_bytes = task.total - task.completed
         eta_seconds = remaining_bytes / task.speed
         eta_str = format_eta(eta_seconds)
     else:
-        eta_str = "00:00"
+        eta_str = "--:--"
 
     bar = render_bar(task.completed, task.total, bar_width)
     pct = format_percentage(task.completed, task.total)
 
-    # Create status info for status determination
+    # Format the right-aligned section
+    right_section = _format_right_section(
+        size_str, speed_str, eta_str, bar, pct
+    )
+
+    # Format: name on left, right section on right with padding
+    name_section = f"{name:<{max_name_width}}"
+    total_length = len(name_section) + len(right_section)
+
+    if total_length < terminal_width:
+        # Add padding to push right section to the right
+        padding = terminal_width - total_length
+        line = f"{name_section}{' ' * padding}{right_section}"
+    else:
+        # Not enough space, just concatenate with single space
+        line = f"{name_section} {right_section}"
+
+    lines.append(line)
+
+    # Create status info for error message display
     status_info = TaskStatusInfo(
         is_finished=task.is_finished,
         success=task.success,
         description=task.description,
         error_message=task.error_message,
-    )
-
-    # Use status symbol, but show empty space for in-progress downloads
-    if status_info.is_finished:
-        if status_info.success:
-            status = "✓"
-        elif status_info.success is False:
-            status = "✖"
-        else:
-            # success is None: finished but outcome not recorded
-            status = "?"
-    else:
-        # In-progress: show empty space
-        status = " "
-
-    lines.append(
-        f"{name:<{max_name_width}} {size_str} {speed_str} "
-        f"{eta_str:>5} {bar} {pct:>6} {status}"
     )
 
     # Show error message if applicable
@@ -898,6 +925,12 @@ def render_downloads_section(
         config.min_name_width,
     )
 
+    # Get terminal width for right-alignment
+    try:
+        terminal_width = shutil.get_terminal_size().columns
+    except (AttributeError, ValueError, OSError):
+        terminal_width = 80
+
     total_downloads = len(download_tasks)
 
     header = OPERATION_NAMES.get(ProgressType.DOWNLOAD)
@@ -906,7 +939,9 @@ def render_downloads_section(
     for task_id in download_tasks:
         task = tasks[task_id]
         lines.extend(
-            format_download_lines(task, max_name_width, config.bar_width)
+            format_download_lines(
+                task, max_name_width, config.bar_width, terminal_width
+            )
         )
 
     # Add total summary line
@@ -926,17 +961,29 @@ def render_downloads_section(
         eta_seconds = remaining_bytes / total_speed if total_speed > 0 else 0
         eta_str = format_eta(eta_seconds)
     else:
-        eta_str = "00:00"
+        eta_str = "--:--"
 
-    size_str = f"{human_mib(total_size):>10}"
-    speed_str = f"{human_speed_bps(total_speed):>10}"
+    size_str = human_mib(total_size)
+    speed_str = human_speed_bps(total_speed)
     bar = render_bar(total_completed, total_size, config.bar_width)
     pct = format_percentage(total_completed, total_size)
 
-    total_line = (
-        f"Total ({completed_count}/{total_downloads})"
-        f" {size_str} {speed_str} {eta_str:>5} {bar} {pct:>6}"
+    # Format the right-aligned section for total line
+    right_section = _format_right_section(
+        size_str, speed_str, eta_str, bar, pct
     )
+
+    # Format total line with left-aligned label and right-aligned metrics
+    total_label = f"Total ({completed_count}/{total_downloads})"
+    name_section = f"{total_label:<{max_name_width}}"
+    total_length = len(name_section) + len(right_section)
+
+    if total_length < terminal_width:
+        padding = terminal_width - total_length
+        total_line = f"{name_section}{' ' * padding}{right_section}"
+    else:
+        total_line = f"{name_section} {right_section}"
+
     lines.append(total_line)
     return lines
 
