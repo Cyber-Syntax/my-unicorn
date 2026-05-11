@@ -22,6 +22,7 @@ class Phase(Enum):
     API_FETCHING = auto()
     DOWNLOAD = auto()
     PROCESSING = auto()
+    SUMMARY = auto()
 
 
 class ProcessingPhase(Enum):
@@ -47,9 +48,8 @@ PHASE_SECTION_LABELS: dict[Phase, str] = {
     Phase.API_FETCHING: ":: Querying upstream releases...",
     Phase.DOWNLOAD: ":: Retrieving appimages...",
     Phase.PROCESSING: ":: Processing package changes...",
+    Phase.SUMMARY: ":: Creating transaction summary...",
 }
-
-TRANSACTION_SUMMARY_HEADER: str = ":: Creating transaction summary..."
 
 # Per-task verbs
 PROCESSING_LABELS: dict[ProcessingPhase, str] = {

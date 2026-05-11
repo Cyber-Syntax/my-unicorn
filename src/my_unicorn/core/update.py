@@ -37,7 +37,7 @@ from my_unicorn.core.post_download import (
     PostDownloadContext,
     PostDownloadProcessor,
 )
-from my_unicorn.core.progress.progress_types import TRANSACTION_SUMMARY_HEADER
+from my_unicorn.core.progress.progress_types import Phase, PHASE_SECTION_LABELS
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,
     ProgressReporter,
@@ -1267,7 +1267,8 @@ def display_update_results(results: dict) -> None:
 
     # If we have detailed info, use formatted summary
     if update_infos:
-        logger.info(TRANSACTION_SUMMARY_HEADER)
+        header = PHASE_SECTION_LABELS.get(Phase.SUMMARY)
+        logger.info(header)
 
         # Show updated apps with version info
         for app_name in updated:

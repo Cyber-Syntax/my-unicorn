@@ -37,7 +37,7 @@ class TestProgressType:
 
     def test_progress_type_count(self) -> None:
         """Expected number of progress types."""
-        assert len(Phase) == 3
+        assert len(Phase) == 4
 
     def test_sub_progress_type_count(self) -> None:
         """Expected number of sub-progress types."""

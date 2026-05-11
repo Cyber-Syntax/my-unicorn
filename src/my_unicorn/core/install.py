@@ -29,7 +29,7 @@ from my_unicorn.core.post_download import (
     PostDownloadContext,
     PostDownloadProcessor,
 )
-from my_unicorn.core.progress.progress_types import TRANSACTION_SUMMARY_HEADER
+from my_unicorn.core.progress.progress_types import PHASE_SECTION_LABELS, Phase
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,
     ProgressReporter,
@@ -135,7 +135,8 @@ def print_install_summary(results: list[dict[str, Any]]) -> None:
         _print_all_already_installed(results)
         return
 
-    logger.info(TRANSACTION_SUMMARY_HEADER)
+    header = PHASE_SECTION_LABELS.get(Phase.SUMMARY)
+    logger.info(header)
 
     for result in results:
         _print_result_line(result)

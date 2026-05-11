@@ -54,6 +54,7 @@ class TestProgressType:
             "API_FETCHING",
             "DOWNLOAD",
             "PROCESSING",
+            "SUMMARY",
         }
 
         actual_types = {pt.name for pt in Phase}
