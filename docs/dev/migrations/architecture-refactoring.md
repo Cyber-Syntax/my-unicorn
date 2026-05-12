@@ -173,7 +173,6 @@ Previously, CLI commands directly instantiated services with complex dependency 
 
 ```python
 # In CLI commands (complex wiring)
-from my_unicorn.core.http_session import create_http_session
 from my_unicorn.core.auth import GitHubAuthManager
 from my_unicorn.core.download import DownloadService
 from my_unicorn.core.verify import VerificationService
