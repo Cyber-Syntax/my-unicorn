@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Consolidated logger to one module for better maintenance and consistency.
 - Consolidate progress modules to two modules as progress/ascii.py and progress/progress.py for better organization and maintainability.
 
+## [2.6.1-alpha] - 2026-05-08
+
+### Fixed
+
+- Fixed redundant status print on update command. (#233)
+
 ## [2.6.0-alpha] - 2026-05-08
 
 ### Added
@@ -1004,6 +1010,7 @@ Please change your current configuration files to the new format. The new format
 - refactor: improve better error handling on verify.py
 - chore: add copilot instructions
 
+[2.6.1-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v2.6.0-alpha...v2.6.1-alpha
 [2.6.0-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v2.5.2-alpha...v2.6.0-alpha
 [2.5.2-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v2.5.1-alpha...v2.5.2-alpha
 [2.5.1-alpha]: https://github.com/Cyber-Syntax/my-unicorn/compare/v2.5.0-alpha...v2.5.1-alpha
