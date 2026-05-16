@@ -4,7 +4,7 @@ from pathlib import Path
 
 from pytest import MonkeyPatch
 
-from my_unicorn.logger.config import load_log_settings
+from my_unicorn.logger import load_log_settings
 
 
 def test_load_log_settings_with_env_var(monkeypatch: MonkeyPatch) -> None:

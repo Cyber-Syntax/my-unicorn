@@ -1295,12 +1295,12 @@ def display_update_results(results: dict) -> None:
             if app_info.is_success:
                 version = app_info.current_version
                 logger.info(
-                    "%-25s Already up to date (%s)",  # noqa: RUF001
+                    "%-25s Already up to date (%s)",
                     app_name,
                     version,
                 )
             else:
-                logger.info("%-25s Already up to date", app_name)  # noqa: RUF001
+                logger.info("%-25s Already up to date", app_name)
 
     else:
         # Fallback to simple logger output

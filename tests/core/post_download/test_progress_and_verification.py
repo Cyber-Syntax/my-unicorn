@@ -12,7 +12,7 @@ from my_unicorn.core.post_download import (
     PostDownloadContext,
     PostDownloadProcessor,
 )
-from my_unicorn.core.progress.display import ProgressDisplay
+from my_unicorn.core.progress import ProgressDisplay
 from my_unicorn.core.protocols.progress import NullProgressReporter
 from my_unicorn.exceptions import VerificationError
 
@@ -32,8 +32,7 @@ class TestSetupProgressTracking:
         processor_instance.progress_reporter = mock_display
 
         with patch(
-            "my_unicorn.core.progress.display_workflows"
-            ".create_installation_workflow",
+            "my_unicorn.core.progress.create_installation_workflow",
             new_callable=AsyncMock,
         ) as mock_create_workflow:
             mock_create_workflow.return_value = (
@@ -77,8 +76,7 @@ class TestSetupProgressTracking:
         processor_instance.progress_reporter = mock_display
 
         with patch(
-            "my_unicorn.core.progress.display_workflows"
-            ".create_installation_workflow",
+            "my_unicorn.core.progress.create_installation_workflow",
             new_callable=AsyncMock,
         ) as mock_create_workflow:
             mock_create_workflow.return_value = ("ver_123", "install_456")

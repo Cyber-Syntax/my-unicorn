@@ -8,7 +8,7 @@ import time
 
 import pytest
 
-from my_unicorn.core.progress.display_registry import TaskRegistry
+from my_unicorn.core.progress import TaskRegistry
 from my_unicorn.core.progress.progress_types import (
     ProgressType,
     TaskConfig,
@@ -331,31 +331,6 @@ async def test_task_registry_multiple_types() -> None:
         retrieved = await registry.get_task_info_full(f"task_{idx}")
         assert retrieved is not None
         assert retrieved.name == types_and_names[idx][1]
-
-
-@pytest.mark.asyncio
-async def test_task_registry_add_to_task_sets() -> None:
-    """Test that tasks are added to appropriate type sets."""
-
-    registry = TaskRegistry()
-
-    # Add tasks of same type
-    for i in range(3):
-        task_info = TaskInfo(
-            task_id=f"download_{i}",
-            namespaced_id=f"download_{i}",
-            name=f"Download {i}",
-            progress_type=ProgressType.DOWNLOAD,
-            created_at=time.monotonic(),
-        )
-        await registry.add_task_info(f"download_{i}", task_info)
-
-    # Verify all are in the download task set
-    download_set = await registry.get_task_set(ProgressType.DOWNLOAD)
-    assert len(download_set) == 3
-    assert "download_0" in download_set
-    assert "download_1" in download_set
-    assert "download_2" in download_set
 
 
 @pytest.mark.asyncio

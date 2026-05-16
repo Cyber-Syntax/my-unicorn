@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from my_unicorn.core.progress.display_logger import LoggerSuppression
+from my_unicorn.core.progress import LoggerSuppression
 
 
 class TestLoggerSuppressionContext:

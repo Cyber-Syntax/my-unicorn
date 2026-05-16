@@ -5,7 +5,7 @@ from __future__ import annotations
 import io
 from unittest.mock import MagicMock
 
-from my_unicorn.core.progress.ascii_output import TerminalWriter
+from my_unicorn.core.progress.ascii import TerminalWriter
 
 
 class TestTerminalWriterInit:

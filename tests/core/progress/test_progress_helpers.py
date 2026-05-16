@@ -1,6 +1,6 @@
 import io
 
-from my_unicorn.core.progress.ascii_sections import format_download_lines
+from my_unicorn.core.progress.ascii import format_download_lines
 from my_unicorn.core.progress.progress import (
     AsciiProgressBackend,
     ProgressConfig,
@@ -17,7 +17,7 @@ def make_backend():
 
 
 def test_compute_display_name_strips_appimage():
-    from my_unicorn.core.progress.ascii_format import compute_display_name
+    from my_unicorn.core.progress.ascii import compute_display_name
 
     task = TaskState(
         task_id="t1",

@@ -192,9 +192,7 @@ class TestDisplayUpdateResults:
             mock_logger.info.assert_any_call(
                 "✓ Successfully updated: %s", "app1"
             )
-            mock_logger.error.assert_any_call(
-                "× Failed to update: %s", "app2"
-            )
+            mock_logger.error.assert_any_call("× Failed to update: %s", "app2")
             mock_logger.info.assert_any_call("Already up to date: %s", "app3")
 
     def test_display_update_results_mixed(self, caplog):

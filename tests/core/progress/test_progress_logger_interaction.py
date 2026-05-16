@@ -21,7 +21,7 @@ from logging.handlers import RotatingFileHandler
 
 import pytest
 
-from my_unicorn.core.progress.display import ProgressDisplay
+from my_unicorn.core.progress import ProgressDisplay
 from my_unicorn.core.progress.progress_types import ProgressType
 from my_unicorn.logger import _state, get_logger
 
