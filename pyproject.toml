@@ -1,38 +1,20 @@
 [project]
 name = 'my-unicorn'
-version = '2.6.1-alpha'
+version = '2.6.2-alpha'
 license = { text = "GPL-3.0-or-later" }
 description = 'My Unicorn is a command-line tool to manage AppImages on Linux. It allows users to install, update, and manage AppImages from GitHub repositories easily. It is designed to simplify the process of handling AppImages, making it more convenient for users to keep their applications up-to-date.'
 keywords = ["appimage", "appimage-manager"]
-requires-python = ">= 3.12"
+requires-python = ">= 3.12,<3.14"
 authors = [{ name = "Cyber-Syntax" }]
 dependencies = [
-  "aiofiles",
-  "aiohttp",
-  "asyncio",
-  "orjson",
-  "uvloop",
-  "keyring",
-  "packaging",
-  "pyyaml",
-  "jsonschema",
-  "aiohappyeyeballs",
-  "aiosignal",
-  "attrs",
-  "cffi",
-  "cryptography",
-  "frozenlist",
-  "idna",
-  "jaraco-classes",
-  "jaraco-context",
-  "jaraco-functools",
-  "jeepney",
-  "more-itertools",
-  "multidict",
-  "propcache",
-  "pycparser",
-  "secretstorage",
-  "yarl",
+  "aiohttp>=3.12",
+  "aiofiles>=25",
+  "uvloop>=0.21; platform_system != 'Windows'",
+  "keyring>=25",
+  "packaging>=25",
+  "jsonschema>=4.23",
+  "pyyaml>=5",
+  "orjson>=3.10",
 ]
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -58,17 +40,16 @@ my-unicorn = "my_unicorn.main:main"
 
 [dependency-groups]
 dev = [
-  "pytest",
-  "pytest-cov",
-  "pytest-mock",
-  "pytest-asyncio",
-  "pytest-env",
-  "aioresponses",
-  "requests",
-  "mypy",
-  "types-pyyaml",
+  "pytest>=9",
+  "pytest-cov>=6",
+  "pytest-mock>=3",
+  "pytest-asyncio>=1",
+  "mypy>=1",
+  "pip-audit>=2",
+  "aioresponses>=0.6.4",
+  "requests>=2",
 ]
-lint = ["ruff"]
+lint = ["ruff>=0.15"]
 
 [build-system]
 requires = ["setuptools", "wheel"]
@@ -77,6 +58,7 @@ build-backend = "setuptools.build_meta"
 [tool.uv]
 managed = true
 required-environments = ["sys_platform == 'linux'"]
+exclude-newer = "7 days"
 
 [tool.setuptools.package-data]
 #NOTE: include all JSON files in the specified directories for inclusion in the package
@@ -90,7 +72,7 @@ include = ["my_unicorn*"]
 source = ["my_unicorn"]
 
 [tool.pytest.ini_options]
-addopts = ["--import-mode=importlib"]
+addopts = "--cov=src --cov-fail-under=80 --cov-report=html --cov-report=term-missing"
 testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
@@ -194,8 +176,8 @@ lines-between-types = 0
 
 [tool.ruff.lint.per-file-ignores]
 "scripts/*.py" = [
-  "INP001",  # Scripts are standalone, not part of a package
-  "T201",    # print() is expected in CLI scripts
+  "INP001", # Scripts are standalone, not part of a package
+  "T201",   # print() is expected in CLI scripts
 ]
 "test_*.py" = [
   "S101",    # asserts allowed in tests...
