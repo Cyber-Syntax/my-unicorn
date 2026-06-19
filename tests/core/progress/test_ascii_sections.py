@@ -6,7 +6,7 @@ including SectionRenderConfig dataclass and pure rendering functions.
 
 from __future__ import annotations
 
-from my_unicorn.core.progress.ascii_sections import (
+from my_unicorn.core.progress.ascii import (
     SectionRenderConfig,
     calculate_dynamic_name_width,
     compute_max_name_width,
@@ -15,7 +15,6 @@ from my_unicorn.core.progress.ascii_sections import (
     render_api_section,
     render_downloads_section,
     render_processing_section,
-    select_current_task,
 )
 from my_unicorn.core.progress.progress_types import (
     DEFAULT_MIN_NAME_WIDTH,
@@ -52,75 +51,6 @@ class TestSectionRenderConfig:
 
         assert config.bar_width == 20
         assert config.min_name_width == 10
-
-
-class TestSelectCurrentTask:
-    """Test cases for select_current_task function."""
-
-    def test_select_current_task_returns_first_unfinished(self) -> None:
-        """Test that first unfinished task is selected."""
-        task1 = TaskState(
-            task_id="t1",
-            name="Task 1",
-            progress_type=ProgressType.VERIFICATION,
-            is_finished=False,
-        )
-        task2 = TaskState(
-            task_id="t2",
-            name="Task 2",
-            progress_type=ProgressType.VERIFICATION,
-            is_finished=False,
-        )
-
-        result = select_current_task([task1, task2])
-        assert result == task1
-
-    def test_select_current_task_returns_failed_when_all_finished(
-        self,
-    ) -> None:
-        """Test that failed task is selected when all finished."""
-        task1 = TaskState(
-            task_id="t1",
-            name="Task 1",
-            progress_type=ProgressType.VERIFICATION,
-            is_finished=True,
-            success=True,
-        )
-        task2 = TaskState(
-            task_id="t2",
-            name="Task 2",
-            progress_type=ProgressType.VERIFICATION,
-            is_finished=True,
-            success=False,
-        )
-
-        result = select_current_task([task1, task2])
-        assert result == task2
-
-    def test_select_current_task_returns_last_when_all_completed(self) -> None:
-        """Test that last task is selected when all completed successfully."""
-        task1 = TaskState(
-            task_id="t1",
-            name="Task 1",
-            progress_type=ProgressType.VERIFICATION,
-            is_finished=True,
-            success=True,
-        )
-        task2 = TaskState(
-            task_id="t2",
-            name="Task 2",
-            progress_type=ProgressType.VERIFICATION,
-            is_finished=True,
-            success=True,
-        )
-
-        result = select_current_task([task1, task2])
-        assert result == task2
-
-    def test_select_current_task_empty_list_returns_none(self) -> None:
-        """Test that None is returned for empty list."""
-        result = select_current_task([])
-        assert result is None
 
 
 class TestCalculateDynamicNameWidth:
