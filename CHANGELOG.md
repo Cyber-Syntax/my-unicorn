@@ -12,6 +12,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Consolidated logger to one module for better maintenance and consistency.
 - Consolidate progress modules to two modules as progress/ascii.py and progress/progress.py for better organization and maintainability.
 
+## [2.6.2-alpha] - 2026-06-02
+
+### Fixed
+
+- Fixed using inner dependencies in pyproject.toml instead of parent dependency.
+- Constraints dependency versions to prevent supply chain attacks, unexpected behavior, and security vulnerabilities.
+
+### Changed
+
+- Updated dependencies to latest versions.
+
 ## [2.6.1-alpha] - 2026-05-08
 
 ### Fixed
@@ -24,13 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added new appimage supports; spotube, helium-linux, muffon, pear-desktop, simpmusic.
 - Install script (install.sh) improvements:
-    - Improved argument parsing and error handling for better user experience.
-    - Added support for uninstalling my-unicorn via `./install.sh -u` or `./install.sh --uninstall` command.
-    - Added support for installing my-unicorn via tag base install via `./install.sh -i`, `./install.sh --install` or specific tag install via `./install.sh -i <tag>` or `./install.sh --install <tag>` command.
-        - Example: `./install.sh -i 2.5.0-alpha` or `./install.sh --install 2.5.0-alpha` to install specific tag version.
+  - Improved argument parsing and error handling for better user experience.
+  - Added support for uninstalling my-unicorn via `./install.sh -u` or `./install.sh --uninstall` command.
+  - Added support for installing my-unicorn via tag base install via `./install.sh -i`, `./install.sh --install` or specific tag install via `./install.sh -i <tag>` or `./install.sh --install <tag>` command.
+    - Example: `./install.sh -i 2.5.0-alpha` or `./install.sh --install 2.5.0-alpha` to install specific tag version.
 - autocomplete.bash script improvements:
-    - Added error handling for unknown arguments and missing arguments.
-    - Improved argument parsing logic for better user experience.
+  - Added error handling for unknown arguments and missing arguments.
+  - Improved argument parsing logic for better user experience.
 - Added support to keep hash checksum of downloaded appimage in app state config even if verification fails. (by @SAY-5 #245 in #313)
 - Added support to keep github api digest of downloaded appimage in app state config even if verification fails.
 
@@ -133,7 +144,7 @@ Updated types-pyyaml v6.0.12.20250915 -> v6.0.12.20260408
 ```
 
 - For developers:
-    - Consolidated backup modules to one backup.py module for better organization and maintainability.
+  - Consolidated backup modules to one backup.py module for better organization and maintainability.
 
 ### Fixed
 
@@ -150,16 +161,16 @@ Updated types-pyyaml v6.0.12.20250915 -> v6.0.12.20260408
 ### Added
 
 - Single‑instance support across the CLI by introducing a process‑level lock file.
-    - New `LockManager` class uses `fcntl.flock` for exclusive locking.
-    - `CLIRunner` now acquires/releases the lock around command execution.
-    - `LockError` exception added for lock acquisition failures.
-    - `LOCKFILE_PATH` constant defined in `constants.py`.
+  - New `LockManager` class uses `fcntl.flock` for exclusive locking.
+  - `CLIRunner` now acquires/releases the lock around command execution.
+  - `LockError` exception added for lock acquisition failures.
+  - `LOCKFILE_PATH` constant defined in `constants.py`.
 
 - Comprehensive test coverage for the new locking feature.
-    - Unit tests verify `LOCKFILE_PATH` and `LockError` behavior.
-    - Integration tests exercise `LockManager` and `CLIRunner` under success and failure scenarios.
-    - End‑to‑end CLI tests confirm that only one process can run at a time.
-    - Exception tests updated to include lock‑related error messages.
+  - Unit tests verify `LOCKFILE_PATH` and `LockError` behavior.
+  - Integration tests exercise `LockManager` and `CLIRunner` under success and failure scenarios.
+  - End‑to‑end CLI tests confirm that only one process can run at a time.
+  - Exception tests updated to include lock‑related error messages.
 
 - Documentation for the single‑instance feature, including architecture details, flow diagrams, and failure modes.
 
@@ -174,38 +185,38 @@ Updated types-pyyaml v6.0.12.20250915 -> v6.0.12.20260408
 - Created `ProgressReporter` protocol for UI decoupling from core modules
 - Introduced `ServiceContainer` for dependency injection and service lifecycle management
 - Implemented domain-specific exception hierarchy with `MyUnicornError` base class:
-    - `VerificationError` with `HashMismatchError`, `HashUnavailableError`, `HashComputationError`
-    - `WorkflowError` with `InstallError`, `UpdateError`, `PostProcessingError`
-    - `NetworkError` with `DownloadError`, `GitHubAPIError`
-    - Added `is_retryable` and `retry_after` attributes for retry logic
+  - `VerificationError` with `HashMismatchError`, `HashUnavailableError`, `HashComputationError`
+  - `WorkflowError` with `InstallError`, `UpdateError`, `PostProcessingError`
+  - `NetworkError` with `DownloadError`, `GitHubAPIError`
+  - Added `is_retryable` and `retry_after` attributes for retry logic
 - Added async file I/O support using `aiofiles` library for non-blocking downloads
 - Added `NullProgressReporter` implementing null object pattern for optional progress tracking
 - Added comprehensive Raises sections to all public method docstrings in workflow modules for better error documentation
 - Added async safety documentation to class docstrings explaining thread safety and concurrent access patterns
 - Enhanced in-memory caching documentation with performance metrics and thread safety notes
 - Extended `app_state_v2.schema.json` with new verification fields for enhanced state tracking:
-    - `overall_passed`: Boolean indicating if any verification method succeeded
-    - `actual_method`: Enum (`digest`|`checksum_file`|`skip`) indicating which method was used
-    - `warning`: Optional warning message for unverified installations
-    - `methods[].digest`: Alternative single hash field (replaces separate computed/expected)
+  - `overall_passed`: Boolean indicating if any verification method succeeded
+  - `actual_method`: Enum (`digest`|`checksum_file`|`skip`) indicating which method was used
+  - `warning`: Optional warning message for unverified installations
+  - `methods[].digest`: Alternative single hash field (replaces separate computed/expected)
 - Extended `cache_release.schema.json` with `checksum_files[]` array for caching downloaded checksum files:
-    - Stores source URL, filename, algorithm, and hash mappings
-    - Enables verification reuse without re-downloading checksum files
+  - Stores source URL, filename, algorithm, and hash mappings
+  - Enables verification reuse without re-downloading checksum files
 - Added `get_checksum_files()`, `has_checksum_files()`, and `get_checksum_file_for_asset()` methods to `CacheManager`
 - Test support for bulk updates and stronger CLI coverage
-    - Added `test_update_all_cmd` and a `--update-all` test flag in `scripts/test.py` to validate "update all" workflows.
+  - Added `test_update_all_cmd` and a `--update-all` test flag in `scripts/test.py` to validate "update all" workflows.
 - Significant test coverage increases and reorganization
-    - Dozens of focused unit tests added across progress, verification, update and utils (representative files: `tests/core/progress/test_ascii_format.py`, `test_ascii_sections.py`, `test_ascii_output.py`, `test_display_id.py`).
-    - Tests reorganized for clearer scopes and faster discovery (see `tests/cli/`, `tests/core/`, `tests/config/`, `tests/utils/`).
-    - Added 100+ tests covering schema validation, cache operations, and verification workflows
+  - Dozens of focused unit tests added across progress, verification, update and utils (representative files: `tests/core/progress/test_ascii_format.py`, `test_ascii_sections.py`, `test_ascii_output.py`, `test_display_id.py`).
+  - Tests reorganized for clearer scopes and faster discovery (see `tests/cli/`, `tests/core/`, `tests/config/`, `tests/utils/`).
+  - Added 100+ tests covering schema validation, cache operations, and verification workflows
 
 ### Changed
 
 - setup.sh script renamed to install.sh and updated installation commands:
-    - Production install command updated:
-        - Use `./install.sh -i` or `./install.sh --install` to perform a standard installation.
-    - Development install command updated:
-        - Use `./install.sh -e` or `./install.sh --editable` to install in editable mode.
+  - Production install command updated:
+    - Use `./install.sh -i` or `./install.sh --install` to perform a standard installation.
+  - Development install command updated:
+    - Use `./install.sh -e` or `./install.sh --editable` to install in editable mode.
 - Refactored core architecture to use dependency injection via `ServiceContainer`
 - Replaced UI dependencies in core modules with protocol-based abstractions (`ProgressReporter`)
 - Refactored `DownloadService` and `VerificationService` to use `ProgressReporter` protocol
@@ -222,44 +233,44 @@ Updated types-pyyaml v6.0.12.20250915 -> v6.0.12.20260408
 - Update workflow recalculates verification state with fresh hashes instead of preserving stale data
 - Enhanced `StateVerification` and `VerificationMethod` TypedDicts with comprehensive docstrings
 - Large internal refactors to improve modularity and maintainability
-    - Verification: replaced the monolithic checksum parser with a `checksum_parser/` package (specialized parsers + detector/normalizer) and split the verification service into focused modules (detection, helpers, execution, verification methods).
-        - Result: `service.py` shrank from ~1322 → 437 lines; multiple mypy issues fixed.
-    - Update & logging subsystems decomposed into smaller modules:
-        - `update.py` split into `context.py`, `catalog_cache.py`, `manager.py`, `workflows.py`.
-        - `logger.py` split into 6 focused modules while preserving the singleton API via re-exports.
-        - Fixes and test updates made during the split (no behavioral changes to public CLI).
-    - Progress/display rework — moved from `ui` to `core/progress` and extracted many helpers (`ascii_format`, `ascii_sections`, `ascii_output`, `display_id`, `display_registry`, `display_logger`, `display_session`, `display_workflows`).
-        - Keeps prior public behavior while improving SRP, testability and code size.
-        - Import paths updated throughout CLI and tests.
+  - Verification: replaced the monolithic checksum parser with a `checksum_parser/` package (specialized parsers + detector/normalizer) and split the verification service into focused modules (detection, helpers, execution, verification methods).
+    - Result: `service.py` shrank from ~1322 → 437 lines; multiple mypy issues fixed.
+  - Update & logging subsystems decomposed into smaller modules:
+    - `update.py` split into `context.py`, `catalog_cache.py`, `manager.py`, `workflows.py`.
+    - `logger.py` split into 6 focused modules while preserving the singleton API via re-exports.
+    - Fixes and test updates made during the split (no behavioral changes to public CLI).
+  - Progress/display rework — moved from `ui` to `core/progress` and extracted many helpers (`ascii_format`, `ascii_sections`, `ascii_output`, `display_id`, `display_registry`, `display_logger`, `display_session`, `display_workflows`).
+    - Keeps prior public behavior while improving SRP, testability and code size.
+    - Import paths updated throughout CLI and tests.
 - Documentation & housekeeping
-    - UI docs clarified and examples expanded (`docs/ui.md`).
-    - Minor repo maintenance: `.gitignore` and `AGENTS.md` improved for clarity.
+  - UI docs clarified and examples expanded (`docs/ui.md`).
+  - Minor repo maintenance: `.gitignore` and `AGENTS.md` improved for clarity.
 
 ### Fixed
 
 - **Critical Bug Fix: Hash Detection in Checksum Verification**
-    - Fixed a critical bug where hexadecimal checksums were incorrectly processed as base64, causing hash detection failure called `binascii.Error: Incorrect padding` during verification for certain apps (e.g., Heroic, QOwnNotes) that use latest-linux.yml file with hex hashes.
-    - This fix ensures that the normalization function correctly detects and processes both hex and base64 encodings, preventing corruption of hex hashes and allowing all verification methods to function properly.
-    - Hex hashes (e.g., from Heroic, QOwnNotes) are now preserved without corruption
-    - Base64 hashes (e.g., from Legcord, Superproductivity) continue to work correctly
+  - Fixed a critical bug where hexadecimal checksums were incorrectly processed as base64, causing hash detection failure called `binascii.Error: Incorrect padding` during verification for certain apps (e.g., Heroic, QOwnNotes) that use latest-linux.yml file with hex hashes.
+  - This fix ensures that the normalization function correctly detects and processes both hex and base64 encodings, preventing corruption of hex hashes and allowing all verification methods to function properly.
+  - Hex hashes (e.g., from Heroic, QOwnNotes) are now preserved without corruption
+  - Base64 hashes (e.g., from Legcord, Superproductivity) continue to work correctly
 - Fixed update command not refreshing verification data when updating to new versions
 - Fixed `VerificationError` not being raised when all verification methods fail
 - Fixed checksum file references not persisting to cache JSON files
 - Corrected asynchronous and protocol issues in progress reporting
-    - `ProgressReporter` protocol methods made `async def`; `NullProgressReporter` and related callers updated; added protocol-compliance tests.
+  - `ProgressReporter` protocol methods made `async def`; `NullProgressReporter` and related callers updated; added protocol-compliance tests.
 - Reliability fixes in post-download and verification flows
-    - Guarded hash-retrieval in `PostDownloadProcessor` and improved null-safety checks.
+  - Guarded hash-retrieval in `PostDownloadProcessor` and improved null-safety checks.
 - Test and typing fixes uncovered by the refactors
-    - Multiple test failures resolved (including patched instantiation sites for `DownloadService` / `PostDownloadProcessor`); `test_update.py` suite fully passing after fixes.
+  - Multiple test failures resolved (including patched instantiation sites for `DownloadService` / `PostDownloadProcessor`); `test_update.py` suite fully passing after fixes.
 
 ### Removed
 
 - Legacy venv-wrapper.bash script and install functionality removed from install.sh.
 - Removed legacy/monolithic and obsolete modules
-    - Deleted legacy `checksum_parser.py` (replaced by the new `checksum_parser/` package).
-    - Removed old monolithic `update.py` / `logger.py` implementations (functionality preserved in new modules).
-    - Deleted obsolete UI helper `src/my_unicorn/ui/display_common.py` and other unused legacy files.
-    - Removed several deprecated test-package `__init__` files as the test layout was modernized.
+  - Deleted legacy `checksum_parser.py` (replaced by the new `checksum_parser/` package).
+  - Removed old monolithic `update.py` / `logger.py` implementations (functionality preserved in new modules).
+  - Deleted obsolete UI helper `src/my_unicorn/ui/display_common.py` and other unused legacy files.
+  - Removed several deprecated test-package `__init__` files as the test layout was modernized.
 
 ### Notes
 
@@ -332,37 +343,37 @@ Updated types-pyyaml v6.0.12.20250915 -> v6.0.12.20260408
 ### Breaking Changes
 
 - **Config Module Refactor**: Removed backward compatibility classes from config module
-    - `DirectoryManager` class removed - use `Paths` class instead
-    - `CatalogManager` alias removed - use `CatalogLoader` directly
-    - Import paths remain the same: `from my_unicorn.config import Paths, CatalogLoader`
-    - All functionality preserved through `Paths` class static methods
+  - `DirectoryManager` class removed - use `Paths` class instead
+  - `CatalogManager` alias removed - use `CatalogLoader` directly
+  - Import paths remain the same: `from my_unicorn.config import Paths, CatalogLoader`
+  - All functionality preserved through `Paths` class static methods
 - **Config Format Migration**: Application configuration format changed from v1.0.0 to v2.0.0
-    - Manual migration required via `my-unicorn migrate` command before use
-    - Automatic backups created during migration (.json.backup files)
-    - Config v2 uses hybrid structure: catalog apps store only state + catalog_ref, URL apps store full config in overrides
+  - Manual migration required via `my-unicorn migrate` command before use
+  - Automatic backups created during migration (.json.backup files)
+  - Config v2 uses hybrid structure: catalog apps store only state + catalog_ref, URL apps store full config in overrides
 - **Global Config**: Global configuration version updated to 1.0.2
 - **Command Rename**: `list` command deprecated in favor of `catalog` command (removed entirely)
 
 ### Added
 
 - **JSON Schema Validation**: Comprehensive validation for catalog and app state configurations
-    - Auto-detection of v1 vs v2 config formats
-    - Runtime validation at load/save operations
-    - Clear error messages with JSON path references
-    - IDE support via .schema.json files
+  - Auto-detection of v1 vs v2 config formats
+  - Runtime validation at load/save operations
+  - Clear error messages with JSON path references
+  - IDE support via .schema.json files
 - **App Descriptions**: Added descriptions for all 27 catalog applications
 - **Catalog Command**: Enhanced `catalog` command with app descriptions
-    - `catalog --available` shows apps with descriptions
-    - `catalog --info <app-name>` displays detailed app information
+  - `catalog --available` shows apps with descriptions
+  - `catalog --info <app-name>` displays detailed app information
 - **Migration Infrastructure**: Complete v1→v2 migration system
-    - Dedicated `migration/` package with modular structure
-    - Automatic backup creation before migration
-    - Support for both catalog and URL-installed apps
-    - Post-migration validation with schema checking
+  - Dedicated `migration/` package with modular structure
+  - Automatic backup creation before migration
+  - Support for both catalog and URL-installed apps
+  - Post-migration validation with schema checking
 - **Verification Warnings**: Installation proceeds with warnings when no verification methods available
-    - Clear security warnings for users
-    - Progress display shows ⚠ symbol for unverified installs
-    - Detailed logging for debugging
+  - Clear security warnings for users
+  - Progress display shows ⚠ symbol for unverified installs
+  - Detailed logging for debugging
 
 ### Changed
 
@@ -370,47 +381,47 @@ Updated types-pyyaml v6.0.12.20250915 -> v6.0.12.20260408
 - **Upgrade Process Update**: Use 'uv tool upgrade' command and enhance test coverage
 - **Documentation Enhancement**: Enhanced readme, updated todo.md, and added comprehensive config documentation
 - **Config Structure**: New hybrid v2 configuration format
-    - Catalog apps: Minimal config (state + catalog_ref pointing to catalog filename)
-    - URL apps: Full config stored in overrides section
-    - Improved separation of concerns and reduced duplication
+  - Catalog apps: Minimal config (state + catalog_ref pointing to catalog filename)
+  - URL apps: Full config stored in overrides section
+  - Improved separation of concerns and reduced duplication
 - **Verification State**: Enhanced verification tracking in app state
-    - Multiple verification methods tracked per installation
-    - Detailed status for each method (type, algorithm, hashes, source)
-    - Properly saves `passed: false` when no verification occurs
+  - Multiple verification methods tracked per installation
+  - Detailed status for each method (type, algorithm, hashes, source)
+  - Properly saves `passed: false` when no verification occurs
 - **Icon State**: Improved icon state tracking
-    - Method field indicates extraction vs download
-    - Accurate migration from v1 extraction boolean
+  - Method field indicates extraction vs download
+  - Accurate migration from v1 extraction boolean
 - **Icon Handling**: Refactored to extract icons from AppImage only (no external download)
-    - Removed download method from icon handling
-    - Catalog JSON files updated to remove download_url entries
-    - New extract_icon_from_appimage() function in file_ops.py
+  - Removed download method from icon handling
+  - Catalog JSON files updated to remove download_url entries
+  - New extract_icon_from_appimage() function in file_ops.py
 - **Migration Organization**: Refactored migration code into dedicated package
-    - `migration/base.py` - Common utilities
-    - `migration/app_config.py` - App config migration
-    - `migration/catalog_config.py` - Catalog config migration
-    - `migration/global_config.py` - Global config migration
-    - Eliminated code duplication
+  - `migration/base.py` - Common utilities
+  - `migration/app_config.py` - App config migration
+  - `migration/catalog_config.py` - Catalog config migration
+  - `migration/global_config.py` - Global config migration
+  - Eliminated code duplication
 - **Command Refactoring**: Renamed deprecated `list` command to `catalog` with enhanced features
-    - Use new `catalog` command instead of `list`
+  - Use new `catalog` command instead of `list`
 - **Logging Improvements**: Replaced print statements with logger for CLI output
-    - Introduced SimpleConsoleFormatter for clean console messages
-    - Improved logging consistency and error reporting
+  - Introduced SimpleConsoleFormatter for clean console messages
+  - Improved logging consistency and error reporting
 
 ### Fixed
 
 - **Icon Migration**: Fixed v1→v2 migration incorrectly setting icon.method to "download"
-    - Now correctly checks source field first, then falls back to extraction boolean
-    - Affects apps like tagspaces, super-productivity with extraction+URL
+  - Now correctly checks source field first, then falls back to extraction boolean
+  - Affects apps like tagspaces, super-productivity with extraction+URL
 - **Catalog App Verification**: Fixed checksum_file verification not preserved during migration
-    - Migration now consults catalog for correct verification method
-    - Apps like standard-notes properly migrated
+  - Migration now consults catalog for correct verification method
+  - Apps like standard-notes properly migrated
 - **URL Install Config**: Fixed URL-installed apps creating empty overrides in source fields
-    - Now properly populates source section in overrides
+  - Now properly populates source section in overrides
 - **Migration Command**: Fixed migrate command failing on v1 configs
-    - Now reads raw JSON directly instead of using load_app_config validation
+  - Now reads raw JSON directly instead of using load_app_config validation
 - **Catalog Reference**: Fixed catalog apps incorrectly migrated as URL apps
-    - catalog_ref now maps to catalog filename (app_name), not repo name
-    - No overrides added to catalog apps during migration
+  - catalog_ref now maps to catalog filename (app_name), not repo name
+  - No overrides added to catalog apps during migration
 - **Beekeeper Studio Naming**: Fixed wrong catalog filename from beekeper-studio to beekeeper-studio
 - **Icon Method Mapping**: Fixed deprecated download method mapping during migration
 - **Backup Migration**: Removed automatic migration, now fully folder-based structure
@@ -419,24 +430,24 @@ Updated types-pyyaml v6.0.12.20250915 -> v6.0.12.20260408
 ### Removed
 
 - **Legacy Config Support**: Removed support for v1 configuration format
-    - Post-migration, only v2 configs accepted
-    - Simplifies codebase and maintenance
+  - Post-migration, only v2 configs accepted
+  - Simplifies codebase and maintenance
 - **List Command Alias**: Completely removed `list` command
-    - Use new `catalog` command instead
-    - No backward compatible alias maintained
+  - Use new `catalog` command instead
+  - No backward compatible alias maintained
 - **Old Migration Code**: Removed legacy migration code from main modules
-    - All migration logic now in dedicated `migration/` package
-    - Cleaner separation of concerns
+  - All migration logic now in dedicated `migration/` package
+  - Cleaner separation of concerns
 - **Icon Download Logic**: Completely removed icon download functionality
-    - Now extracts icons directly from AppImage files
-    - Removed download_url entries from all catalog configurations
+  - Now extracts icons directly from AppImage files
+  - Removed download_url entries from all catalog configurations
 - **Backup Migration**: Removed automatic migration from old flat backup format to folder-based structure
-    - Users with old backups (\*.backup.AppImage) should manually reorganize them if needed
-    - New installations and users who already migrated are unaffected
-    - Backup system now exclusively uses folder-based structure with metadata.json
+  - Users with old backups (\*.backup.AppImage) should manually reorganize them if needed
+  - New installations and users who already migrated are unaffected
+  - Backup system now exclusively uses folder-based structure with metadata.json
 - **Show Progress Parameter**: Removed show_progress parameter from download methods
-    - Progress always enabled for install/update operations
-    - Download progress conditionally shown based on file size
+  - Progress always enabled for install/update operations
+  - Download progress conditionally shown based on file size
 - **Deprecated Classes**: Removed old icon handler classes and unused tool scripts
 - **Deprecated Progress Methods**: Removed deprecated task creation methods from progress service
 
@@ -445,33 +456,33 @@ Updated types-pyyaml v6.0.12.20250915 -> v6.0.12.20260408
 #### Migrating from v1.x to v2.0.0
 
 1. **beekeeper-studio name**:
-    - (Recommended) If you use beekeeper-studio, remove the app before migration to v2.0.0 and reinstall after migration to avoid issues.
-    - You can manually rename your config and desktop files for Beekeeper Studio if you migrated before reinstalling:
-        1. Rename `~/.config/my-unicorn/apps/beekeper-studio.json` to `beekeeper-studio.json`.
-        2. Rename `~/.local/share/applications/beekeper-studio.desktop` to `beekeeper-studio.desktop`.
-        3. Update `catalog_ref` field in the config file to `beekeeper-studio`.
+   - (Recommended) If you use beekeeper-studio, remove the app before migration to v2.0.0 and reinstall after migration to avoid issues.
+   - You can manually rename your config and desktop files for Beekeeper Studio if you migrated before reinstalling:
+     1. Rename `~/.config/my-unicorn/apps/beekeper-studio.json` to `beekeeper-studio.json`.
+     2. Rename `~/.local/share/applications/beekeper-studio.desktop` to `beekeeper-studio.desktop`.
+     3. Update `catalog_ref` field in the config file to `beekeeper-studio`.
 
 2. **Run migration command**:
 
-    ```bash
-    my-unicorn migrate
-    ```
+   ```bash
+   my-unicorn migrate
+   ```
 
 3. **Migration process**:
-    - Automatically detects v1 configs in `~/.config/my-unicorn/apps/`
-    - Creates `.json.backup` files before migration
-    - Converts to v2 format with appropriate structure
-    - Validates migrated configs against JSON schema
+   - Automatically detects v1 configs in `~/.config/my-unicorn/apps/`
+   - Creates `.json.backup` files before migration
+   - Converts to v2 format with appropriate structure
+   - Validates migrated configs against JSON schema
 
 4. **After migration**:
-    - Review migrated configs in `~/.config/my-unicorn/apps/`
-    - Backups available in `~/.config/my-unicorn/apps/backups/`
-    - Use `catalog` command instead of `list` (alias still works)
+   - Review migrated configs in `~/.config/my-unicorn/apps/`
+   - Backups available in `~/.config/my-unicorn/apps/backups/`
+   - Use `catalog` command instead of `list` (alias still works)
 
 5. **Config structure changes**:
-    - Catalog apps: Only state + catalog_ref stored (metadata from catalog)
-    - URL apps: Full config in overrides section
-    - See docs/config.md for detailed v2 format documentation
+   - Catalog apps: Only state + catalog_ref stored (metadata from catalog)
+   - URL apps: Full config in overrides section
+   - See docs/config.md for detailed v2 format documentation
 
 For detailed migration information, see [docs/config.md](docs/config.md).
 
@@ -757,10 +768,10 @@ Please read the [wiki.md](docs/wiki.md) for more information.
 1. Global config now use INI format
 2. App specific configs now use better structured Json format
 3. We now use new libraries for better performance
-    - orjson instead of json
-    - uvloop instead of asyncio for running
-    - aiohttp instead of requests
-    - tqdm.asyncio instead of manual progress bar
+   - orjson instead of json
+   - uvloop instead of asyncio for running
+   - aiohttp instead of requests
+   - tqdm.asyncio instead of manual progress bar
 4. Authentication is simplified for better security and performance
 5. Locale support, migration and other similar features removed for the simplicity of the code
    but they might be implemented in the future.
@@ -908,19 +919,19 @@ This release add new app catalog feature to use a new format. The new format is 
 
 ```json
 {
-    "owner": "zen-browser",
-    "repo": "desktop",
-    "app_display_name": "Zen Browser",
-    "description": "A content-focused browser for distraction-free browsing",
-    "category": "Productivity",
-    "tags": ["browser", "focus", "distraction-free", "privacy"],
-    "checksum_hash_type": "sha256",
-    "appimage_name_template": "zen-{characteristic_suffix}.AppImage",
-    "checksum_file_name": "extracted_checksum",
-    "preferred_characteristic_suffixes": ["x86_64", "amd64"],
-    "icon_info": "https://raw.githubusercontent.com/zen-browser/desktop/main/docs/assets/zen-black.svg",
-    "icon_file_name": "zen_browser_icon.png",
-    "icon_repo_path": "docs/assets/zen-black.svg"
+  "owner": "zen-browser",
+  "repo": "desktop",
+  "app_display_name": "Zen Browser",
+  "description": "A content-focused browser for distraction-free browsing",
+  "category": "Productivity",
+  "tags": ["browser", "focus", "distraction-free", "privacy"],
+  "checksum_hash_type": "sha256",
+  "appimage_name_template": "zen-{characteristic_suffix}.AppImage",
+  "checksum_file_name": "extracted_checksum",
+  "preferred_characteristic_suffixes": ["x86_64", "amd64"],
+  "icon_info": "https://raw.githubusercontent.com/zen-browser/desktop/main/docs/assets/zen-black.svg",
+  "icon_file_name": "zen_browser_icon.png",
+  "icon_repo_path": "docs/assets/zen-black.svg"
 }
 ```
 
@@ -930,8 +941,8 @@ User specific configurations are still used but with minor changes:
 
 ```json
 {
-    "version": "1.12.8b",
-    "appimage_name": "zen-x86_64.AppImage"
+  "version": "1.12.8b",
+  "appimage_name": "zen-x86_64.AppImage"
 }
 ```
 
