@@ -23,6 +23,22 @@ if [ ! -x "$UNICORN" ]; then
   exit 127
 fi
 
+# Ensure network connection with NetworkManager
+# Check nmcli command exists
+if ! command -v nmcli &>/dev/null; then
+  echo "Error: nmcli command not found. NetworkManager is not installed."
+  exit 1
+fi
+
+if ! output=$(nmcli -t -f STATE general); then
+  echo "Error: Failed to check network connection. Unknown nmcli command error."
+  echo "$output"
+  exit 1
+elif [[ "$output" != "connected" ]]; then
+  echo "Error: Network is not connected."
+  exit 1
+fi
+
 # my-unicorn new version check command (removed - use 'my-unicorn upgrade' manually)
 check_upgrade() {
   if ! output="$("$UNICORN" upgrade --check --refresh-cache 2>&1)"; then
