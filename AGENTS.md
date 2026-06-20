@@ -55,7 +55,6 @@ src/my_unicorn/
 │   ├── desktop_entry.py    # Desktop file generation
 │   ├── download.py         # File download logic
 │   ├── file_ops.py         # File operations (copy, move, delete)
-│   ├── http_session.py     # HTTP session management
 │   ├── install.py          # Installation logic and workflows
 │   ├── icon.py             # Icon extraction
 │   ├── post_download.py    # Post-download helpers for install/update workflows
