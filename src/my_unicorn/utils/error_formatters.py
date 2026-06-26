@@ -5,6 +5,9 @@ from typing import Any
 from my_unicorn.exceptions import InstallationError
 
 
+# TODO: it is used for make user friendly but seems like
+# this isn't show the building, etc. like mappings not work
+# so remove these when you not need to format anymore.
 def get_user_friendly_error(error: InstallationError) -> str:
     """Convert InstallationError to user-friendly message.
 

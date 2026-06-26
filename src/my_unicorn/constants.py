@@ -324,6 +324,8 @@ VERSION_UNKNOWN: Final[str] = "unknown"
 # Common Error Message Patterns
 # =============================================================================
 
+# TODO: remove all these and move them to exceptions.py module if they're differ
+# than our current messages
 # Error message templates for consistency
 ERROR_NO_APPIMAGE_ASSET: Final[str] = "No suitable AppImage asset found"
 ERROR_NO_RELEASE_FOUND: Final[str] = "No release found for {owner}/{repo}"

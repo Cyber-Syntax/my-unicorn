@@ -45,7 +45,9 @@ from .progress_types import (
     Phase,
     ProcessingPhase,
     ProgressConfig,
+    TaskError,
     TaskState,
+    TaskStatusInfo,
 )
 
 logger = get_logger(__name__)
@@ -234,6 +236,8 @@ class AsciiProgressBackend:
         task_id: str,
         success: bool = True,  # noqa: FBT001, FBT002
         description: str | None = None,
+        errors: list[TaskError] | None = None,
+        warnings: list[TaskError] | None = None,
     ) -> None:
         """Mark a task as finished.
 
@@ -254,11 +258,15 @@ class AsciiProgressBackend:
             task = self.tasks[task_id]
             task.is_finished = True
             task.success = success
+
             if description is not None:
-                if not success and "Error:" not in description:
-                    # Extract error message for cleaner display
-                    task.error_message = description
                 task.description = description
+
+            if errors:
+                task.errors.extend(errors)
+            if warnings:
+                task.warnings.extend(warnings)
+
             task.last_update = time.monotonic()
 
     def _build_output(self) -> str:
@@ -540,16 +548,6 @@ class SectionRenderConfig:
     interactive: bool = False
 
 
-@dataclass(frozen=True, slots=True)
-class TaskStatusInfo:
-    """Information for determining task status."""
-
-    is_finished: bool
-    success: bool | None
-    description: str
-    error_message: str
-
-
 def determine_task_status_symbol(
     status_info: TaskStatusInfo,
     spinner: str,
@@ -601,10 +599,8 @@ def should_show_warning_message(status_info: TaskStatusInfo) -> bool:
 
     """
     return bool(
-        status_info.is_finished
-        and status_info.success
-        and status_info.description
-        and "not verified" in status_info.description.lower()
+        status_info.warnings
+        or ("not verified" in status_info.description.lower())
     )
 
 
@@ -619,9 +615,8 @@ def should_show_error_message(status_info: TaskStatusInfo) -> bool:
 
     """
     return bool(
-        status_info.is_finished
-        and not status_info.success
-        and status_info.error_message
+        status_info.errors
+        or (status_info.success is False and status_info.description)
     )
 
 
@@ -770,18 +765,13 @@ def format_download_lines(
 
     lines.append(line)
 
-    # Create status info for error message display
-    status_info = TaskStatusInfo(
-        is_finished=task.is_finished,
-        success=task.success,
-        description=task.description,
-        error_message=task.error_message,
-    )
-
-    # Show error message if applicable
-    if should_show_error_message(status_info):
-        error_msg = truncate_text(task.error_message, 60)
-        lines.append(f"    Error: {error_msg}")
+    # process errors via TaskError
+    if task.errors:
+        for err in task.errors:
+            msg = truncate_text(err.details, 120)
+            lines.append(
+                f"error: network error while downloading {task.name} : {msg}"
+            )
 
     return lines
 
@@ -808,30 +798,27 @@ def format_processing_task_lines(
     operation = PROCESSING_LABELS.get(task.sub_type)
     if operation is None:
         operation = "processing"
+
     operation_label = f"{operation[:1]}{operation[1:]}"
 
-    # Create status info for status determination
-    status_info = TaskStatusInfo(
-        is_finished=task.is_finished,
-        success=task.success,
-        description=task.description,
-        error_message=task.error_message,
-    )
-
-    # Determine status symbol using helper function
-    status = determine_task_status_symbol(status_info, spinner)
-
+    # match ui design e.g "installing"
     name = truncate_text(task.name, name_width)
-    lines.append(f"{phase_str} {operation_label} {name} {status}")
 
-    # Show warning message if applicable
-    if should_show_warning_message(status_info):
-        msg = truncate_text(task.description, 60)
-        lines.append(f"    {msg}")
-    # Show error message if applicable
-    elif should_show_error_message(status_info):
-        error_msg = truncate_text(task.error_message, 60)
-        lines.append(f"    Error: {error_msg}")
+    # clean output without symbols
+    lines.append(f"{phase_str} {operation_label} {name}")
+
+    # Display Warnings/Errors
+    if task.warnings:
+        for warning in task.warnings:
+            # example: "warning: checksum asset not found"
+            msg = truncate_text(warning.details, 120)
+            lines.append(f"warning: {msg}")
+
+    if task.errors:
+        for err in task.errors:
+            # Example: "error: failed to install 'appflowy' : Permission denied"
+            msg = truncate_text(err.details, 120)
+            lines.append(f"error: failed to {operation} '{task.name}' : {msg}")
 
     return lines
 

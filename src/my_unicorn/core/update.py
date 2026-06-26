@@ -37,14 +37,16 @@ from my_unicorn.core.post_download import (
     PostDownloadContext,
     PostDownloadProcessor,
 )
-from my_unicorn.core.progress.progress_types import Phase, PHASE_SECTION_LABELS
+from my_unicorn.core.progress.progress_types import PHASE_SECTION_LABELS, Phase
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,
     ProgressReporter,
 )
 from my_unicorn.core.verify import VerificationService
 from my_unicorn.exceptions import (
+    ERROR_MESSAGES,
     ConfigurationError,
+    ErrorCode,
     UpdateError,
     VerificationError,
 )
@@ -991,11 +993,26 @@ async def load_catalog_for_update(
         ) from e
 
 
+# TODO: use Result class  with unified pattern
+# T for success, E for error typevar, learn for warnings (maybe W work?)
+# so you can use all of the returns
+# and would be better design
+# also you can share with install result
+@dataclass
+class AssetSelectionResult:
+    asset: Asset | None
+    error: ErrorCode | None
+    message: str | None = None
+
+    def ok(self) -> bool:
+        return self.asset is not None and self.error is None
+
+
 def select_asset_for_update(
     app_name: str,
     update_info: UpdateInfo,
     catalog_entry: dict[str, Any] | None,
-) -> tuple[Asset | None, str | None]:
+) -> AssetSelectionResult:
     """Select AppImage asset from release data.
 
     Args:
@@ -1009,10 +1026,15 @@ def select_asset_for_update(
     """
     if not update_info.release_data:
         logger.error("No release data available for %s", app_name)
-        return None, "No release data available"
+        return AssetSelectionResult(
+            asset=None,
+            error=ErrorCode.UPDATE_FAILED,
+            message="No release data available",
+        )
 
     # Convert catalog_entry to dict if needed
     catalog_dict = dict(catalog_entry) if catalog_entry else None
+
     appimage_asset = select_best_appimage_asset(
         update_info.release_data,
         catalog_entry=catalog_dict,
@@ -1021,16 +1043,23 @@ def select_asset_for_update(
     )
 
     if not appimage_asset:
-        # use debug level to avoid duplicate `:: Querying upstream releases...` log messages.
-        # see #294
-        #
+        # use debug level to avoid duplicate `:: Querying upstream releases...` log messages. see #294
         # user can still see the no appimage error in the summary section.
         logger.debug(
             "No AppImage found for %s, may still be building", app_name
         )
-        return None, "AppImage not found in release - may still be building"
+        # return None, "AppImage not found in release - may still be building"
+        return AssetSelectionResult(
+            asset=None,
+            error=ErrorCode.APPIMAGE_ASSET_NOT_FOUND,
+            message=ERROR_MESSAGES.get(ErrorCode.APPIMAGE_ASSET_NOT_FOUND),
+        )
 
-    return appimage_asset, None
+    return AssetSelectionResult(
+        asset=appimage_asset,
+        error=None,
+        message=None,
+    )
 
 
 async def prepare_update_context(
@@ -1094,11 +1123,17 @@ async def prepare_update_context(
     )
 
     # Select AppImage asset
-    appimage_asset, error = select_asset_for_update(
+    asset_result = select_asset_for_update(
         app_name, update_info, catalog_entry
     )
-    if error:
-        return None, error
+
+    # TODO: add ErrorCode exception msg in exceptions.py when you figure out
+    # what type of errors might happen here with correct good text
+    # e.g ErrorCode.APPIMAGE_SELECTION_FAILED
+    if not asset_result.ok():
+        return None, asset_result.message or "Asset selection failed"
+
+    appimage_asset = asset_result.asset
 
     return {
         "app_config": app_config,

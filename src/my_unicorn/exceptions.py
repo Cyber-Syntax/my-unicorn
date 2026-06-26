@@ -9,7 +9,94 @@ This module defines a hierarchical exception structure that provides:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from enum import Enum
 
+
+# TODO: add more exception when you find out some of them useful
+# for example; no prerelease found, fallback to latest release (this warning example)
+# TODO:  asset not found is actually api error, so might be seperate a new class for it if we grow them more
+class ErrorCode(Enum):
+    """Error codes for progress tracking."""
+
+    GITHUB_API_ERROR = "github_api_eror"
+    DOWNLOAD_FAILED = "download_failed"
+    PROCESSING_FAILED = "processing_failed"
+    VERIFICATION_FAILED = "verification_failed"
+    INSTALLATION_FAILED = "installation_failed"
+    UPDATE_FAILED = "update_failed"
+    ICON_EXTRACTION_FAILED = "icon_extraction_failed"
+    DESKTOP_ENTRY_CREATION_FAILED = "desktop_entry_creation_failed"
+    APPIMAGE_MOVE_FAILED = "appimage_move_failed"
+    UNKNOWN_ERROR = "unknown_error"
+    APPIMAGE_ASSET_NOT_FOUND = "appimage_asset_not_found"
+    CHECKSUM_ASSET_NOT_FOUND = "checksum_asset_not_found"
+    NETWORK_TIMEOUT = "network_timeout"
+    NETWORK_DNS_FAILURE = "network_dns_failure"
+    CHECKSUM_MISMATCH = "checksum_mismatch"
+    PERMISSION_DENIED = "permission_denied"
+
+
+# TODO: add missing errorcodes from above
+# TODO: decide checksum_asset_not_found -> is going where? ErrorCode or WarningCode?
+ERROR_MESSAGES = {
+    ErrorCode.APPIMAGE_ASSET_NOT_FOUND: "appimage asset not found : appimage builds may still be processing, try again later. Some developers may not provide appimage builds, so this might be external to my-unicorn's control.",
+    ErrorCode.NETWORK_TIMEOUT: "network timeout while downloading asset",
+    ErrorCode.NETWORK_DNS_FAILURE: "could not resolve upstream host",
+    ErrorCode.PERMISSION_DENIED: "permission denied",
+    ErrorCode.CHECKSUM_MISMATCH: "checksum verification failed",
+    ErrorCode.UNKNOWN_ERROR: "an unknown error occurred",
+}
+
+
+class WarningCode(Enum):
+    """Warning codes for progress tracking."""
+
+    NO_CHECKSUM_SKIPPED = "no_checksum_skipped"
+    NO_CHECKSUM_UNSUPPORTED = "no_checksum_unsupported"
+
+
+WARNING_MESSAGES = {
+    WarningCode.NO_CHECKSUM_SKIPPED: "no checksum provided by upstream : skipping verification",
+    WarningCode.NO_CHECKSUM_UNSUPPORTED: "checksum asset not found : some developers not provide any, please report an issue for the package maintainers if you verified this isn't my-unicorn fault",
+}
+
+
+class ErrorDisplayState(Enum):
+    """Display state for errors in progress tracking."""
+
+    PENDING = "PENDING"
+    SHOWN = "SHOWN"
+    ACKNOWLEDGED = "ACKNOWLEDGED"
+
+
+class ErrorSeverity(Enum):
+    """Error severity levels for progress tracking."""
+
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+
+
+@dataclass
+class ErrorContext:
+    """Context for errors in progress tracking."""
+
+    phase: str
+    app_name: str
+    error_code: ErrorCode
+    error_severity: ErrorSeverity
+    details: str
+
+
+@dataclass
+class TaskError(ErrorContext):
+    """Context for errors specific to a task in progress tracking."""
+
+    processing_phase: str
+    timestamp: str
+
+
+# -- exceptions
 class MyUnicornError(Exception):
     """Base exception for all my-unicorn errors.
 
@@ -41,9 +128,10 @@ class MyUnicornError(Exception):
 
     def __init__(  # noqa: PLR0913
         self,
-        message: str,
+        message: str | None = None,
         target: str | None = None,
         *,
+        error_code: ErrorCode | None = None,
         context: dict[str, object] | None = None,
         is_retryable: bool = False,
         retry_after: int | None = None,
@@ -60,7 +148,19 @@ class MyUnicornError(Exception):
             cause: Original exception that caused this error.
 
         """
+        self.error_code = error_code
+
+        if message is None and error_code is not None:
+            message = ERROR_MESSAGES.get(
+                error_code,
+                ERROR_MESSAGES[ErrorCode.UNKNOWN_ERROR],
+            )
+
+        if message is None:
+            message = "Unknown error"
+
         super().__init__(message)
+
         self.message = message
         self.target = target
         self.context = context or {}
