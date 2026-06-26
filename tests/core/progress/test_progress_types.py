@@ -69,6 +69,7 @@ class TestProgressType:
             "INSTALLATION",
             "UPDATE",
             "DESKTOP_ENTRY_CREATION",
+            "MOVE_APPIMAGE",
         }
 
         actual_types = {pt.name for pt in ProcessingPhase}

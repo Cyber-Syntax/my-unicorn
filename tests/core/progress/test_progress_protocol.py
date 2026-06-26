@@ -41,7 +41,7 @@ class TestProgressType:
 
     def test_sub_progress_type_count(self) -> None:
         """Expected number of sub-progress types."""
-        assert len(ProcessingPhase) == 5
+        assert len(ProcessingPhase) == 6
 
     def test_progress_types_are_unique(self) -> None:
         """All progress type values are unique."""

@@ -19,7 +19,7 @@ from my_unicorn.core.update import (
     resolve_update_info,
     select_asset_for_update,
 )
-from my_unicorn.exceptions import ConfigurationError, UpdateError
+from my_unicorn.exceptions import ConfigurationError, ErrorCode, UpdateError
 
 
 class TestResolveUpdateInfo:
@@ -317,7 +317,7 @@ class TestSelectAssetForUpdate:
             "my_unicorn.core.update.select_best_appimage_asset",
             return_value=sample_asset,
         ) as select_asset_mock:
-            asset, error = select_asset_for_update(
+            result = select_asset_for_update(
                 app_name="test-app",
                 update_info=update_info,
                 catalog_entry=None,
@@ -329,8 +329,10 @@ class TestSelectAssetForUpdate:
             installation_source="url",
             raise_on_not_found=False,
         )
-        assert asset == sample_asset
-        assert error is None
+        assert result.ok() is True
+        assert result.asset == sample_asset
+        assert result.error is None
+        assert result.message is None
 
     def test_select_asset_for_update_uses_catalog_source(
         self,
@@ -353,7 +355,7 @@ class TestSelectAssetForUpdate:
             "my_unicorn.core.update.select_best_appimage_asset",
             return_value=sample_asset,
         ) as select_asset_mock:
-            asset, error = select_asset_for_update(
+            result = select_asset_for_update(
                 app_name="test-app",
                 update_info=update_info,
                 catalog_entry=catalog_entry,
@@ -365,8 +367,10 @@ class TestSelectAssetForUpdate:
             installation_source="catalog",
             raise_on_not_found=False,
         )
-        assert asset == sample_asset
-        assert error is None
+        assert result.ok() is True
+        assert result.asset == sample_asset
+        assert result.error is None
+        assert result.message is None
 
     def test_select_asset_for_update_no_release_data(
         self,
@@ -380,15 +384,16 @@ class TestSelectAssetForUpdate:
         """
         update_info = update_info_factory(release_data=None)
 
-        asset, error = select_asset_for_update(
+        result = select_asset_for_update(
             app_name="test-app",
             update_info=update_info,
             catalog_entry=None,
         )
 
-        assert asset is None
-        assert error is not None
-        assert "No release data" in error
+        assert result.ok() is False
+        assert result.asset is None
+        assert result.error == ErrorCode.UPDATE_FAILED
+        assert result.message == "No release data available"
 
     def test_select_asset_for_update_appimage_not_found(
         self,
@@ -408,12 +413,36 @@ class TestSelectAssetForUpdate:
             "my_unicorn.core.update.select_best_appimage_asset",
             return_value=None,
         ):
-            asset, error = select_asset_for_update(
+            result = select_asset_for_update(
                 app_name="test-app",
                 update_info=update_info,
                 catalog_entry=None,
             )
 
-        assert asset is None
-        assert error is not None
-        assert "AppImage not found" in error
+        assert result.ok() is False
+        assert result.asset is None
+        assert result.error == ErrorCode.APPIMAGE_ASSET_NOT_FOUND
+        assert result.message is not None
+
+    def test_select_asset_for_update_failure(
+        self,
+        update_info_factory: Callable[..., UpdateInfo],
+    ) -> None:
+        release_data = MagicMock()
+        release_data.assets = []
+        update_info = update_info_factory(release_data=release_data)
+
+        with patch(
+            "my_unicorn.core.update.select_best_appimage_asset",
+            return_value=None,
+        ):
+            result = select_asset_for_update(
+                app_name="test-app",
+                update_info=update_info,
+                catalog_entry=None,
+            )
+
+        assert result.ok() is False
+        assert result.asset is None
+        assert result.error == ErrorCode.APPIMAGE_ASSET_NOT_FOUND
+        assert result.message is not None

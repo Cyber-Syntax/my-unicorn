@@ -27,7 +27,7 @@ class TestVerificationSuccessUI:
     """Test suite for successful verification UI display."""
 
     def test_verification_success_ui(self) -> None:
-        """Verify "(1/2) Verifying app ✓" format.
+        """Verify "(1/2) verifying app" format.
 
         Tests successful verification display format.
         """
@@ -61,9 +61,8 @@ class TestVerificationSuccessUI:
         assert "(1/2)" in output
         assert "verifying" in output
         assert "qownnotes" in output
-        assert "✓" in output
-        # Should have format like "(1/2) verifying qownnotes ✓"
-        assert "(1/2) verifying qownnotes ✓" in output
+        # Should have format like "(1/2) verifying qownnotes"
+        assert "(1/2) verifying qownnotes" in output
 
 
 @pytest.mark.integration
@@ -71,7 +70,7 @@ class TestVerificationWarningUI:
     """Test suite for verification warnings display."""
 
     def test_verification_warning_ui(self) -> None:
-        """Verify '! not verified (dev did not provide checksums)' format."""
+        """Verify 'not verified (dev did not provide checksums)' format."""
         # Arrange - create a verification with warning
         task = TaskState(
             task_id="v1",
@@ -103,7 +102,6 @@ class TestVerificationWarningUI:
         assert "(1/2)" in output
         assert "verifying" in output
         assert "weektodo" in output
-        assert "!" in output  # Warning symbol
         # Warning message should be on next line with indentation
         assert "not verified (dev did not provide checksums)" in output
 
@@ -151,8 +149,8 @@ class TestVerificationWarningUI:
 
         # Assert - should show both phases
         assert ":: Processing package changes..." in output
-        assert "(1/2) verifying weektodo !" in output
-        assert "(2/2) installing weektodo ✓" in output
+        assert "(1/2) verifying weektodo" in output
+        assert "(2/2) installing weektodo" in output
 
 
 @pytest.mark.integration
@@ -160,13 +158,12 @@ class TestInstallationSuccessUI:
     """Test suite for successful installation UI display."""
 
     def test_installation_success_ui(self) -> None:
-        """Verify "(2/2) Installing app ✓" format for successful installation.
+        """Verify "(2/2) Installing app" format for successful installation.
 
         Tests that successful installation displays:
         - Phase number: (2/2)
         - Operation: "Installing"
         - App name
-        - Success checkmark: ✓
         """
         # Arrange - create a completed successful installation task
         task = TaskState(
@@ -198,9 +195,8 @@ class TestInstallationSuccessUI:
         assert "(2/2)" in output
         assert "installing" in output
         assert "qownnotes" in output
-        assert "✓" in output
-        # Should have format like "(2/2) installing qownnotes ✓"
-        assert "(2/2) installing qownnotes ✓" in output
+        # Should have format like "(2/2) installing qownnotes"
+        assert "(2/2) installing qownnotes" in output
 
 
 @pytest.mark.integration
@@ -250,8 +246,8 @@ class TestProcessingPhasesSequentialUI:
 
         # Assert - should show proper phase sequence
         # Phases should be 1/2 then 2/2 for the same app
-        assert "(1/2) verifying qownnotes ✓" in output
-        assert "(2/2) installing qownnotes ✓" in output
+        assert "(1/2) verifying qownnotes" in output
+        assert "(2/2) installing qownnotes" in output
 
     def test_processing_phases_multiple_apps_sequential_ui(self) -> None:
         """Verify phase numbering for multiple apps in sequence.
@@ -315,10 +311,10 @@ class TestProcessingPhasesSequentialUI:
         output = "\n".join(output_lines)
 
         # Assert - should show all phases in order
-        assert "(1/2) verifying qownnotes ✓" in output
-        assert "(2/2) installing qownnotes ✓" in output
-        assert "(1/2) verifying appflowy ✓" in output
-        assert "(2/2) installing appflowy ✓" in output
+        assert "(1/2) verifying qownnotes" in output
+        assert "(2/2) installing qownnotes" in output
+        assert "(1/2) verifying appflowy" in output
+        assert "(2/2) installing appflowy" in output
 
 
 @pytest.mark.integration
@@ -529,4 +525,3 @@ class TestProcessingHeaderSelection:
         text = "\n".join(sections["install"].lines)
         assert "qownnotes" in text
         assert "appflowy" in text
-        assert "✓" in text
