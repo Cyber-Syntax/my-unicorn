@@ -199,11 +199,8 @@ class CLIRunner:
                 # Route to appropriate command handler
                 await self._execute_command(args)
 
-        except LockError:
-            logger.error(  # noqa: TRY400
-                "Another my-unicorn instance is already running. "
-                "Please wait or stop the other instance."
-            )
+        except LockError as e:
+            logger.error("%s", e.message)
             sys.exit(1)
         except KeyboardInterrupt:
             logger.info("Operation cancelled by user via KeyboardInterrupt")

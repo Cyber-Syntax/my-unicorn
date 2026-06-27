@@ -5,6 +5,20 @@ This module defines a hierarchical exception structure that provides:
 - Rich context data for debugging and logging
 - Retry metadata for network-related errors
 - Exception chaining support for preserving root causes
+
+ErrorCode                <-- stable identifiers
+        │
+        ▼
+ERRORS / ERROR_MESSAGES  <-- centralized human messages
+        │
+        ▼
+MyUnicornError           <-- stores code, context, cause
+        │
+        ├── InstallError
+        ├── VerificationError
+        ├── NetworkError
+        ├── ConfigurationError
+        └── UpdateError
 """
 
 from __future__ import annotations
@@ -13,9 +27,11 @@ from dataclasses import dataclass
 from enum import Enum
 
 
-# TODO: add more exception when you find out some of them useful
-# for example; no prerelease found, fallback to latest release (this warning example)
-# TODO:  asset not found is actually api error, so might be seperate a new class for it if we grow them more
+# NOTE: currently our usage is simple
+# use errorcode for exact error
+# and use message for details
+# use general if you don't know exact error
+# use exact error from ErrorCode if you now exact error
 class ErrorCode(Enum):
     """Error codes for progress tracking."""
 
@@ -31,21 +47,27 @@ class ErrorCode(Enum):
     UNKNOWN_ERROR = "unknown_error"
     APPIMAGE_ASSET_NOT_FOUND = "appimage_asset_not_found"
     CHECKSUM_ASSET_NOT_FOUND = "checksum_asset_not_found"
+    DIGEST_HASH_NOT_FOUND = "digest_hash_not_found"
     NETWORK_TIMEOUT = "network_timeout"
     NETWORK_DNS_FAILURE = "network_dns_failure"
     CHECKSUM_MISMATCH = "checksum_mismatch"
     PERMISSION_DENIED = "permission_denied"
+    LOCK_INSTANCE_FAILED = "lock_instance_failed"
+    LOCK_ACQUIRE_FAILED = "lock_acquire_failed"
 
 
 # TODO: add missing errorcodes from above
-# TODO: decide checksum_asset_not_found -> is going where? ErrorCode or WarningCode?
 ERROR_MESSAGES = {
+    ErrorCode.DOWNLOAD_FAILED: "Something went wrong while downloading",
     ErrorCode.APPIMAGE_ASSET_NOT_FOUND: "appimage asset not found : appimage builds may still be processing, try again later. Some developers may not provide appimage builds, so this might be external to my-unicorn's control.",
     ErrorCode.NETWORK_TIMEOUT: "network timeout while downloading asset",
     ErrorCode.NETWORK_DNS_FAILURE: "could not resolve upstream host",
+    ErrorCode.DESKTOP_ENTRY_CREATION_FAILED: "Failed to create desktop entry",
     ErrorCode.PERMISSION_DENIED: "permission denied",
-    ErrorCode.CHECKSUM_MISMATCH: "checksum verification failed",
+    ErrorCode.CHECKSUM_MISMATCH: "checksum verification failed because of hash mismatches",
     ErrorCode.UNKNOWN_ERROR: "an unknown error occurred",
+    ErrorCode.LOCK_INSTANCE_FAILED: "Another my-unicorn instance is already running.Please wait or stop the other instance.",
+    ErrorCode.LOCK_ACQUIRE_FAILED: "Failed to acquire lock",
 }
 
 
@@ -58,10 +80,14 @@ class WarningCode(Enum):
 
 WARNING_MESSAGES = {
     WarningCode.NO_CHECKSUM_SKIPPED: "no checksum provided by upstream : skipping verification",
-    WarningCode.NO_CHECKSUM_UNSUPPORTED: "checksum asset not found : some developers not provide any, please report an issue for the package maintainers if you verified this isn't my-unicorn fault",
+    WarningCode.NO_CHECKSUM_UNSUPPORTED: "checksum asset not found : some developers not provide any, please report an issue for the app maintainers if you verified this isn't my-unicorn fault",
 }
 
 
+# TODO: we didn't implement any special case for
+# display state and for YAGNI
+# we probably going to remove this
+# keep it for now, remove later
 class ErrorDisplayState(Enum):
     """Display state for errors in progress tracking."""
 
@@ -85,7 +111,7 @@ class ErrorContext:
     app_name: str
     error_code: ErrorCode
     error_severity: ErrorSeverity
-    details: str
+    details: str | None
 
 
 @dataclass
@@ -97,6 +123,8 @@ class TaskError(ErrorContext):
 
 
 # -- exceptions
+# Main exception for my-unicorn
+# TODO: make sure it support ErrorCode and messages
 class MyUnicornError(Exception):
     """Base exception for all my-unicorn errors.
 
@@ -183,21 +211,11 @@ class MyUnicornError(Exception):
         return base
 
 
+# TODO: remove this and use InstallError instead
 class InstallationError(MyUnicornError):
     """Raised when installation fails."""
 
     error_prefix = "Installation failed"
-
-
-class ValidationError(MyUnicornError):
-    """Raised when target validation fails."""
-
-    error_prefix = "Validation failed"
-
-
-# =============================================================================
-# Verification Exceptions
-# =============================================================================
 
 
 class VerificationError(MyUnicornError):
@@ -218,136 +236,7 @@ class VerificationError(MyUnicornError):
     error_prefix = "Verification failed"
 
 
-class HashMismatchError(VerificationError):
-    """Raised when computed hash doesn't match expected hash.
-
-    This error indicates a potential data corruption or tampering.
-    Re-downloading may help if the original download was corrupted.
-
-    Attributes:
-        expected: Expected hash value.
-        actual: Computed hash value.
-        algorithm: Hash algorithm used (sha256, sha512).
-        file_path: Path to the file that was verified.
-
-    """
-
-    def __init__(
-        self,
-        expected: str,
-        actual: str,
-        algorithm: str,
-        file_path: str,
-    ) -> None:
-        """Initialize hash mismatch error with verification details.
-
-        Args:
-            expected: Expected hash value from release.
-            actual: Computed hash value from file.
-            algorithm: Hash algorithm used (sha256, sha512).
-            file_path: Path to the file that was verified.
-
-        """
-        super().__init__(
-            f"Hash verification failed for {file_path}",
-            context={
-                "expected_hash": expected,
-                "actual_hash": actual,
-                "algorithm": algorithm,
-                "file_path": file_path,
-            },
-            is_retryable=False,
-        )
-        self.expected = expected
-        self.actual = actual
-        self.algorithm = algorithm
-        self.file_path = file_path
-
-
-class HashUnavailableError(VerificationError):
-    """Raised when no hash is available for verification.
-
-    This can occur when the release doesn't provide checksum files
-    or the checksum format is not supported.
-
-    Attributes:
-        app_name: Name of the application.
-        version: Version being verified.
-
-    """
-
-    def __init__(self, app_name: str, version: str) -> None:
-        """Initialize hash unavailable error.
-
-        Args:
-            app_name: Name of the application.
-            version: Version being verified.
-
-        """
-        super().__init__(
-            f"No hash available for {app_name} v{version}",
-            context={"app_name": app_name, "version": version},
-            is_retryable=False,
-        )
-        self.app_name = app_name
-        self.version = version
-
-
-class HashComputationError(VerificationError):
-    """Raised when hash computation fails (I/O error, algorithm error).
-
-    This is typically retryable since the underlying cause may be
-    transient (file system busy, temporary I/O error).
-
-    Attributes:
-        file_path: Path to the file being hashed.
-        algorithm: Hash algorithm being used.
-
-    """
-
-    def __init__(
-        self,
-        file_path: str,
-        algorithm: str,
-        cause: Exception,
-    ) -> None:
-        """Initialize hash computation error.
-
-        Args:
-            file_path: Path to the file being hashed.
-            algorithm: Hash algorithm being used.
-            cause: Original exception that caused the failure.
-
-        """
-        super().__init__(
-            f"Failed to compute {algorithm} hash for {file_path}",
-            context={"file_path": file_path, "algorithm": algorithm},
-            is_retryable=True,
-            retry_after=1,
-            cause=cause,
-        )
-        self.file_path = file_path
-        self.algorithm = algorithm
-
-
-# =============================================================================
-# Workflow Exceptions
-# =============================================================================
-
-
-class WorkflowError(MyUnicornError):
-    """Base class for workflow orchestration errors.
-
-    Workflow errors occur during high-level operations like install,
-    update, or remove. They typically wrap lower-level exceptions
-    with additional context about the operation being performed.
-
-    """
-
-    error_prefix = "Workflow failed"
-
-
-class InstallError(WorkflowError):
+class InstallError(MyUnicornError):
     """Raised when installation workflow fails.
 
     This wraps errors that occur during the install process,
@@ -358,7 +247,7 @@ class InstallError(WorkflowError):
     error_prefix = "Install failed"
 
 
-class UpdateError(WorkflowError):
+class UpdateError(MyUnicornError):
     """Raised when update workflow fails.
 
     This wraps errors that occur during the update process,
@@ -369,126 +258,10 @@ class UpdateError(WorkflowError):
     error_prefix = "Update failed"
 
 
-class PostProcessingError(WorkflowError):
-    """Raised when post-download processing fails.
-
-    Post-processing includes icon extraction, desktop entry creation,
-    and permission setting. These errors are typically non-fatal.
-
-    Attributes:
-        step: Name of the processing step that failed.
-        app_name: Name of the application being processed.
-
-    """
-
-    error_prefix = "Post-processing failed"
-
-    def __init__(
-        self,
-        step: str,
-        app_name: str,
-        cause: Exception,
-    ) -> None:
-        """Initialize post-processing error.
-
-        Args:
-            step: Name of the processing step (icon_extraction, desktop_entry).
-            app_name: Name of the application being processed.
-            cause: Original exception that caused the failure.
-
-        """
-        super().__init__(
-            f"Post-processing step '{step}' failed for {app_name}",
-            context={"step": step, "app_name": app_name},
-            is_retryable=False,
-            cause=cause,
-        )
-        self.step = step
-        self.app_name = app_name
-
-
-# =============================================================================
-# Network Exceptions
-# =============================================================================
-
-
-class NetworkError(MyUnicornError):
-    """Base class for network-related errors.
-
-    Network errors are typically retryable since they may be caused
-    by transient issues like network congestion or server load.
-
-    Attributes:
-        url: URL that caused the error (if applicable).
-        status_code: HTTP status code (if applicable).
-
-    """
-
-    error_prefix = "Network error"
-
-    def __init__(
-        self,
-        message: str,
-        *,
-        url: str | None = None,
-        status_code: int | None = None,
-        retry_after: int = 5,
-        cause: Exception | None = None,
-    ) -> None:
-        """Initialize network error with connection details.
-
-        Args:
-            message: Error message describing the failure.
-            url: URL that caused the error.
-            status_code: HTTP status code if applicable.
-            retry_after: Suggested retry delay in seconds.
-            cause: Original exception that caused the failure.
-
-        """
-        context: dict[str, object] = {}
-        if url:
-            context["url"] = url
-        if status_code:
-            context["status_code"] = status_code
-
-        super().__init__(
-            message,
-            context=context,
-            is_retryable=True,
-            retry_after=retry_after,
-            cause=cause,
-        )
-        self.url = url
-        self.status_code = status_code
-
-
-class DownloadError(NetworkError):
-    """Raised when file download fails.
-
-    This can occur due to network issues, server errors, or
-    file not found (404) responses.
-
-    """
-
-    error_prefix = "Download failed"
-
-
-class GitHubAPIError(NetworkError):
-    """Raised when GitHub API request fails.
-
-    This includes rate limiting, authentication failures,
-    and API endpoint errors.
-
-    """
-
-    error_prefix = "GitHub API error"
-
-
-# =============================================================================
-# Configuration Exceptions
-# =============================================================================
-
-
+# TODO: this is used from logger, update modules
+# might be better to add a message in above messages section
+# and remove this instead for easy showcase
+# but not sure about how we canhandle context?
 class ConfigurationError(MyUnicornError):
     """Raised when configuration is invalid or missing.
 
@@ -536,11 +309,9 @@ class ConfigurationError(MyUnicornError):
         self.field = field
 
 
-# =============================================================================
-# Locking Exceptions
-# =============================================================================
-
-
+# TODO: same like above configuration exception
+# we use it in runner.py for loc error
+# better to use message via ErrorCode
 class LockError(MyUnicornError):
     """Raised when lock acquisition fails.
 
