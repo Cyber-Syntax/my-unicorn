@@ -43,6 +43,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
     from my_unicorn.core.progress.progress_types import ProcessingPhase
+    from my_unicorn.exceptions import TaskError
 
 
 class ProgressTaskInfo(TypedDict):
@@ -189,6 +190,8 @@ class ProgressReporter(Protocol):
         *,
         success: bool = True,
         description: str | None = None,
+        errors: list[TaskError] | None = None,
+        warnings: list[TaskError] | None = None,
     ) -> None:
         """Mark a task as complete.
 
@@ -199,6 +202,8 @@ class ProgressReporter(Protocol):
             task_id: Identifier of task to finish.
             success: Whether task completed successfully.
             description: Final status message.
+            errors: Structured errors to render with the task.
+            warnings: Structured warnings to render with the task.
 
         """
         ...
@@ -304,6 +309,8 @@ class NullProgressReporter:
         *,
         success: bool = True,
         description: str | None = None,
+        errors: list[TaskError] | None = None,
+        warnings: list[TaskError] | None = None,
     ) -> None:
         """Mark task as complete (no-op).
 
@@ -311,6 +318,8 @@ class NullProgressReporter:
             task_id: Task identifier (ignored).
             success: Success status (ignored).
             description: Description (ignored).
+            errors: Structured errors (ignored).
+            warnings: Structured warnings (ignored).
 
         """
 

@@ -73,6 +73,7 @@ if TYPE_CHECKING:
     from typing import Self
 
     from my_unicorn.core.protocols.progress import ProgressTaskInfo
+    from my_unicorn.exceptions import TaskError
 
 __all__ = [
     "ID_CACHE_LIMIT",
@@ -543,6 +544,8 @@ class ProgressDisplay(ProgressReporter):
         *,
         success: bool = True,
         description: str | None = None,
+        errors: list[TaskError] | None = None,
+        warnings: list[TaskError] | None = None,
     ) -> None:
         """Mark a task as finished.
 
@@ -550,6 +553,8 @@ class ProgressDisplay(ProgressReporter):
             task_id: Task identifier
             success: Whether the task succeeded
             description: Final description
+            errors: Structured errors to render with the task.
+            warnings: Structured warnings to render with the task.
 
         """
         # Get task info to check if it exists and has total
@@ -565,7 +570,11 @@ class ProgressDisplay(ProgressReporter):
 
         # Update backend
         self._backend.finish_task(
-            task_id=task_id, success=success, description=description
+            task_id=task_id,
+            success=success,
+            description=description,
+            errors=errors,
+            warnings=warnings,
         )
 
         # Let the regular render loop handle finished states; avoid
@@ -680,6 +689,7 @@ class IDGenerator:
             >>> gen.generate_namespaced_id(Phase.DOWNLOAD, "file.zip")
             'dl_1_file.zip'  # Returns cached value
         """
+        type_key: Phase | ProcessingPhase
         if isinstance(progress_type, ProcessingPhase):
             type_key = progress_type
         else:

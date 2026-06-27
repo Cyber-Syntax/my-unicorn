@@ -245,6 +245,8 @@ class AsciiProgressBackend:
             task_id: Task identifier
             success: Whether the task succeeded
             description: Final description (error message if failed)
+            errors: Structured errors to render with the task.
+            warnings: Structured warnings to render with the task.
 
         """
         # Protect read/modify of shared state
@@ -357,19 +359,25 @@ class AsciiProgressBackend:
             Complete output string with all sections
 
         """
-        lines: list[str] = []
-        lines.extend(render_api_section(tasks_snapshot, order_snapshot))
-        lines.extend(
-            render_downloads_section(
-                tasks_snapshot, order_snapshot, self._section_config
-            )
+        sections: list[str] = []
+
+        api_lines = render_api_section(tasks_snapshot, order_snapshot)
+        if api_lines:
+            sections.append("\n".join(api_lines))
+
+        download_lines = render_downloads_section(
+            tasks_snapshot, order_snapshot, self._section_config
         )
-        lines.extend(
-            render_processing_section(
-                tasks_snapshot, order_snapshot, self._section_config
-            )
+        if download_lines:
+            sections.append("\n".join(download_lines))
+
+        processing_lines = render_processing_section(
+            tasks_snapshot, order_snapshot, self._section_config
         )
-        return "\n".join(lines)
+        if processing_lines:
+            sections.append("\n".join(processing_lines))
+
+        return "\n\n".join(sections)
 
 
 class TerminalWriter:
@@ -429,6 +437,15 @@ class TerminalWriter:
             logger.debug("Failed to write output: %s", exc)
 
     @staticmethod
+    def _section_signatures(section: str) -> tuple[str, str]:
+        """Return stable and exact signatures for a rendered section."""
+        stripped = section.strip()
+        first_line = stripped.splitlines()[0] if stripped else ""
+        if first_line.startswith(":: "):
+            return first_line, stripped
+        return stripped, stripped
+
+    @staticmethod
     def _find_new_sections(
         output: str, known_sections: set[str]
     ) -> tuple[list[str], set[str]]:
@@ -448,9 +465,25 @@ class TerminalWriter:
 
         for section in sections:
             section_sig = section.strip()
-            if section_sig and section_sig not in known_sections:
+            if not section_sig:
+                continue
+
+            stable_sig, exact_sig = TerminalWriter._section_signatures(section)
+            if stable_sig in known_sections and exact_sig in known_sections:
+                continue
+
+            if stable_sig in known_sections:
+                lines = section_sig.splitlines()
+                section_body = "\n".join(lines[1:]).strip()
+                if section_body and exact_sig not in known_sections:
+                    new_sections.append(section_body)
+                    new_signatures.add(exact_sig)
+                continue
+
+            if exact_sig not in known_sections:
                 new_sections.append(section)
-                new_signatures.add(section_sig)
+                new_signatures.add(stable_sig)
+                new_signatures.add(exact_sig)
 
         return new_sections, new_signatures
 
@@ -768,7 +801,7 @@ def format_download_lines(
     # process errors via TaskError
     if task.errors:
         for err in task.errors:
-            msg = truncate_text(err.details, 120)
+            msg = truncate_text(err.details or "", 120)
             lines.append(
                 f"error: network error while downloading {task.name} : {msg}"
             )
@@ -795,7 +828,11 @@ def format_processing_task_lines(
     lines: list[str] = []
     phase_str = f"({task.phase}/{task.total_phases})"
 
-    operation = PROCESSING_LABELS.get(task.sub_type)
+    operation = (
+        PROCESSING_LABELS.get(task.sub_type)
+        if task.sub_type is not None
+        else None
+    )
     if operation is None:
         operation = "processing"
 
@@ -812,19 +849,19 @@ def format_processing_task_lines(
         for warning in task.warnings:
             # example: "warning: checksum asset not found"
             # FIXME: type errors
-            msg = truncate_text(warning.details, 120)
+            msg = truncate_text(warning.details or "", 120)
             lines.append(f"warning: {msg}")
 
     if task.errors:
         for err in task.errors:
             # Example: "error: failed to install 'appflowy' : Permission denied"
-            msg = truncate_text(err.details, 120)
+            msg = truncate_text(err.details or "", 120)
             lines.append(f"error: failed to {operation} '{task.name}' : {msg}")
 
     return lines
 
 
-def render_api_section(
+def render_api_section(  # noqa: PLR0912
     tasks: dict[str, TaskState],
     order: list[str],
 ) -> list[str]:
@@ -838,7 +875,7 @@ def render_api_section(
         List of formatted output lines for API section
 
     """
-    header = PHASE_SECTION_LABELS.get(Phase.API_FETCHING)
+    header = PHASE_SECTION_LABELS[Phase.API_FETCHING]
     api_tasks = [
         t
         for t in order
@@ -873,6 +910,10 @@ def render_api_section(
             status = "Fetching..."
 
         lines.append(f"{name:20} {status}")
+        if task.errors:
+            for err in task.errors:
+                details = truncate_text(err.details or "", 120)
+                lines.append(f"error: failed to query {task.name} : {details}")
 
     return lines
 
@@ -919,7 +960,7 @@ def render_downloads_section(
 
     total_downloads = len(download_tasks)
 
-    header = PHASE_SECTION_LABELS.get(Phase.DOWNLOAD)
+    header = PHASE_SECTION_LABELS[Phase.DOWNLOAD]
 
     lines = [header]
     for task_id in download_tasks:
@@ -990,8 +1031,8 @@ def render_processing_section(
         List of formatted output lines for processing section
 
     """
-    installing_header = PHASE_SECTION_LABELS.get(Phase.PROCESSING)
-    verifying_header = PROCESSING_LABELS.get(ProcessingPhase.VERIFICATION)
+    installing_header = PHASE_SECTION_LABELS[Phase.PROCESSING]
+    verifying_header = PROCESSING_LABELS[ProcessingPhase.VERIFICATION]
 
     post_tasks = [
         t

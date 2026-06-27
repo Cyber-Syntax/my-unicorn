@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -47,6 +48,8 @@ from my_unicorn.exceptions import (
     ERROR_MESSAGES,
     ConfigurationError,
     ErrorCode,
+    ErrorSeverity,
+    TaskError,
     UpdateError,
     VerificationError,
 )
@@ -64,6 +67,52 @@ logger = get_logger(__name__)
 
 
 # helpers
+def _build_progress_task_error(
+    app_name: str,
+    phase: Phase,
+    error_code: ErrorCode,
+    details: str,
+    processing_phase: str | None = None,
+) -> TaskError:
+    """Build structured progress error context."""
+    phase_name = phase.name.lower()
+    return TaskError(
+        phase=phase_name,
+        processing_phase=processing_phase or phase_name,
+        app_name=app_name,
+        error_code=error_code,
+        error_severity=ErrorSeverity.ERROR,
+        details=details,
+        timestamp=datetime.now(UTC).isoformat(),
+    )
+
+
+async def _finish_api_progress_task_with_error(
+    progress_reporter: ProgressReporter | None,
+    task_id: str | None,
+    app_name: str,
+    asset_result: AssetSelectionResult,
+    error_message: str,
+) -> None:
+    """Attach an error to an existing progress task when available."""
+    if progress_reporter is None or task_id is None:
+        return
+
+    await progress_reporter.finish_task(
+        task_id,
+        success=False,
+        description=error_message,
+        errors=[
+            _build_progress_task_error(
+                app_name=app_name,
+                phase=Phase.API_FETCHING,
+                error_code=asset_result.error or ErrorCode.UPDATE_FAILED,
+                details=error_message,
+            )
+        ],
+    )
+
+
 def _find_update_info(
     app_name: str,
     update_infos: list[UpdateInfo],
@@ -649,6 +698,8 @@ class UpdateManager:
                 self.check_single_update,
                 self._load_app_config_or_fail,
                 self._catalog_cache.load_catalog,
+                self.progress_reporter,
+                self._shared_api_task_id,
             )
 
         return await update_single_app(
@@ -734,9 +785,6 @@ async def update_cached_progress(
 
     try:
         task_info = progress_reporter.get_task_info(shared_api_task_id)
-        if not task_info:
-            return
-
         completed = task_info.get("completed", 0)
         total_value = task_info.get("total")
         new_completed = int(completed) + 1
@@ -1097,7 +1145,9 @@ def load_update_config(
 async def load_catalog_for_update(
     app_name: str,
     app_config: dict[str, Any],
-    load_catalog_cached_func: Callable,
+    load_catalog_cached_func: Callable[
+        [str], Awaitable[dict[str, Any] | None]
+    ],
 ) -> dict[str, Any] | None:
     """Load catalog entry if referenced in app config.
 
@@ -1171,7 +1221,7 @@ def select_asset_for_update(
 
     """
     if not update_info.release_data:
-        logger.error("No release data available for %s", app_name)
+        logger.debug("No release data available for %s", app_name)
         return AssetSelectionResult(
             asset=None,
             error=ErrorCode.UPDATE_FAILED,
@@ -1212,9 +1262,7 @@ def select_asset_for_update(
     # FAILED  ytmdesktop
     # ytmdesktop appimage asset not found : appimage builds may still be processing, try again later. Some developers may not provide appimage builds, so this might be external to my-unicorn's control.
     if not appimage_asset:
-        # use debug level to avoid duplicate `:: Querying upstream releases...` log messages. see #294
-        # user can still see the no appimage error in the summary section.
-        logger.error(
+        logger.debug(
             "No AppImage found for %s, may still be building", app_name
         )
         # TODO: use exceptions not AssetSelectionResult
@@ -1232,7 +1280,7 @@ def select_asset_for_update(
     )
 
 
-async def prepare_update_context(
+async def prepare_update_context(  # noqa: PLR0913
     app_name: str,
     session: aiohttp.ClientSession,
     force: bool,
@@ -1244,6 +1292,8 @@ async def prepare_update_context(
     load_catalog_cached_func: Callable[
         [str], Awaitable[dict[str, Any] | None]
     ],
+    progress_reporter: ProgressReporter | None = None,
+    api_task_id: str | None = None,
 ) -> tuple[dict[str, Any] | None, str | None]:
     """Prepare context for update operation.
 
@@ -1255,6 +1305,8 @@ async def prepare_update_context(
         check_single_update_func: Function to check single update
         load_app_config_func: Function to load app config
         load_catalog_cached_func: Function to load cached catalog
+        progress_reporter: Optional progress reporter for inline errors
+        api_task_id: Optional API progress task ID for inline errors
 
     Returns:
         Tuple of (context dict, error message). Context is None on error.
@@ -1301,7 +1353,15 @@ async def prepare_update_context(
     # what type of errors might happen here with correct good text
     # e.g ErrorCode.APPIMAGE_SELECTION_FAILED
     if not asset_result.ok():
-        return None, asset_result.message or "Asset selection failed"
+        error_message = asset_result.message or "Asset selection failed"
+        await _finish_api_progress_task_with_error(
+            progress_reporter=progress_reporter,
+            task_id=api_task_id,
+            app_name=app_name,
+            asset_result=asset_result,
+            error_message=error_message,
+        )
+        return None, error_message
 
     appimage_asset = asset_result.asset
 
