@@ -151,7 +151,7 @@ def display_update_results(results: dict) -> None:
         # Show failed apps with error info
         for app_name in failed:
             app_info = _find_update_info(app_name, update_infos)
-            logger.info("FAILED  %s", app_name)
+            logger.info("FAILED %s", app_name)
             # Keep error reason indented under the app name
             # app name is already shown in the log line above
             if app_info and app_info.error_reason:
@@ -163,12 +163,12 @@ def display_update_results(results: dict) -> None:
             if app_info.is_success:
                 version = app_info.current_version
                 logger.info(
-                    "%-25s Already up to date (%s)",
+                    "UPTODATE %-20s  %s",
                     app_name,
                     version,
                 )
             else:
-                logger.info("%-25s Already up to date", app_name)
+                logger.info("UPTODATE %-20s  %s", app_name)
 
     else:
         # Fallback to simple logger output
@@ -1058,7 +1058,7 @@ async def resolve_update_info(
 
     # Check if update is needed (skip if up to date and not forced)
     if not update_info.has_update and not force:
-        logger.info("%s is already up to date", app_name)
+        logger.info("UP TO DATE  %s", app_name)
         return update_info, None  # Return info for skip handling
 
     return update_info, None
@@ -1178,10 +1178,33 @@ def select_asset_for_update(
         raise_on_not_found=False,
     )
 
+    # TODO: we must show error here on the api section without duplicate Querying text
+    # because we migrate new pacman style cli design
+    # we are going to remove summary section error showcase completely,and only show failed, success
+    # NOTE: if we make logger.debug to logger.error
+    # it make it this error like #294
+    # ➜ my-unicorn update
+    # :: Querying upstream releases...
+    # :::: Querying upstream releases...
+    # GitHub Releases      2/2 Retrieved from cache
+    # :: Retrieving appimages...
+    # zen-x86_64                                                                                                         117.0 MiB   10.6 MB/s      5s [=============>                ]  48%
+    # Total (0/1)                                                                                                        117.0 MiB   10.6 MB/s      5s [=============>                ]  48%
+    # CLI cancelled by user
+    # TODO: might be solveable via making it exception instead of if?
+    # this probably happen because of async maybe, which it isn't even show error which it is show the error
+    # when I only update the ytmdesktop:
+    # ➜ my-unicorn update ytmdesktop
+    # :: Querying upstream releases...
+    # GitHub Releases      1/1 Retrieved from cache
+    # 13:36:55 - my_unicorn.core.update - ERROR - No AppImage found for ytmdesktop, may still be building
+    # :: Creating transaction summary...
+    # FAILED  ytmdesktop
+    # ytmdesktop appimage asset not found : appimage builds may still be processing, try again later. Some developers may not provide appimage builds, so this might be external to my-unicorn's control.
     if not appimage_asset:
         # use debug level to avoid duplicate `:: Querying upstream releases...` log messages. see #294
         # user can still see the no appimage error in the summary section.
-        logger.debug(
+        logger.error(
             "No AppImage found for %s, may still be building", app_name
         )
         # return None, "AppImage not found in release - may still be building"
