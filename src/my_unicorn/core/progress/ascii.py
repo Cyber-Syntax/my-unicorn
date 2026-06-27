@@ -811,6 +811,7 @@ def format_processing_task_lines(
     if task.warnings:
         for warning in task.warnings:
             # example: "warning: checksum asset not found"
+            # FIXME: type errors
             msg = truncate_text(warning.details, 120)
             lines.append(f"warning: {msg}")
 

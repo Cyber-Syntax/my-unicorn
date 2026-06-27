@@ -762,9 +762,13 @@ class Verifier:
         logger.debug("   Expected hash: %s", hash_value)
         logger.debug("🧮 Computing %s hash…", algo.upper())
 
-        actual_hash = self.compute_hash(algo)  # type: ignore[arg-type]
+        # FIXME: Argument to bound method `Verifier.compute_hash` is incorrect: Expected `Literal["sha256", "sha512"]`, found `str`
+        actual_hash = self.compute_hash(algo)
         logger.debug("   Computed hash: %s", actual_hash)
 
+        # TODO: use new exception modules for it:
+        # details can have the expected and actual
+        # so machine can be able to see the differences on hash mismatch
         if actual_hash.lower() != hash_value.lower():
             msg = (
                 "Digest mismatch!\n"

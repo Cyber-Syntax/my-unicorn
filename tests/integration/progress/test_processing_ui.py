@@ -18,6 +18,7 @@ from my_unicorn.core.progress.progress_types import (
     ProcessingPhase,
     TaskState,
 )
+from my_unicorn.exceptions import ErrorCode, ErrorSeverity, TaskError
 
 from .test_ui_helpers import capture_progress_output, parse_output_sections
 
@@ -103,6 +104,8 @@ class TestVerificationWarningUI:
         assert "verifying" in output
         assert "weektodo" in output
         # Warning message should be on next line with indentation
+        # FIXME:AssertionError: assert 'not verified (dev did not provide checksums)' in 'verifying\n(1/2) verifying weektodo'
+        # TODO: we might need to change verifying to skipped for weektodo?
         assert "not verified (dev did not provide checksums)" in output
 
     def test_verification_warning_with_next_phase(self) -> None:
@@ -327,8 +330,7 @@ class TestProcessingErrorUI:
         Tests that when a processing task fails, the error message
         is displayed correctly with formatting:
         - Phase and operation
-        - Error symbol
-        - Error message on next line with indentation
+        - Error message
         """
         # Arrange - create a failed task with error message
         task = TaskState(
@@ -340,7 +342,17 @@ class TestProcessingErrorUI:
             total_phases=2,
             is_finished=True,
             success=False,
-            error_message="Failed to create desktop entry: Permission denied",
+            errors=[
+                TaskError(
+                    phase="download",
+                    processing_phase="download",
+                    app_name="bad.AppImage",
+                    error_code=ErrorCode.DESKTOP_ENTRY_CREATION_FAILED,
+                    error_severity=ErrorSeverity.ERROR,
+                    details="Failed to create desktop entry: Permission denied",
+                    timestamp="2026-01-01T00:00:00Z",
+                )
+            ],
         )
 
         tasks = {"i1": task}
@@ -361,9 +373,10 @@ class TestProcessingErrorUI:
         assert "(2/2)" in output
         assert "installing" in output
         assert "broken-app" in output
-        # Error message should appear on next line with indentation
-        assert "Error:" in output
-        assert "Failed to create desktop entry" in output
+        assert (
+            "error: failed to installing 'broken-app' : Failed to create desktop entry: Permission denied"
+            in output
+        )
 
     def test_verification_error_ui(self) -> None:
         """Verify error messages appear correctly in verification phase.
@@ -380,7 +393,17 @@ class TestProcessingErrorUI:
             total_phases=2,
             is_finished=True,
             success=False,
-            error_message="Hash verification failed: SHA256 mismatch",
+            errors=[
+                TaskError(
+                    phase="download",
+                    processing_phase="download",
+                    app_name="bad.AppImage",
+                    error_code=ErrorCode.CHECKSUM_MISMATCH,
+                    error_severity=ErrorSeverity.ERROR,
+                    details="Hash verification failed: SHA256 mismatch",
+                    timestamp="2026-01-01T00:00:00Z",
+                )
+            ],
         )
 
         tasks = {"v1": task}
@@ -402,8 +425,10 @@ class TestProcessingErrorUI:
         assert "verifying" in output
         assert "bad-app" in output
         # Error message should appear
-        assert "Error:" in output
-        assert "Hash verification failed" in output
+        assert (
+            "error: failed to verifying 'bad-app' : Hash verification failed: SHA256 mismatch"
+            in output
+        )
 
 
 @pytest.mark.integration

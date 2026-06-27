@@ -14,6 +14,12 @@ from my_unicorn.core.progress.ascii import (
     render_downloads_section,
 )
 from my_unicorn.core.progress.progress_types import Phase, TaskState
+from my_unicorn.exceptions import (
+    ERROR_MESSAGES,
+    ErrorCode,
+    ErrorSeverity,
+    TaskError,
+)
 
 from .test_ui_helpers import parse_output_sections
 
@@ -109,7 +115,17 @@ class TestDownloadProgressBarUI:
             completed=50.0 * 1024 * 1024,
             is_finished=True,
             success=False,
-            error_message="Connection timeout while downloading from server",
+            errors=[
+                TaskError(
+                    phase="download",
+                    processing_phase="download",
+                    app_name="bad.AppImage",
+                    error_code=ErrorCode.NETWORK_DNS_FAILURE,
+                    error_severity=ErrorSeverity.ERROR,
+                    details=ERROR_MESSAGES.get(ErrorCode.NETWORK_TIMEOUT),
+                    timestamp="2026-01-01T00:00:00Z",
+                )
+            ],
         )
 
         tasks = {"dl_1": task}
@@ -126,8 +142,8 @@ class TestDownloadProgressBarUI:
         output = "\n".join(output_lines)
 
         # Assert - should show error message
-        assert "Error:" in output
-        assert "timeout" in output.lower()
+        # FIXME: E       AssertionError: assert 'error: network timeout while downloading asset' in ':: Retrieving appimages...\nbroken-app   100.0 MiB          --   --:-- [==============>               ]  50%\nerror: ...work timeout while downloading asset\nTotal (0/1)  100.0 MiB     -- MB/s   --:-- [==============>               ]  50%'
+        assert "error: network timeout while downloading asset" in output
         # Failed downloads should show error
         assert "broken-app" in output
 

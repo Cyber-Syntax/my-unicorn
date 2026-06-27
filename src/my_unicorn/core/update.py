@@ -516,6 +516,7 @@ class UpdateManager:
             logger.exception("Failed to check updates for %s", app_name)
             return UpdateInfo.create_error(app_name, str(e))
 
+        # TODO: use exceptions not constants for unexpected
         except Exception as e:
             # Catch-all for unexpected errors
             logger.exception("Failed to check updates for %s", app_name)
@@ -1144,6 +1145,15 @@ class AssetSelectionResult:
         return self.asset is not None and self.error is None
 
 
+# TODO: why we don't use api to handle errors for us?
+# we also have install, so we share api for both
+# also update is just still install the appimage...
+# for specific errors like update fail or install fail
+# might good but we don't need to worry about it so much.
+# my main issue is that I must show errors directly
+# after the api fails, not after in the update or install
+# which both actually send api request
+# so it seems like my architecture wrong?
 def select_asset_for_update(
     app_name: str,
     update_info: UpdateInfo,
@@ -1207,6 +1217,7 @@ def select_asset_for_update(
         logger.error(
             "No AppImage found for %s, may still be building", app_name
         )
+        # TODO: use exceptions not AssetSelectionResult
         # return None, "AppImage not found in release - may still be building"
         return AssetSelectionResult(
             asset=None,

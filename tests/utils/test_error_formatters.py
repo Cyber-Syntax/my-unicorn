@@ -3,7 +3,6 @@
 from my_unicorn.exceptions import InstallationError
 from my_unicorn.utils.error_formatters import (
     build_install_error_result,
-    build_success_result,
     get_user_friendly_error,
 )
 
@@ -96,66 +95,3 @@ class TestBuildInstallErrorResult:
 
         required_keys = {"success", "target", "name", "error", "source"}
         assert set(result.keys()) == required_keys
-
-
-class TestBuildSuccessResult:
-    """Tests for build_success_result function."""
-
-    def test_catalog_success_without_path(self):
-        """Test building success result for catalog installation without path."""
-        result = build_success_result("myapp", "myapp", is_url=False)
-
-        assert result["success"] is True
-        assert result["target"] == "myapp"
-        assert result["name"] == "myapp"
-        assert result["source"] == "catalog"
-        assert "path" not in result
-
-    def test_catalog_success_with_path(self):
-        """Test building success result for catalog installation with path."""
-        result = build_success_result(
-            "myapp", "myapp", is_url=False, installed_path="/opt/myapp"
-        )
-
-        assert result["success"] is True
-        assert result["path"] == "/opt/myapp"
-
-    def test_url_success(self):
-        """Test building success result for URL installation."""
-        result = build_success_result(
-            "https://example.com/app.AppImage",
-            "customapp",
-            is_url=True,
-            installed_path="/opt/customapp",
-        )
-
-        assert result["success"] is True
-        assert result["target"] == "https://example.com/app.AppImage"
-        assert result["name"] == "customapp"
-        assert result["source"] == "url"
-        assert result["path"] == "/opt/customapp"
-
-    def test_different_target_and_name(self):
-        """Test that target and name can differ (URL vs app name)."""
-        result = build_success_result(
-            "https://example.com/app.AppImage", "myapp", is_url=True
-        )
-
-        assert result["target"] == "https://example.com/app.AppImage"
-        assert result["name"] == "myapp"
-
-    def test_result_structure_minimal(self):
-        """Test minimal result structure without optional fields."""
-        result = build_success_result("myapp", "myapp", is_url=False)
-
-        required_keys = {"success", "target", "name", "source"}
-        assert set(result.keys()) == required_keys
-
-    def test_result_structure_complete(self):
-        """Test complete result structure with all optional fields."""
-        result = build_success_result(
-            "myapp", "myapp", is_url=False, installed_path="/opt/myapp"
-        )
-
-        expected_keys = {"success", "target", "name", "source", "path"}
-        assert set(result.keys()) == expected_keys

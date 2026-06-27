@@ -8,6 +8,10 @@ from my_unicorn.exceptions import InstallationError
 # TODO: it is used for make user friendly but seems like
 # this isn't show the building, etc. like mappings not work
 # so remove these when you not need to format anymore.
+# just use the exceptions.py to handle showcase for errors
+# TODO: also findout how to handle the empty spaces
+# TODO: also handle that app_name for each failed app for better error show
+# chatgpt have a chat about this
 def get_user_friendly_error(error: InstallationError) -> str:
     """Convert InstallationError to user-friendly message.
 

@@ -54,6 +54,7 @@ class ErrorCode(Enum):
     PERMISSION_DENIED = "permission_denied"
     LOCK_INSTANCE_FAILED = "lock_instance_failed"
     LOCK_ACQUIRE_FAILED = "lock_acquire_failed"
+    INVALID_CONFIG = "invalid_config"
 
 
 # TODO: add missing errorcodes from above
@@ -68,6 +69,7 @@ ERROR_MESSAGES = {
     ErrorCode.UNKNOWN_ERROR: "an unknown error occurred",
     ErrorCode.LOCK_INSTANCE_FAILED: "Another my-unicorn instance is already running.Please wait or stop the other instance.",
     ErrorCode.LOCK_ACQUIRE_FAILED: "Failed to acquire lock",
+    ErrorCode.INVALID_CONFIG: "invalid config : make sure that you have ~/.config/my-unicorn/settings.conf and with correct template",
 }
 
 
@@ -259,9 +261,7 @@ class UpdateError(MyUnicornError):
 
 
 # TODO: this is used from logger, update modules
-# might be better to add a message in above messages section
-# and remove this instead for easy showcase
-# but not sure about how we canhandle context?
+# refactor those modules to use this correctly with context etc.
 class ConfigurationError(MyUnicornError):
     """Raised when configuration is invalid or missing.
 
@@ -275,38 +275,6 @@ class ConfigurationError(MyUnicornError):
     """
 
     error_prefix = "Configuration error"
-
-    def __init__(
-        self,
-        message: str,
-        *,
-        config_path: str | None = None,
-        field: str | None = None,
-        cause: Exception | None = None,
-    ) -> None:
-        """Initialize configuration error.
-
-        Args:
-            message: Error message describing the configuration issue.
-            config_path: Path to the configuration file.
-            field: Specific field that caused the error.
-            cause: Original exception that caused the failure.
-
-        """
-        context: dict[str, object] = {}
-        if config_path:
-            context["config_path"] = config_path
-        if field:
-            context["field"] = field
-
-        super().__init__(
-            message,
-            context=context,
-            is_retryable=False,
-            cause=cause,
-        )
-        self.config_path = config_path
-        self.field = field
 
 
 # TODO: same like above configuration exception

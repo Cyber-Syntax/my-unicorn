@@ -22,6 +22,12 @@ from my_unicorn.core.progress.progress_types import (
     ProcessingPhase,
     TaskState,
 )
+from my_unicorn.exceptions import (
+    ERROR_MESSAGES,
+    ErrorCode,
+    ErrorSeverity,
+    TaskError,
+)
 
 
 class TestSectionRenderConfig:
@@ -133,14 +139,24 @@ class TestFormatDownloadLines:
             completed=0.0,
             is_finished=True,
             success=False,
-            error_message="Network timeout",
+            errors=[
+                TaskError(
+                    phase="download",
+                    processing_phase="download",
+                    app_name="bad.AppImage",
+                    error_code=ErrorCode.NETWORK_TIMEOUT,
+                    error_severity=ErrorSeverity.ERROR,
+                    details=ERROR_MESSAGES.get(ErrorCode.NETWORK_TIMEOUT),
+                    timestamp="2026-01-01T00:00:00Z",
+                )
+            ],
         )
 
         lines = format_download_lines(task, max_name_width=20, bar_width=30)
 
         assert len(lines) >= 2
-        assert "Error:" in lines[1]
-        assert "Network timeout" in lines[1]
+        assert "error:" in lines[1]
+        assert "network timeout while downloading asset" in lines[1]
 
     def test_format_download_lines_completed_successfully(self) -> None:
         """Test formatting completed download."""
@@ -198,7 +214,17 @@ class TestFormatProcessingTaskLines:
             total_phases=2,
             is_finished=True,
             success=False,
-            error_message="Hash mismatch",
+            errors=[
+                TaskError(
+                    phase="download",
+                    processing_phase="download",
+                    app_name="bad.AppImage",
+                    error_code=ErrorCode.NETWORK_DNS_FAILURE,
+                    error_severity=ErrorSeverity.ERROR,
+                    details=ERROR_MESSAGES.get(ErrorCode.CHECKSUM_MISMATCH),
+                    timestamp="2026-01-01T00:00:00Z",
+                )
+            ],
         )
         spinner = "⠋"
 
@@ -207,7 +233,10 @@ class TestFormatProcessingTaskLines:
         )
 
         assert len(lines) >= 2
-        assert "Error:" in lines[1]
+        assert (
+            "checksum verification failed because of hash mismatches"
+            in lines[1]
+        )
 
     def test_format_processing_task_lines_installation(self) -> None:
         """Test formatting installation task."""

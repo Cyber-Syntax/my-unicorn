@@ -7,6 +7,12 @@ from my_unicorn.core.progress.progress import (
     ProgressConfig,
     TaskState,
 )
+from my_unicorn.exceptions import (
+    ERROR_MESSAGES,
+    ErrorCode,
+    ErrorSeverity,
+    TaskError,
+)
 
 
 def make_backend():
@@ -58,7 +64,20 @@ def test_format_download_lines_success_and_error():
         speed=0,
         is_finished=True,
         success=False,
-        error_message="Something went wrong while downloading",
+        errors=[
+            TaskError(
+                phase="download",
+                processing_phase="download",
+                app_name="bad.AppImage",
+                error_code=ErrorCode.DOWNLOAD_FAILED,
+                error_severity=ErrorSeverity.ERROR,
+                details=ERROR_MESSAGES.get(ErrorCode.DOWNLOAD_FAILED),
+                timestamp="2026-01-01T00:00:00Z",
+            )
+        ],
     )
     lines = format_download_lines(task_fail, max_name_width=20, bar_width=30)
-    assert any("Error:" in l for l in lines)
+    assert (
+        "error: network error while downloading bad.AppImage : Something went wrong while downloading"
+        in lines
+    )
