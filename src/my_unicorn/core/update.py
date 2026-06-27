@@ -489,6 +489,30 @@ class UpdateManager:
             app_config=app_config,
         )
 
+    async def _report_api_error(self, app_name: str, error_msg: str) -> None:
+        """Helper to report API errors to progress reporter."""
+        from my_unicorn.core.progress.progress_types import Phase, TaskError, ErrorSeverity
+        from datetime import UTC, datetime
+
+        err_id = await self.progress_reporter.add_task(
+            name=app_name, progress_type=Phase.API_FETCHING
+        )
+        await self.progress_reporter.finish_task(
+            err_id,
+            success=False,
+            errors=[
+                TaskError(
+                    phase="api_fetching",
+                    processing_phase="api_fetching",
+                    app_name=app_name,
+                    error_code=ErrorCode.UPDATE_FAILED,
+                    error_severity=ErrorSeverity.ERROR,
+                    details=error_msg,
+                    timestamp=datetime.now(UTC).isoformat(),
+                )
+            ],
+        )
+
     async def check_single_update(
         self,
         app_name: str,
@@ -533,6 +557,13 @@ class UpdateManager:
                 owner, repo, should_use_prerelease, session, refresh_cache
             )
 
+            if self.progress_reporter and self._shared_api_task_id:
+                info = self.progress_reporter.get_task_info(self._shared_api_task_id)
+                await self.progress_reporter.update_task(
+                    self._shared_api_task_id,
+                    completed=info["completed"] + 1,
+                )
+
             # Build and return update info
             return await self._build_update_info(
                 app_name, app_config, release_data
@@ -558,20 +589,29 @@ class UpdateManager:
                     e.status,
                     e.message,
                 )
+            # Report error by creating a finished task
+            if self.progress_reporter:
+                await self._report_api_error(app_name, error_msg)
             return UpdateInfo.create_error(app_name, error_msg)
 
         except (ConfigurationError, ValueError) as e:
             # Handle config and validation errors
             logger.exception("Failed to check updates for %s", app_name)
+            if self.progress_reporter:
+                await self._report_api_error(app_name, str(e))
             return UpdateInfo.create_error(app_name, str(e))
 
         # TODO: use exceptions not constants for unexpected
         except Exception as e:
             # Catch-all for unexpected errors
             logger.exception("Failed to check updates for %s", app_name)
+            error_msg = ERROR_UNEXPECTED.format(error=e)
+            if self.progress_reporter:
+                await self._report_api_error(app_name, error_msg)
             return UpdateInfo.create_error(
-                app_name, ERROR_UNEXPECTED.format(error=e)
+                app_name, error_msg
             )
+
 
     async def check_updates(
         self,
@@ -607,14 +647,20 @@ class UpdateManager:
 
         logger.info("🔄 Checking %d app(s) for updates...", len(app_names))
 
-        async with aiohttp.ClientSession() as session:
-            tasks = [
-                self.check_single_update(
-                    app, session, refresh_cache=refresh_cache
-                )
-                for app in app_names
-            ]
-            return await asyncio.gather(*tasks)
+        from my_unicorn.core.protocols.progress import github_api_progress_task
+
+        async with github_api_progress_task(
+            self.progress_reporter, task_name="GitHub", total=len(app_names)
+        ) as api_task_id:
+            self._shared_api_task_id = api_task_id
+            async with aiohttp.ClientSession() as session:
+                tasks = [
+                    self.check_single_update(
+                        app, session, refresh_cache=refresh_cache
+                    )
+                    for app in app_names
+                ]
+                return await asyncio.gather(*tasks)
 
     def _load_app_config_or_fail(
         self, app_name: str, context: str = ""

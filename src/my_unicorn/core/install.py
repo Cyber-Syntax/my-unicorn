@@ -795,15 +795,44 @@ class InstallHandler:
         async def install_one(app_or_url: str, is_url: bool) -> dict[str, Any]:
             async with semaphore:
                 try:
-                    if is_url:
-                        return await self.install_from_url(
-                            app_or_url, **options
-                        )
-                    return await self.install_from_catalog(
-                        app_or_url, **options
+                    result = await (
+                        self.install_from_url(app_or_url, **options)
+                        if is_url
+                        else self.install_from_catalog(app_or_url, **options)
                     )
+                    
+                    if self.progress_reporter and api_task_id:
+                        info = self.progress_reporter.get_task_info(api_task_id)
+                        await self.progress_reporter.update_task(
+                            api_task_id,
+                            completed=info["completed"] + 1,
+                        )
+                        
+                    return result
                 # TODO: add exceptions variables
                 except InstallationError as error:
+                    # Report error
+                    if self.progress_reporter and api_task_id:
+                        from my_unicorn.core.progress.progress_types import Phase, TaskError, ErrorSeverity
+                        from datetime import UTC, datetime
+                        from my_unicorn.exceptions import ErrorCode
+
+                        err_id = await self.progress_reporter.add_task(
+                            name=app_or_url, progress_type=Phase.API_FETCHING
+                        )
+                        await self.progress_reporter.finish_task(
+                            err_id, 
+                            success=False,
+                            errors=[TaskError(
+                                phase="api_fetching",
+                                processing_phase="api_fetching",
+                                app_name=app_or_url,
+                                error_code=ErrorCode.INSTALL_FAILED,
+                                error_severity=ErrorSeverity.ERROR,
+                                details=str(error),
+                                timestamp=datetime.now(UTC).isoformat()
+                            )]
+                        )
                     logger.error(
                         "Installation error for %s: %s", app_or_url, error
                     )
@@ -839,9 +868,15 @@ class InstallHandler:
                         "source": source,
                     }
 
-        tasks = [install_one(app, is_url=False) for app in catalog_apps]
-        tasks += [install_one(url, is_url=True) for url in url_apps]
-        return await asyncio.gather(*tasks)
+        # Create one shared API task
+        from my_unicorn.core.protocols.progress import github_api_progress_task
+
+        async with github_api_progress_task(
+            self.progress_reporter, task_name="GitHub", total=len(catalog_apps) + len(url_apps)
+        ) as api_task_id:
+            tasks = [install_one(app, is_url=False) for app in catalog_apps]
+            tasks += [install_one(url, is_url=True) for url in url_apps]
+            return await asyncio.gather(*tasks)
 
     # ------------------------------------------------------------------
     # Private helpers (kept so tests can mock _fetch_release /

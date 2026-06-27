@@ -361,7 +361,7 @@ class AsciiProgressBackend:
         """
         sections: list[str] = []
 
-        api_lines = render_api_section(tasks_snapshot, order_snapshot)
+        api_lines = render_api_section(tasks_snapshot, order_snapshot, self._section_config)
         if api_lines:
             sections.append("\n".join(api_lines))
 
@@ -861,25 +861,25 @@ def format_processing_task_lines(
     return lines
 
 
-def render_api_section(  # noqa: PLR0912
+def render_api_section(
     tasks: dict[str, TaskState],
     order: list[str],
+    config: SectionRenderConfig,
 ) -> list[str]:
-    """Render API fetching section.
+    """Render API fetching section as a consolidated progress bar.
 
     Args:
         tasks: Dictionary of all tasks
         order: List of task IDs in order
+        config: SectionRenderConfig with rendering options
 
     Returns:
         List of formatted output lines for API section
-
     """
     header = PHASE_SECTION_LABELS[Phase.API_FETCHING]
     api_tasks = [
         t
         for t in order
-        # using .get() prevents crashes if task state changes during rendering.
         if (task := tasks.get(t)) and task.progress_type == Phase.API_FETCHING
     ]
 
@@ -887,33 +887,34 @@ def render_api_section(  # noqa: PLR0912
         return []
 
     lines = [header]
+    
+    # Calculate aggregate progress
+    total_completed = sum(tasks[t].completed for t in api_tasks)
+    total_units = sum(tasks[t].total for t in api_tasks)
+    
+    # Render progress bar
+    bar = render_bar(total_completed, total_units, config.bar_width)
+    pct = format_percentage(total_completed, total_units)
+    
+    # Static label for the API bar
+    label = "GitHub"
+    
+    # Right-aligned metrics (similar to download bar)
+    right_section = f"{bar} {pct:>4}"
+    
+    # Format line: label on left, right section on right
+    line = f"{label:<20} {right_section}"
+    lines.append(line)
+    
+    # Collect all errors
     for task_id in api_tasks:
         task = tasks[task_id]
-        name = truncate_text(task.name, 18)
-
-        if task.total > 0:
-            completed = int(task.completed)
-            total = int(task.total)
-            if task.is_finished or completed >= total:
-                if "cached" in task.description.lower():
-                    status = f"{total}/{total} Retrieved from cache"
-                else:
-                    status = f"{total}/{total} Retrieved"
-            else:
-                status = f"{completed}/{total} Fetching..."
-        elif task.is_finished:
-            if "cached" in task.description.lower():
-                status = "Retrieved from cache"
-            else:
-                status = "Retrieved"
-        else:
-            status = "Fetching..."
-
-        lines.append(f"{name:20} {status}")
         if task.errors:
             for err in task.errors:
                 details = truncate_text(err.details or "", 120)
-                lines.append(f"error: failed to query {task.name} : {details}")
+                # Only show error if it has details to avoid empty lines
+                if details:
+                    lines.append(f"error: {details}")
 
     return lines
 
