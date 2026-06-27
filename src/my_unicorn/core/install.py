@@ -90,6 +90,22 @@ def _print_all_already_installed(results: list[dict[str, Any]]) -> None:
         logger.info("   - %s", result.get("name", "Unknown"))
 
 
+##FIXME:
+#
+# this happens when url install
+# 13:11:01 - my_unicorn.core.install - ERROR - Failed to install from URL https://github.com/ytmdesktop/ytmdesktop: Install failed: Installation failed: No assets found in release (url=https://github.com/ytmdesktop/ytmdesktop, source=url)
+# :: Creating transaction summary...
+# FAILED  https://github.com/ytmdesktop/ytmdesktop
+# 13:11:01 - my_unicorn.core.install - ERROR - Install failed: Installation failed: No assets found in release (url=https://github.com/ytmdesktop/ytmdesktop, source=url)
+# this happens catalog install
+# ➜ my-unicorn install flameshot
+# :: Querying upstream releases...
+# GitHub Releases      1/1 Retrieved
+# 13:11:51 - my_unicorn.core.install - ERROR - Failed to install flameshot: Installation failed: No assets found in release
+# :: Creating transaction summary...
+# FAILED  flameshot
+# 13:11:51 - my_unicorn.core.install - ERROR - No assets found in release - may still be building
+#
 def _print_result_line(result: dict[str, Any]) -> None:
     """Print a single installation result line.
 
@@ -107,8 +123,8 @@ def _print_result_line(result: dict[str, Any]) -> None:
     app_name = result.get("name", "Unknown")
 
     if not result.get("success", False):
-        logger.error("%-25s × Installation failed", app_name)
-        logger.error("%-25s    → %s", "", result.get("error", "Unknown error"))
+        logger.info("FAILED  %s", app_name)
+        logger.error("%s", result.get("error", "Unknown error"))
         return
 
     if result.get("status") == "already_installed":
@@ -142,6 +158,7 @@ def print_install_summary(results: list[dict[str, Any]]) -> None:
         _print_result_line(result)
 
 
+# TODO: use warning message exceptions for these
 def display_no_targets_error() -> None:
     """Display error when no installation targets are specified."""
     logger.error("× No targets specified.")
@@ -174,6 +191,7 @@ async def fetch_release(
     """
     try:
         release = await github_client.get_latest_release(owner, repo)
+        # TODO: change it to exceptions.py not constant
         if not release:
             msg = ERROR_NO_RELEASE_FOUND.format(owner=owner, repo=repo)
             raise InstallError(
@@ -264,6 +282,7 @@ async def install_workflow(
 
         result = await post_download_processor.process(context)
 
+        # TODO: add exceptions
         if not result.success:
             msg = result.error or "Post-download processing failed"
             raise InstallationError(msg)
@@ -384,6 +403,7 @@ async def install_from_catalog(
 
     """
 
+    # TODO: change it to exceptions.py instead of constants.py
     def _raise_no_asset() -> None:
         raise InstallError(
             ERROR_NO_APPIMAGE_ASSET,
@@ -431,6 +451,8 @@ async def install_from_catalog(
             **options,
         )
 
+    # TODO: add exceptions special variables
+    # remove build_install_error_result from error_formatters.py
     except InstallationError as error:
         logger.error("Failed to install %s: %s", app_name, error)
         return build_install_error_result(error, app_name, is_url=False)
@@ -780,6 +802,7 @@ class InstallHandler:
                     return await self.install_from_catalog(
                         app_or_url, **options
                     )
+                # TODO: add exceptions variables
                 except InstallationError as error:
                     logger.error(
                         "Installation error for %s: %s", app_or_url, error

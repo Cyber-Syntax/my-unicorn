@@ -63,6 +63,140 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
+# helpers
+def _find_update_info(
+    app_name: str,
+    update_infos: list[UpdateInfo],
+) -> UpdateInfo:
+    """Find UpdateInfo for a specific app.
+
+    Args:
+        app_name: Name of the app to find.
+        update_infos: List of UpdateInfo objects.
+
+    Returns:
+        UpdateInfo for the app with default error if not found.
+
+    """
+    for info in update_infos:
+        if info.app_name == app_name:
+            return info
+    # Return default error UpdateInfo if not found
+    return UpdateInfo(
+        app_name=app_name,
+        error_reason="Update info not found",
+    )
+
+
+def display_update_error(message: str) -> None:
+    """Display an error message.
+
+    Args:
+        message: Error message to display.
+
+    """
+    logger.error("× %s", message)
+
+
+def display_check_results(results: dict) -> None:
+    """Display check-only results from update service.
+
+    Args:
+        results: Results dictionary with 'available_updates' key
+
+    """
+    if results["available_updates"]:
+        logger.info("Updates available:")
+        for info in results["available_updates"]:
+            logger.info(
+                "  %s: %s → %s",
+                info["app_name"],
+                info["current_version"],
+                info["latest_version"],
+            )
+        logger.info("\nRun 'my-unicorn update' to install updates")
+    else:
+        logger.info("✓ All apps are up to date")
+
+
+def display_update_results(results: dict) -> None:
+    """Display update operation results from update service.
+
+    Args:
+        results: Results dictionary with 'updated', 'failed', 'up_to_date',
+            and 'update_infos' keys
+
+    """
+    updated = results.get("updated", [])
+    failed = results.get("failed", [])
+    up_to_date = results.get("up_to_date", [])
+    update_infos = results.get("update_infos", [])
+
+    # If we have detailed info, use formatted summary
+    if update_infos:
+        header = PHASE_SECTION_LABELS.get(Phase.SUMMARY)
+        logger.info(header)
+
+        # Show updated apps with version info
+        for app_name in updated:
+            app_info = _find_update_info(app_name, update_infos)
+            if app_info.is_success:
+                version_info = (
+                    f"{app_info.current_version} → {app_info.latest_version}"
+                )
+                logger.info("%-25s ✓ %s", app_name, version_info)
+            else:
+                logger.info("%-25s ✓ Updated", app_name)
+
+        # Show failed apps with error info
+        for app_name in failed:
+            app_info = _find_update_info(app_name, update_infos)
+            logger.info("FAILED  %s", app_name)
+            # Keep error reason indented under the app name
+            # app name is already shown in the log line above
+            if app_info and app_info.error_reason:
+                logger.info("%s %s", app_name, app_info.error_reason)
+
+        # Show up-to-date apps
+        for app_name in up_to_date:
+            app_info = _find_update_info(app_name, update_infos)
+            if app_info.is_success:
+                version = app_info.current_version
+                logger.info(
+                    "%-25s Already up to date (%s)",
+                    app_name,
+                    version,
+                )
+            else:
+                logger.info("%-25s Already up to date", app_name)
+
+    else:
+        # Fallback to simple logger output
+        if updated:
+            logger.info("✓ Successfully updated: %s", ", ".join(updated))
+        if failed:
+            logger.error("× Failed to update: %s", ", ".join(failed))
+        if up_to_date:
+            logger.info("Already up to date: %s", ", ".join(up_to_date))
+
+
+def display_invalid_apps(
+    invalid_apps: list[str], config_manager: ConfigManager
+) -> None:
+    """Display warning about invalid app names.
+
+    Args:
+        invalid_apps: List of app names not found
+        config_manager: ConfigManager instance for listing installed apps
+
+    """
+    if invalid_apps:
+        logger.warning("! Apps not found: %s", ", ".join(invalid_apps))
+        installed = config_manager.list_installed_apps()
+        if installed:
+            logger.info("   Installed apps: %s", ", ".join(installed))
+
+
 class UpdateManager:
     r"""Manages updates for installed AppImage applications.
 
@@ -239,6 +373,7 @@ class UpdateManager:
             cache_manager=self.cache_manager,
             auth_manager=self.auth_manager,
         )
+        # TODO: find a good warning message and error exceptions for these
         if should_use_prerelease:
             logger.debug("Fetching latest prerelease for %s/%s", owner, repo)
             try:
@@ -354,6 +489,7 @@ class UpdateManager:
                 app_name, app_config, release_data
             )
 
+        # FIXME: Object of type `object` has no attribute `ClientResponseError`
         except aiohttp.client_exceptions.ClientResponseError as e:
             # Handle HTTP errors (401, 403, 404, etc.)
             if e.status == 401:
@@ -1230,139 +1366,6 @@ class CatalogCache:
     def clear(self) -> None:
         """Clear the catalog cache."""
         self._cache.clear()
-
-
-def _find_update_info(
-    app_name: str,
-    update_infos: list[UpdateInfo],
-) -> UpdateInfo:
-    """Find UpdateInfo for a specific app.
-
-    Args:
-        app_name: Name of the app to find.
-        update_infos: List of UpdateInfo objects.
-
-    Returns:
-        UpdateInfo for the app with default error if not found.
-
-    """
-    for info in update_infos:
-        if info.app_name == app_name:
-            return info
-    # Return default error UpdateInfo if not found
-    return UpdateInfo(
-        app_name=app_name,
-        error_reason="Update info not found",
-    )
-
-
-def display_update_error(message: str) -> None:
-    """Display an error message.
-
-    Args:
-        message: Error message to display.
-
-    """
-    logger.error("× %s", message)
-
-
-def display_check_results(results: dict) -> None:
-    """Display check-only results from update service.
-
-    Args:
-        results: Results dictionary with 'available_updates' key
-
-    """
-    if results["available_updates"]:
-        logger.info("Updates available:")
-        for info in results["available_updates"]:
-            logger.info(
-                "  %s: %s → %s",
-                info["app_name"],
-                info["current_version"],
-                info["latest_version"],
-            )
-        logger.info("\nRun 'my-unicorn update' to install updates")
-    else:
-        logger.info("✓ All apps are up to date")
-
-
-def display_update_results(results: dict) -> None:
-    """Display update operation results from update service.
-
-    Args:
-        results: Results dictionary with 'updated', 'failed', 'up_to_date',
-            and 'update_infos' keys
-
-    """
-    updated = results.get("updated", [])
-    failed = results.get("failed", [])
-    up_to_date = results.get("up_to_date", [])
-    update_infos = results.get("update_infos", [])
-
-    # If we have detailed info, use formatted summary
-    if update_infos:
-        header = PHASE_SECTION_LABELS.get(Phase.SUMMARY)
-        logger.info(header)
-
-        # Show updated apps with version info
-        for app_name in updated:
-            app_info = _find_update_info(app_name, update_infos)
-            if app_info.is_success:
-                version_info = (
-                    f"{app_info.current_version} → {app_info.latest_version}"
-                )
-                logger.info("%-25s ✓ %s", app_name, version_info)
-            else:
-                logger.info("%-25s ✓ Updated", app_name)
-
-        # Show failed apps with error info
-        for app_name in failed:
-            app_info = _find_update_info(app_name, update_infos)
-            logger.info("%-25s × Update failed", app_name)
-            # Keep error reason indented under the app name
-            # app name is already shown in the log line above
-            if app_info and app_info.error_reason:
-                logger.info("%-25s    → %s", "", app_info.error_reason)
-
-        # Show up-to-date apps
-        for app_name in up_to_date:
-            app_info = _find_update_info(app_name, update_infos)
-            if app_info.is_success:
-                version = app_info.current_version
-                logger.info(
-                    "%-25s Already up to date (%s)",
-                    app_name,
-                    version,
-                )
-            else:
-                logger.info("%-25s Already up to date", app_name)
-
-    else:
-        # Fallback to simple logger output
-        if updated:
-            logger.info("✓ Successfully updated: %s", ", ".join(updated))
-        if failed:
-            logger.error("× Failed to update: %s", ", ".join(failed))
-        if up_to_date:
-            logger.info("Already up to date: %s", ", ".join(up_to_date))
-
-
-def display_invalid_apps(
-    invalid_apps: list[str], config_manager: ConfigManager
-) -> None:
-    """Display warning about invalid app names.
-
-    Args:
-        invalid_apps: List of app names not found
-        config_manager: ConfigManager instance for listing installed apps
-
-    """
-    if invalid_apps:
-        logger.warning("! Apps not found: %s", ", ".join(invalid_apps))
-        installed = config_manager.list_installed_apps()
-        if installed:
-            logger.info("   Installed apps: %s", ", ".join(installed))
 
 
 @dataclass
