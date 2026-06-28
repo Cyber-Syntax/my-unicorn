@@ -10,6 +10,7 @@ import sys
 import uvloop
 
 from my_unicorn.cli import CLIRunner
+from my_unicorn.exceptions import MyUnicornError
 from my_unicorn.logger import get_logger
 
 logger = get_logger(__name__)
@@ -26,9 +27,14 @@ async def async_main() -> None:
     try:
         await runner.run()
         logger.debug("CLI completed successfully")
+    except MyUnicornError as e:
+        # Clean, red, no stack trace (handled by ConsoleFormatter)
+        logger.error(str(e))
+        sys.exit(1)
     except Exception:
-        logger.exception("CLI encountered an error")
-        raise
+        # Unexpected crash: Stack trace is desired here
+        logger.exception("CLI encountered an unexpected error")
+        sys.exit(1)
 
 
 def main() -> None:

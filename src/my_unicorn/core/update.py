@@ -996,7 +996,7 @@ async def update_single_app(
 
     except (UpdateError, VerificationError) as e:
         # Re-raise domain exceptions as they already have context
-        logger.exception("Failed to update %s", app_name)
+        logger.error(str(e))
         return False, str(e)
     except Exception as e:
         # Wrap unexpected exceptions in UpdateError with context
@@ -1159,7 +1159,7 @@ async def resolve_update_info(
 
     # Check if update is needed (skip if up to date and not forced)
     if not update_info.has_update and not force:
-        logger.info("UP TO DATE  %s", app_name)
+        logger.info("UPTODATE  %s", app_name)
         return update_info, None  # Return info for skip handling
 
     return update_info, None
@@ -1318,14 +1318,9 @@ def select_asset_for_update(
         logger.debug(
             "No AppImage found for %s, may still be building", app_name
         )
-        # TODO: use exceptions not AssetSelectionResult
-        # return None, "AppImage not found in release - may still be building"
-        return AssetSelectionResult(
-            asset=None,
-            error=ErrorCode.APPIMAGE_ASSET_NOT_FOUND,
-            message=ERROR_MESSAGES.get(ErrorCode.APPIMAGE_ASSET_NOT_FOUND).format(
-                app_name=app_name
-            ),
+        raise UpdateError(
+            error_code=ErrorCode.APPIMAGE_ASSET_NOT_FOUND,
+            context={"app_name": app_name},
         )
 
     return AssetSelectionResult(

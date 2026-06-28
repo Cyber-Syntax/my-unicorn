@@ -42,7 +42,6 @@ from my_unicorn.exceptions import (
 )
 from my_unicorn.logger import get_logger
 from my_unicorn.utils.appimage_utils import select_best_appimage_asset
-from my_unicorn.utils.error_formatters import build_install_error_result
 from my_unicorn.utils.github_utils import parse_github_url
 
 if TYPE_CHECKING:
@@ -125,7 +124,7 @@ def _print_result_line(result: dict[str, Any]) -> None:
 
     if not result.get("success", False):
         logger.info("FAILED  %s", app_name)
-        logger.error("%s", result.get("error", "Unknown error"))
+        logger.info("%s", result.get("error", "Unknown error"))
         return
 
     if result.get("status") == "already_installed":
@@ -457,10 +456,22 @@ async def install_from_catalog(
     # remove build_install_error_result from error_formatters.py
     except InstallationError as error:
         logger.error("Failed to install %s: %s", app_name, error)
-        return build_install_error_result(error, app_name, is_url=False)
+        return {
+            "success": False,
+            "target": app_name,
+            "name": app_name,
+            "error": str(error),
+            "source": InstallSource.CATALOG,
+        }
     except (InstallError, VerificationError) as error:
         logger.error("Failed to install %s: %s", app_name, error)
-        return build_install_error_result(error, app_name, is_url=False)
+        return {
+            "success": False,
+            "target": app_name,
+            "name": app_name,
+            "error": str(error),
+            "source": InstallSource.CATALOG,
+        }
     except Exception as error:
         install_error = InstallError(
             str(error),
@@ -468,9 +479,13 @@ async def install_from_catalog(
             cause=error,
         )
         logger.error("Failed to install %s: %s", app_name, install_error)
-        return build_install_error_result(
-            install_error, app_name, is_url=False
-        )
+        return {
+            "success": False,
+            "target": app_name,
+            "name": app_name,
+            "error": str(install_error),
+            "source": InstallSource.CATALOG,
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -607,7 +622,13 @@ async def install_from_url(
 
     except (InstallError, VerificationError) as error:
         logger.error("Failed to install from URL %s: %s", github_url, error)
-        return build_install_error_result(error, github_url, is_url=True)
+        return {
+            "success": False,
+            "target": github_url,
+            "name": github_url,
+            "error": str(error),
+            "source": InstallSource.URL,
+        }
     except Exception as error:
         install_error = InstallError(
             str(error),
@@ -617,9 +638,13 @@ async def install_from_url(
         logger.error(
             "Failed to install from URL %s: %s", github_url, install_error
         )
-        return build_install_error_result(
-            install_error, github_url, is_url=True
-        )
+        return {
+            "success": False,
+            "target": github_url,
+            "name": github_url,
+            "error": str(install_error),
+            "source": InstallSource.URL,
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -853,16 +878,30 @@ class InstallHandler:
                     logger.error(
                         "Installation error for %s: %s", app_or_url, error
                     )
-                    return build_install_error_result(
-                        error, app_or_url, is_url
+                    source = (
+                        InstallSource.URL if is_url else InstallSource.CATALOG
                     )
+                    return {
+                        "success": False,
+                        "target": app_or_url,
+                        "name": app_or_url,
+                        "error": str(error),
+                        "source": source,
+                    }
                 except (InstallError, VerificationError) as error:
                     logger.error(
                         "Domain error installing %s: %s", app_or_url, error
                     )
-                    return build_install_error_result(
-                        error, app_or_url, is_url
+                    source = (
+                        InstallSource.URL if is_url else InstallSource.CATALOG
                     )
+                    return {
+                        "success": False,
+                        "target": app_or_url,
+                        "name": app_or_url,
+                        "error": str(error),
+                        "source": source,
+                    }
                 except Exception as error:
                     source = (
                         InstallSource.URL if is_url else InstallSource.CATALOG

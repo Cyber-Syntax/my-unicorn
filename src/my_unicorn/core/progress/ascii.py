@@ -807,7 +807,7 @@ def format_download_lines(
     # process errors via TaskError
     if task.errors:
         for err in task.errors:
-            msg = truncate_text(err.details or "", 120)
+            msg = err.details or ""
             lines.append(
                 f"error: network error while downloading {task.name} : {msg}"
             )
@@ -854,14 +854,13 @@ def format_processing_task_lines(
     if task.warnings:
         for warning in task.warnings:
             # example: "warning: checksum asset not found"
-            # FIXME: type errors
-            msg = truncate_text(warning.details or "", 120)
+            msg = warning.details or ""
             lines.append(f"warning: {msg}")
 
     if task.errors:
         for err in task.errors:
             # Example: "error: failed to install 'appflowy' : Permission denied"
-            msg = truncate_text(err.details or "", 120)
+            msg = err.details or ""
             lines.append(f"error: failed to {operation} '{task.name}' : {msg}")
 
     return lines
@@ -916,7 +915,7 @@ def render_api_section(
         task = tasks[task_id]
         if task.errors:
             for err in task.errors:
-                details = truncate_text(err.details or "", 120)
+                details = err.details or ""
                 if details:
                     # Use the task's name to identify which app had the error
                     lines.append(f"error: {task.name}: {details}")
