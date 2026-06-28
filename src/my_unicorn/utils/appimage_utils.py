@@ -17,6 +17,7 @@ logger = get_logger(__name__)
 
 def select_best_appimage_asset(
     release: Release,
+    app_name: str = "Unknown",
     preferred_suffixes: list[str] | None = None,
     catalog_entry: dict[str, Any] | None = None,
     installation_source: str = "catalog",
@@ -88,7 +89,10 @@ def select_best_appimage_asset(
 
     # Handle not found case
     if not asset and raise_on_not_found:
-        raise InstallationError(error_code=ErrorCode.APPIMAGE_ASSET_NOT_FOUND)
+        raise InstallationError(
+            error_code=ErrorCode.APPIMAGE_ASSET_NOT_FOUND,
+            context={"app_name": app_name},
+        )
 
     return asset
 

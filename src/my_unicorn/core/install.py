@@ -35,6 +35,7 @@ from my_unicorn.core.protocols.progress import (
     ProgressReporter,
 )
 from my_unicorn.exceptions import (
+    ERROR_MESSAGES,
     InstallationError,
     InstallError,
     VerificationError,
@@ -434,6 +435,7 @@ async def install_from_catalog(
 
         asset = select_best_appimage_asset(
             release,
+            app_name=app_name,
             preferred_suffixes=characteristic_suffix,
             installation_source=InstallSource.CATALOG,
         )
@@ -503,6 +505,7 @@ def validate_github_identifiers(owner: str, repo: str) -> None:
 async def validate_and_fetch_release(
     owner: str,
     repo: str,
+    app_name: str,
     *,
     fetch_release_fn: Callable[..., Any],
 ) -> tuple[Release, Asset]:
@@ -511,6 +514,7 @@ async def validate_and_fetch_release(
     Args:
         owner: Repository owner (validated for security before use).
         repo: Repository name.
+        app_name: App name.
         fetch_release_fn: Async callable ``(owner, repo) -> Release``.
 
     Returns:
@@ -526,12 +530,13 @@ async def validate_and_fetch_release(
     release = await fetch_release_fn(owner, repo)
 
     asset = select_best_appimage_asset(
-        release, installation_source=InstallSource.URL
+        release, app_name=app_name, installation_source=InstallSource.URL
     )
     if asset is None:
         raise InstallError(
             ERROR_NO_APPIMAGE_ASSET,
             context={
+                "app_name": app_name,
                 "owner": owner,
                 "repo": repo,
                 "source": InstallSource.URL,
@@ -582,7 +587,7 @@ async def install_from_url(
         )
 
         release, asset = await validate_and_fetch_release(
-            owner, repo, fetch_release_fn=fetch_release_fn
+            owner, repo, app_name, fetch_release_fn=fetch_release_fn
         )
 
         app_config = build_url_install_config(
@@ -800,38 +805,50 @@ class InstallHandler:
                         if is_url
                         else self.install_from_catalog(app_or_url, **options)
                     )
-                    
+
                     if self.progress_reporter and api_task_id:
-                        info = self.progress_reporter.get_task_info(api_task_id)
+                        info = self.progress_reporter.get_task_info(
+                            api_task_id
+                        )
                         await self.progress_reporter.update_task(
                             api_task_id,
                             completed=info["completed"] + 1,
                         )
-                        
+
                     return result
                 # TODO: add exceptions variables
                 except InstallationError as error:
                     # Report error
                     if self.progress_reporter and api_task_id:
-                        from my_unicorn.core.progress.progress_types import Phase, TaskError, ErrorSeverity
                         from datetime import UTC, datetime
+
+                        from my_unicorn.core.progress.progress_types import (
+                            ErrorSeverity,
+                            Phase,
+                            TaskError,
+                        )
                         from my_unicorn.exceptions import ErrorCode
 
                         err_id = await self.progress_reporter.add_task(
-                            name=app_or_url, progress_type=Phase.API_FETCHING
+                            name=f"GitHub {app_or_url}",
+                            progress_type=Phase.API_FETCHING,
                         )
                         await self.progress_reporter.finish_task(
-                            err_id, 
+                            err_id,
                             success=False,
-                            errors=[TaskError(
-                                phase="api_fetching",
-                                processing_phase="api_fetching",
-                                app_name=app_or_url,
-                                error_code=ErrorCode.INSTALL_FAILED,
-                                error_severity=ErrorSeverity.ERROR,
-                                details=str(error),
-                                timestamp=datetime.now(UTC).isoformat()
-                            )]
+                            errors=[
+                                TaskError(
+                                    phase="api_fetching",
+                                    processing_phase="api_fetching",
+                                    app_name=app_or_url,
+                                    error_code=ErrorCode.INSTALL_FAILED,
+                                    error_severity=ErrorSeverity.ERROR,
+                                    details=ERROR_MESSAGES.get(
+                                        ErrorCode.INSTALL_FAILED
+                                    ),
+                                    timestamp=datetime.now(UTC).isoformat(),
+                                )
+                            ],
                         )
                     logger.error(
                         "Installation error for %s: %s", app_or_url, error
@@ -872,7 +889,9 @@ class InstallHandler:
         from my_unicorn.core.protocols.progress import github_api_progress_task
 
         async with github_api_progress_task(
-            self.progress_reporter, task_name="GitHub", total=len(catalog_apps) + len(url_apps)
+            self.progress_reporter,
+            task_name="GitHub Releases",
+            total=len(catalog_apps) + len(url_apps),
         ) as api_task_id:
             tasks = [install_one(app, is_url=False) for app in catalog_apps]
             tasks += [install_one(url, is_url=True) for url in url_apps]

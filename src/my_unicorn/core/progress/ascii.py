@@ -361,9 +361,15 @@ class AsciiProgressBackend:
         """
         sections: list[str] = []
 
-        api_lines = render_api_section(tasks_snapshot, order_snapshot, self._section_config)
+        api_lines = render_api_section(
+            tasks_snapshot, order_snapshot, self._section_config
+        )
         if api_lines:
-            sections.append("\n".join(api_lines))
+            sections.append(
+                PHASE_SECTION_LABELS[Phase.API_FETCHING]
+                + "\n"
+                + "\n".join(api_lines)
+            )
 
         download_lines = render_downloads_section(
             tasks_snapshot, order_snapshot, self._section_config
@@ -876,7 +882,6 @@ def render_api_section(
     Returns:
         List of formatted output lines for API section
     """
-    header = PHASE_SECTION_LABELS[Phase.API_FETCHING]
     api_tasks = [
         t
         for t in order
@@ -886,35 +891,35 @@ def render_api_section(
     if not api_tasks:
         return []
 
-    lines = [header]
-    
+    lines = []
+
     # Calculate aggregate progress
     total_completed = sum(tasks[t].completed for t in api_tasks)
     total_units = sum(tasks[t].total for t in api_tasks)
-    
+
     # Render progress bar
     bar = render_bar(total_completed, total_units, config.bar_width)
     pct = format_percentage(total_completed, total_units)
-    
+
     # Static label for the API bar
-    label = "GitHub"
-    
+    label = "GitHub Releases"
+
     # Right-aligned metrics (similar to download bar)
     right_section = f"{bar} {pct:>4}"
-    
+
     # Format line: label on left, right section on right
     line = f"{label:<20} {right_section}"
     lines.append(line)
-    
-    # Collect all errors
+
+    # Collect all errors from all API tasks
     for task_id in api_tasks:
         task = tasks[task_id]
         if task.errors:
             for err in task.errors:
                 details = truncate_text(err.details or "", 120)
-                # Only show error if it has details to avoid empty lines
                 if details:
-                    lines.append(f"error: {details}")
+                    # Use the task's name to identify which app had the error
+                    lines.append(f"error: {task.name}: {details}")
 
     return lines
 

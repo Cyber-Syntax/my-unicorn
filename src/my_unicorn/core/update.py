@@ -491,11 +491,14 @@ class UpdateManager:
 
     async def _report_api_error(self, app_name: str, error_msg: str) -> None:
         """Helper to report API errors to progress reporter."""
-        from my_unicorn.core.progress.progress_types import Phase, TaskError, ErrorSeverity
         from datetime import UTC, datetime
 
+        from my_unicorn.core.progress.progress_types import Phase
+        from my_unicorn.exceptions import ErrorCode, ErrorSeverity, TaskError
+
         err_id = await self.progress_reporter.add_task(
-            name=app_name, progress_type=Phase.API_FETCHING
+            name=f"GitHub {app_name}",
+            progress_type=Phase.API_FETCHING,
         )
         await self.progress_reporter.finish_task(
             err_id,
@@ -507,7 +510,9 @@ class UpdateManager:
                     app_name=app_name,
                     error_code=ErrorCode.UPDATE_FAILED,
                     error_severity=ErrorSeverity.ERROR,
-                    details=error_msg,
+                    details=ERROR_MESSAGES.get(
+                        ErrorCode.APPIMAGE_ASSET_NOT_FOUND
+                    ),
                     timestamp=datetime.now(UTC).isoformat(),
                 )
             ],
@@ -558,7 +563,9 @@ class UpdateManager:
             )
 
             if self.progress_reporter and self._shared_api_task_id:
-                info = self.progress_reporter.get_task_info(self._shared_api_task_id)
+                info = self.progress_reporter.get_task_info(
+                    self._shared_api_task_id
+                )
                 await self.progress_reporter.update_task(
                     self._shared_api_task_id,
                     completed=info["completed"] + 1,
@@ -608,10 +615,7 @@ class UpdateManager:
             error_msg = ERROR_UNEXPECTED.format(error=e)
             if self.progress_reporter:
                 await self._report_api_error(app_name, error_msg)
-            return UpdateInfo.create_error(
-                app_name, error_msg
-            )
-
+            return UpdateInfo.create_error(app_name, error_msg)
 
     async def check_updates(
         self,
@@ -650,7 +654,9 @@ class UpdateManager:
         from my_unicorn.core.protocols.progress import github_api_progress_task
 
         async with github_api_progress_task(
-            self.progress_reporter, task_name="GitHub", total=len(app_names)
+            self.progress_reporter,
+            task_name="GitHub Releases",
+            total=len(app_names),
         ) as api_task_id:
             self._shared_api_task_id = api_task_id
             async with aiohttp.ClientSession() as session:
@@ -1279,6 +1285,7 @@ def select_asset_for_update(
 
     appimage_asset = select_best_appimage_asset(
         update_info.release_data,
+        app_name=app_name,
         catalog_entry=catalog_dict,
         installation_source="catalog" if catalog_entry else "url",
         raise_on_not_found=False,
@@ -1316,7 +1323,9 @@ def select_asset_for_update(
         return AssetSelectionResult(
             asset=None,
             error=ErrorCode.APPIMAGE_ASSET_NOT_FOUND,
-            message=ERROR_MESSAGES.get(ErrorCode.APPIMAGE_ASSET_NOT_FOUND),
+            message=ERROR_MESSAGES.get(ErrorCode.APPIMAGE_ASSET_NOT_FOUND).format(
+                app_name=app_name
+            ),
         )
 
     return AssetSelectionResult(

@@ -40,6 +40,7 @@ class ErrorCode(Enum):
     PROCESSING_FAILED = "processing_failed"
     VERIFICATION_FAILED = "verification_failed"
     INSTALLATION_FAILED = "installation_failed"
+    INSTALL_FAILED = "install_failed"
     UPDATE_FAILED = "update_failed"
     ICON_EXTRACTION_FAILED = "icon_extraction_failed"
     DESKTOP_ENTRY_CREATION_FAILED = "desktop_entry_creation_failed"
@@ -59,8 +60,10 @@ class ErrorCode(Enum):
 
 # TODO: add missing errorcodes from above
 ERROR_MESSAGES = {
-    ErrorCode.DOWNLOAD_FAILED: "Something went wrong while downloading",
-    ErrorCode.APPIMAGE_ASSET_NOT_FOUND: "appimage asset not found : appimage builds may still be processing, try again later. Some developers may not provide appimage builds, so this might be external to my-unicorn's control.",
+    # TODO: add this to download fail sections to create this error when download fail or network error
+    ErrorCode.DOWNLOAD_FAILED: "Something went wrong while downloading '{app_name}'",
+    ErrorCode.INSTALL_FAILED: "Something went wrong while installing '{app_name}'",
+    ErrorCode.APPIMAGE_ASSET_NOT_FOUND: "appimage asset not found for '{app_name}' : appimage builds may still be processing, try again later. Some developers may not provide appimage builds, so this might be external to my-unicorn's control.",
     ErrorCode.NETWORK_TIMEOUT: "network timeout while downloading asset",
     ErrorCode.NETWORK_DNS_FAILURE: "could not resolve upstream host",
     ErrorCode.DESKTOP_ENTRY_CREATION_FAILED: "Failed to create desktop entry",
@@ -179,12 +182,15 @@ class MyUnicornError(Exception):
 
         """
         self.error_code = error_code
-
+        template = None
         if message is None and error_code is not None:
-            message = ERROR_MESSAGES.get(
+            template = ERROR_MESSAGES.get(
                 error_code,
                 ERROR_MESSAGES[ErrorCode.UNKNOWN_ERROR],
             )
+
+        if template:
+            message = template.format(**(context or {}))
 
         if message is None:
             message = "Unknown error"
