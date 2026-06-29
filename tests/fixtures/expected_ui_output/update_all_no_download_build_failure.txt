@@ -1,8 +1,6 @@
-Fetching from API:
+:: Querying upstream releases...
 GitHub Releases      1/1 Retrieved from cache
-
-Update Summary:
---------------------------------------------------
+:: Creating transaction summary...
 ytmdesktop                × Update failed
                              → AppImage not found in release - may still be building
 beekeeper-studio          Already up to date (5.7.2)

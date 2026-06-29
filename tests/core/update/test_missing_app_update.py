@@ -127,8 +127,8 @@ class TestMissingAppImageUpdate:
             assert error_reason is not None
 
             # Should have context-aware error message
-            assert "AppImage not found" in error_reason
-            assert "may still be building" in error_reason
+            msg = "appimage asset not found : appimage builds may still be processing, try again later. Some developers may not provide appimage builds, so this might be external to my-unicorn's control."
+            assert msg in error_reason
 
     @pytest.mark.asyncio
     async def test_update_multiple_apps_some_missing(

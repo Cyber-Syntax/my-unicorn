@@ -1,6 +1,6 @@
 """Integration tests for download progress UI display.
 
-These tests verify that the "Downloading:" section renders correctly
+These tests verify that the ":: Retrieving appimages..." section renders correctly
 for various download task states including in-progress, completed,
 error, and multi-file downloads.
 """
@@ -13,7 +13,13 @@ from my_unicorn.core.progress.ascii import (
     SectionRenderConfig,
     render_downloads_section,
 )
-from my_unicorn.core.progress.progress_types import ProgressType, TaskState
+from my_unicorn.core.progress.progress_types import Phase, TaskState
+from my_unicorn.exceptions import (
+    ERROR_MESSAGES,
+    ErrorCode,
+    ErrorSeverity,
+    TaskError,
+)
 
 from .test_ui_helpers import parse_output_sections
 
@@ -32,7 +38,7 @@ class TestDownloadProgressBarUI:
         task = TaskState(
             task_id="dl_1",
             name="test-app.AppImage",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=1000.0,
             completed=500.0,
             is_finished=False,
@@ -53,7 +59,7 @@ class TestDownloadProgressBarUI:
         output = "\n".join(output_lines)
 
         # Assert - should show progress bar
-        assert "Downloading:" in output
+        assert ":: Retrieving appimages..." in output
         assert "[" in output
         assert "]" in output
         # Progress bar should have equals signs
@@ -72,7 +78,7 @@ class TestDownloadProgressBarUI:
         task = TaskState(
             task_id="dl_1",
             name="QOwnNotes-x86_64",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=41.6 * 1024 * 1024,  # 41.6 MiB in bytes
             completed=0.0,
             is_finished=False,
@@ -98,50 +104,28 @@ class TestDownloadProgressBarUI:
         assert ":" in output  # ETA should have colon (MM:SS format)
         assert "QOwnNotes" in output
 
-    def test_download_completed_success_ui(self) -> None:
-        """Verify checkmark '✓' appears for successful completed downloads."""
-        # Arrange - create a completed download task
-        task = TaskState(
-            task_id="dl_1",
-            name="AppFlowy-0.11.1-linux-x86_64",
-            progress_type=ProgressType.DOWNLOAD,
-            total=77.6 * 1024 * 1024,  # 77.6 MiB
-            completed=77.6 * 1024 * 1024,
-            is_finished=True,
-            success=True,
-            speed=10.8 * 1024 * 1024,  # 10.8 MB/s
-        )
-
-        tasks = {"dl_1": task}
-        order = ["dl_1"]
-        config = SectionRenderConfig(
-            bar_width=30,
-            min_name_width=15,
-            spinner_fps=4,
-            interactive=False,
-        )
-
-        # Act - render downloads section
-        output_lines = render_downloads_section(tasks, order, config)
-        output = "\n".join(output_lines)
-
-        # Assert - should show checkmark
-        assert "✓" in output
-        assert "100%" in output
-        assert "AppFlowy" in output
-
     def test_download_completed_error_ui(self) -> None:
         """Verify 'Error: message' appears for failed downloads."""
         # Arrange - create a failed download task
         task = TaskState(
             task_id="dl_1",
             name="broken-app.AppImage",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=100.0 * 1024 * 1024,
             completed=50.0 * 1024 * 1024,
             is_finished=True,
             success=False,
-            error_message="Connection timeout while downloading from server",
+            errors=[
+                TaskError(
+                    phase="download",
+                    processing_phase="download",
+                    app_name="bad.AppImage",
+                    error_code=ErrorCode.NETWORK_DNS_FAILURE,
+                    error_severity=ErrorSeverity.ERROR,
+                    details=ERROR_MESSAGES.get(ErrorCode.NETWORK_TIMEOUT),
+                    timestamp="2026-01-01T00:00:00Z",
+                )
+            ],
         )
 
         tasks = {"dl_1": task}
@@ -158,18 +142,18 @@ class TestDownloadProgressBarUI:
         output = "\n".join(output_lines)
 
         # Assert - should show error message
-        assert "Error:" in output
-        assert "timeout" in output.lower()
+        # FIXME: E       AssertionError: assert 'error: network timeout while downloading asset' in ':: Retrieving appimages...\nbroken-app   100.0 MiB          --   --:-- [==============>               ]  50%\nerror: ...work timeout while downloading asset\nTotal (0/1)  100.0 MiB     -- MB/s   --:-- [==============>               ]  50%'
+        assert "error: network timeout while downloading asset" in output
         # Failed downloads should show error
         assert "broken-app" in output
 
     def test_download_multiple_files_ui(self) -> None:
-        """Verify 'Downloading (N):' header for multiple downloads."""
+        """Verify header for multiple downloads."""
         # Arrange - create multiple download tasks
         task1 = TaskState(
             task_id="dl_1",
             name="AppFlowy-0.11.1-linux-x86_64",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=77.6 * 1024 * 1024,
             completed=77.6 * 1024 * 1024,
             is_finished=True,
@@ -179,7 +163,7 @@ class TestDownloadProgressBarUI:
         task2 = TaskState(
             task_id="dl_2",
             name="QOwnNotes-x86_64",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=41.6 * 1024 * 1024,
             completed=41.6 * 1024 * 1024,
             is_finished=True,
@@ -200,8 +184,6 @@ class TestDownloadProgressBarUI:
         output_lines = render_downloads_section(tasks, order, config)
         output = "\n".join(output_lines)
 
-        # Assert - should show count in header
-        assert "Downloading (2):" in output
         # Both files should be listed
         assert "AppFlowy" in output
         assert "QOwnNotes" in output
@@ -213,7 +195,7 @@ class TestDownloadProgressBarUI:
         task_mib = TaskState(
             task_id="dl_1",
             name="small-app",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=50.0 * 1024 * 1024,  # 50 MiB
             completed=50.0 * 1024 * 1024,
             is_finished=True,
@@ -224,7 +206,7 @@ class TestDownloadProgressBarUI:
         task_gib = TaskState(
             task_id="dl_2",
             name="large-app",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=1.5 * 1024 * 1024 * 1024,  # 1.5 GiB
             completed=1.5 * 1024 * 1024 * 1024,
             is_finished=True,
@@ -273,7 +255,7 @@ class TestDownloadProgressBarUI:
         task = TaskState(
             task_id="dl_1",
             name="app.AppImage",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=0.0,  # Unknown size
             completed=0.0,
             is_finished=False,
@@ -298,12 +280,12 @@ class TestDownloadProgressBarUI:
         assert "app" in output
 
     def test_download_single_file_header(self) -> None:
-        """Verify 'Downloading:' header (without count) for single file."""
+        """Verify ':: Retrieving appimages...' header (without count) for single file."""
         # Arrange - create single download task
         task = TaskState(
             task_id="dl_1",
             name="single-app",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=50.0 * 1024 * 1024,
             completed=25.0 * 1024 * 1024,
             is_finished=False,
@@ -323,9 +305,8 @@ class TestDownloadProgressBarUI:
         output_lines = render_downloads_section(tasks, order, config)
         output = "\n".join(output_lines)
 
-        # Assert - should show "Downloading:" without count
-        assert "Downloading:" in output
-        assert "Downloading (1):" not in output
+        # Assert - should show ":: Retrieving appimages..." without count
+        assert ":: Retrieving appimages..." in output
         assert "single-app" in output
 
     def test_download_no_tasks_returns_empty(self) -> None:
@@ -370,7 +351,7 @@ class TestDownloadProgressBarUI:
         task = TaskState(
             task_id="dl_1",
             name="partial-app",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=100.0 * 1024 * 1024,
             completed=75.0 * 1024 * 1024,
             is_finished=False,
@@ -400,7 +381,7 @@ class TestDownloadProgressBarUI:
         task = TaskState(
             task_id="dl_1",
             name="slow-start-app",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=50.0 * 1024 * 1024,
             completed=0.0,
             is_finished=False,

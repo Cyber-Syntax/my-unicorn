@@ -121,10 +121,9 @@ class TestMissingAppImageInstall:
             # Should have context-aware error message
             error_msg = result["error"]
             assert (
-                "No assets found" in error_msg
-                or "AppImage not found" in error_msg
+                "Installation failed: appimage asset not found : appimage builds may still be processing, try again later. Some developers may not provide appimage builds, so this might be external to my-unicorn's control."
+                in error_msg
             )
-            assert "may still be building" in error_msg
 
     @pytest.mark.asyncio
     async def test_install_with_non_appimage_assets(
@@ -149,10 +148,9 @@ class TestMissingAppImageInstall:
             # Should have helpful error message
             error_msg = result["error"]
             assert (
-                "AppImage not found" in error_msg
-                or "No assets found" in error_msg
+                "Installation failed: appimage asset not found : appimage builds may still be processing, try again later. Some developers may not provide appimage builds, so this might be external to my-unicorn's control."
+                in error_msg
             )
-            assert "may still be building" in error_msg
 
     @pytest.mark.asyncio
     async def test_install_multiple_apps_some_missing(
@@ -334,19 +332,17 @@ class TestMissingAppImageInstall:
             assert results_by_name["app2"]["success"] is False
             app2_error = results_by_name["app2"]["error"]
             assert (
-                "AppImage not found" in app2_error
-                or "No assets found" in app2_error
+                "Installation failed: appimage asset not found : appimage builds may still be processing, try again later. Some developers may not provide appimage builds, so this might be external to my-unicorn's control."
+                in app2_error
             )
-            assert "may still be building" in app2_error
 
             # app3 should fail with helpful message (no AppImage assets)
             assert results_by_name["app3"]["success"] is False
             app3_error = results_by_name["app3"]["error"]
             assert (
-                "AppImage not found" in app3_error
-                or "No assets found" in app3_error
+                "Installation failed: appimage asset not found : appimage builds may still be processing, try again later. Some developers may not provide appimage builds, so this might be external to my-unicorn's control."
+                in app3_error
             )
-            assert "may still be building" in app3_error
 
     @pytest.mark.asyncio
     async def test_install_result_structure(
@@ -398,8 +394,9 @@ class TestMissingAppImageInstall:
 
             # Verify error message is helpful
             error_msg = result["error"]
+            # NOTE: this might be related with error_formatter?
+            # FIXME: "no asset found in release"
             assert (
-                "AppImage not found" in error_msg
-                or "No assets found" in error_msg
+                "Installation failed: appimage asset not found : appimage builds may still be processing, try again later. Some developers may not provide appimage builds, so this might be external to my-unicorn's control."
+                in error_msg
             )
-            assert "may still be building" in error_msg

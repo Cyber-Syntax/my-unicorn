@@ -9,11 +9,12 @@ from unittest.mock import patch
 
 import pytest
 
-from my_unicorn.core.progress import TaskInfo
-from my_unicorn.core.progress.progress import (
+from my_unicorn.core.progress import (
+    Phase,
+    ProcessingPhase,
     ProgressConfig,
     ProgressDisplay,
-    ProgressType,
+    TaskInfo,
 )
 
 # 'progress_service' fixture is provided by tests/core/progress/conftest.py
@@ -43,13 +44,13 @@ class TestProgressDisplay:
     ) -> None:
         """Test namespaced ID generation."""
         id1 = progress_service._id_generator.generate_namespaced_id(
-            ProgressType.DOWNLOAD, "test_file"
+            Phase.DOWNLOAD, "test_file"
         )
         id2 = progress_service._id_generator.generate_namespaced_id(
-            ProgressType.DOWNLOAD, "another_file"
+            Phase.DOWNLOAD, "another_file"
         )
         id3 = progress_service._id_generator.generate_namespaced_id(
-            ProgressType.API_FETCHING, "api_call"
+            Phase.API_FETCHING, "api_call"
         )
 
         assert id1.startswith("dl_1_")
@@ -64,7 +65,7 @@ class TestProgressDisplay:
         """Test that namespaced ID sanitizes special characters."""
         dirty_name = "file with spaces & symbols!"
         clean_id = progress_service._id_generator.generate_namespaced_id(
-            ProgressType.DOWNLOAD, dirty_name
+            Phase.DOWNLOAD, dirty_name
         )
 
         assert "dl_1_filewithspaces" in clean_id
@@ -124,7 +125,7 @@ class TestProgressDisplay:
 
         task_id = await progress_service.add_task(
             name="test_file",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=100.0,
             description="Downloading test file",
         )
@@ -136,7 +137,7 @@ class TestProgressDisplay:
         )
         task = progress_service._task_registry.get_task_info_full_sync(task_id)
         assert task.name == "test_file"
-        assert task.progress_type == ProgressType.DOWNLOAD
+        assert task.progress_type == Phase.DOWNLOAD
         assert task.total == 100.0
         assert task.description == "Downloading test file"
 
@@ -151,7 +152,7 @@ class TestProgressDisplay:
         with pytest.raises(RuntimeError, match="Progress session not active"):
             await progress_service.add_task(
                 name="test_file",
-                progress_type=ProgressType.DOWNLOAD,
+                progress_type=Phase.DOWNLOAD,
                 total=100.0,
             )
 
@@ -164,7 +165,7 @@ class TestProgressDisplay:
 
         task_id = await progress_service.add_task(
             name="test_file",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=100.0,
         )
 
@@ -195,7 +196,7 @@ class TestProgressDisplay:
 
         task_id = await progress_service.add_task(
             name="test_file",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=100.0,
         )
 
@@ -216,7 +217,7 @@ class TestProgressDisplay:
 
         task_id = await progress_service.add_task(
             name="test_file",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=100.0,
         )
 
@@ -239,7 +240,7 @@ class TestProgressDisplay:
 
         task_id = await progress_service.add_task(
             name="test_file",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=100.0,
         )
 
@@ -265,13 +266,13 @@ class TestProgressDisplay:
 
         task_id = await progress_service.add_task(
             name="app_name",
-            progress_type=ProgressType.ICON_EXTRACTION,
+            progress_type=ProcessingPhase.ICON_EXTRACTION,
             description="Extracting icon for app_name",
         )
 
         assert task_id is not None
         task = progress_service._task_registry.get_task_info_full_sync(task_id)
-        assert task.progress_type == ProgressType.ICON_EXTRACTION
+        assert task.progress_type == ProcessingPhase.ICON_EXTRACTION
 
         await progress_service.stop_session()
 
@@ -285,7 +286,7 @@ class TestProgressDisplay:
             task_id="test_task_1",
             namespaced_id="test_1_task",
             name="test_task",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             completed=50.0,
             total=100.0,
             description="Test description",
@@ -312,7 +313,7 @@ class TestProgressDisplay:
             task_id="test_task_1",
             namespaced_id="test_1_task",
             name="test_task",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
         )
         await progress_service._task_registry.add_task_info(
             "test_task", task_info
@@ -382,7 +383,7 @@ class TestProgressDisplay:
 
         task_id = await progress_service.add_task(
             name="network_file",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=100.0,
         )
 
@@ -395,30 +396,6 @@ class TestProgressDisplay:
         await progress_service.stop_session()
 
     @pytest.mark.asyncio
-    async def test_verification_error(
-        self, progress_service: ProgressDisplay
-    ) -> None:
-        """Test handling verification error."""
-        from my_unicorn.core.progress import create_verification_task
-
-        await progress_service.start_session()
-
-        task_id = await create_verification_task(progress_service, "file.zip")
-
-        # Simulate verification failure
-        await progress_service.finish_task(
-            task_id,
-            success=False,
-            description="Checksum mismatch",
-        )
-
-        task = progress_service._task_registry.get_task_info_full_sync(task_id)
-        assert task.success is False
-        assert "Checksum mismatch" in task.description
-
-        await progress_service.stop_session()
-
-    @pytest.mark.asyncio
     async def test_icon_extraction_error(
         self, progress_service: ProgressDisplay
     ) -> None:
@@ -427,7 +404,7 @@ class TestProgressDisplay:
 
         task_id = await progress_service.add_task(
             name="app_name",
-            progress_type=ProgressType.ICON_EXTRACTION,
+            progress_type=ProcessingPhase.ICON_EXTRACTION,
             description="Extracting icon for app_name",
         )
 
@@ -453,7 +430,7 @@ class TestProgressDisplay:
 
         task_id = await progress_service.add_task(
             name="concurrent_file",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=100.0,
         )
 
@@ -483,7 +460,7 @@ class TestProgressDisplay:
 
         task_id = await progress_service.add_task(
             name="variable_size_file",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=100.0,
         )
 

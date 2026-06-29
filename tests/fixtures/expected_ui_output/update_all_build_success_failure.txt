@@ -1,15 +1,11 @@
-Fetching from API:
+:: Querying upstream releases...
 GitHub Releases      2/2 Retrieved from cache
-
-Downloading:
+:: Retrieving appimages...
 QOwnNotes-x86_64   57.8 MiB   8.6 MB/s 00:00 [==============================]   100% ✓
-
-Installing:
-(1/2) Verifying qownnotes ✓
-(2/2) Installing qownnotes ✓
-
-Update Summary:
---------------------------------------------------
+:: Processing package changes...
+(1/2) verifying qownnotes ✓
+(2/2) installing qownnotes ✓
+:: Creating transaction summary...
 qownnotes                 ✓ 26.5.4 → 26.5.5
 ytmdesktop                × Update failed
                              → AppImage not found in release - may still be building

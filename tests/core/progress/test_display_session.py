@@ -10,10 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from my_unicorn.core.progress import IDGenerator, SessionManager
-from my_unicorn.core.progress.progress_types import (
-    ProgressConfig,
-    ProgressType,
-)
+from my_unicorn.core.progress.progress_types import Phase, ProgressConfig
 
 
 class TestSessionLifecycle:
@@ -179,7 +176,7 @@ class TestSessionLifecycle:
         id_generator = IDGenerator()
 
         # Populate cache
-        id_generator.generate_namespaced_id(ProgressType.DOWNLOAD, "test")
+        id_generator.generate_namespaced_id(Phase.DOWNLOAD, "test")
 
         session_manager = SessionManager(
             config=config,

@@ -143,8 +143,7 @@ def test_print_install_summary_all_successful(
     output = caplog.text
 
     # Verify header
-    assert "Installation Summary:" in output
-    assert "-" * 50 in output
+    assert ":: Creating transaction summary..." in output
 
     # Verify all app names appear
     assert "qownnotes" in output
@@ -175,7 +174,7 @@ def test_print_install_summary_all_already_installed(
     assert "appflowy" in output
 
     # Should NOT show summary section
-    assert "Installation Summary:" not in output
+    assert ":: Creating transaction summary..." not in output
 
 
 def test_print_install_summary_mixed_results(
@@ -189,7 +188,7 @@ def test_print_install_summary_mixed_results(
     output = caplog.text
 
     # Verify header
-    assert "Installation Summary:" in output
+    assert ":: Creating transaction summary..." in output
 
     # Verify success indicators
     assert "✓ v24.12.5" in output  # successful
@@ -230,7 +229,7 @@ def test_print_install_summary_all_failed(
     output = caplog.text
 
     # Verify header
-    assert "Installation Summary:" in output
+    assert ":: Creating transaction summary..." in output
 
     # Verify all failure indicators
     assert "× Installation failed" in output
@@ -286,7 +285,7 @@ def test_print_install_summary_empty_results(
     output = caplog.text
 
     assert "No installations completed" in output
-    assert "Installation Summary:" not in output
+    assert ":: Creating transaction summary..." not in output
 
 
 def test_categorize_results_logic(

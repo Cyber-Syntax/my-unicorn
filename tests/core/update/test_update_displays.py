@@ -128,7 +128,7 @@ class TestDisplayUpdateResults:
         display_update_results(results)
 
         captured = caplog.text
-        assert "Update Summary:" in captured
+        assert ":: Creating transaction summary..." in captured
         assert "app1" in captured
         assert "✓" in captured
         assert "1.0.0 → 2.0.0" in captured

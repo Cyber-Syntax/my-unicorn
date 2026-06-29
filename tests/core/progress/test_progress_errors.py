@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
-from my_unicorn.core.progress.progress import ProgressDisplay, ProgressType
+from my_unicorn.core.progress.progress import Phase, ProgressDisplay
 
 
 class TestErrorScenarios:
@@ -50,7 +50,7 @@ class TestErrorScenarios:
         with pytest.raises(RuntimeError, match="Progress session not active"):
             await progress_service.add_task(
                 name="test_file",
-                progress_type=ProgressType.DOWNLOAD,
+                progress_type=Phase.DOWNLOAD,
                 total=100.0,
             )
 
@@ -63,7 +63,7 @@ class TestErrorScenarios:
 
         task_id = await progress_service.add_task(
             name="test_file",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=100.0,
         )
 
@@ -88,7 +88,7 @@ class TestErrorScenarios:
 
         task_id = await progress_service.add_task(
             name="test_file",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=100.0,
         )
 
@@ -106,49 +106,19 @@ class TestErrorScenarios:
         """Test that task counters are isolated per progress type."""
         # Generate IDs for different types
         download_id1 = progress_service._id_generator.generate_namespaced_id(
-            ProgressType.DOWNLOAD, "file1"
+            Phase.DOWNLOAD, "file1"
         )
         download_id2 = progress_service._id_generator.generate_namespaced_id(
-            ProgressType.DOWNLOAD, "file2"
+            Phase.DOWNLOAD, "file2"
         )
         api_id1 = progress_service._id_generator.generate_namespaced_id(
-            ProgressType.API_FETCHING, "api1"
+            Phase.API_FETCHING, "api1"
         )
 
         # Each type should have its own counter
         assert download_id1.startswith("dl_1_")
         assert download_id2.startswith("dl_2_")
         assert api_id1.startswith("api_1_")
-
-    @pytest.mark.asyncio
-    async def test_progress_update_methods_comprehensive(
-        self, progress_service: ProgressDisplay
-    ) -> None:
-        """Test different progress update methods."""
-        from my_unicorn.core.progress import create_verification_task
-
-        await progress_service.start_session()
-
-        task_id = await create_verification_task(
-            progress_service, "test.AppImage"
-        )
-
-        # Test absolute completion update
-        await progress_service.update_task(task_id, completed=25.0)
-
-        # Test description update with completion
-        await progress_service.update_task(
-            task_id, description="🔍 Checking integrity...", completed=75.0
-        )
-
-        task_info = progress_service.get_task_info_full(task_id)
-        assert task_info is not None
-        assert task_info.description == "🔍 Checking integrity..."
-        assert task_info.completed == 75.0
-
-        await progress_service.finish_task(task_id, success=True)
-
-        await progress_service.stop_session()
 
     @pytest.mark.asyncio
     async def test_basic_progress_operations_with_session(self) -> None:
@@ -162,7 +132,7 @@ class TestErrorScenarios:
         # Test task creation
         task_id = await service.add_task(
             "test_task",
-            ProgressType.DOWNLOAD,
+            Phase.DOWNLOAD,
             total=100.0,
         )
 
@@ -173,7 +143,7 @@ class TestErrorScenarios:
         task_info = service.get_task_info_full(task_id)
         assert task_info is not None
         assert task_info.name == "test_task"
-        assert task_info.progress_type == ProgressType.DOWNLOAD
+        assert task_info.progress_type == Phase.DOWNLOAD
 
         # Test task completion
         await service.finish_task(task_id, success=True)
@@ -191,7 +161,7 @@ class TestErrorScenarios:
 
         task_id = await service.add_task(
             "speed_test.AppImage",
-            ProgressType.DOWNLOAD,
+            Phase.DOWNLOAD,
             total=10000.0,
         )
 
@@ -213,27 +183,6 @@ class TestErrorScenarios:
         await service.stop_session()
 
     @pytest.mark.asyncio
-    async def test_create_post_processing_task(self) -> None:
-        """Test creating post-processing tasks."""
-        service = ProgressDisplay()
-
-        await service.start_session()
-
-        task_id = await service.add_task(
-            name="MyApp",
-            progress_type=ProgressType.UPDATE,
-            description="Updating MyApp",
-        )
-
-        assert task_id is not None
-        task_info = service.get_task_info_full(task_id)
-        assert task_info is not None
-        assert task_info.progress_type == ProgressType.UPDATE
-        assert task_info.description == "Updating MyApp"
-
-        await service.stop_session()
-
-    @pytest.mark.asyncio
     async def test_id_cache_management(self) -> None:
         """Test ID cache is properly managed."""
         service = ProgressDisplay()
@@ -244,7 +193,7 @@ class TestErrorScenarios:
         for i in range(10):
             await service.add_task(
                 f"task_{i}",
-                ProgressType.DOWNLOAD,
+                Phase.DOWNLOAD,
                 total=100.0,
             )
 
@@ -260,7 +209,7 @@ class TestErrorScenarios:
 
         dl_task = await service.add_task(
             "download.AppImage",
-            ProgressType.DOWNLOAD,
+            Phase.DOWNLOAD,
             total=1000.0,
         )
 
@@ -298,7 +247,7 @@ class TestErrorScenarios:
 
         task_id = await service.add_task(
             "test.AppImage",
-            ProgressType.DOWNLOAD,
+            Phase.DOWNLOAD,
             total=100.0,
         )
 

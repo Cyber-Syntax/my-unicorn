@@ -28,19 +28,15 @@ Turkish: [README.tr.md](README.tr.md)
 
 ```bash
 my-unicorn install qownnotes
-Fetching from API:
+:: Querying upstream releases...
 GitHub Releases      1/1 Retrieved
-
-Downloading:
-QOwnNotes-x86_64   41.5 MiB  10.8 MB/s 00:00 [==============================]   100% ✓
-
-Installing:
+:: Retrieving appimages...
+QOwnNotes-x86_64                     41.5 MiB  10.8 MB/s 00:00 [==============================]   100% ✓
+Total (1/1)                          41.5 MiB  10.8 MB/s 00:00 [==============================]   100%
+:: Processing package changes...
 (1/2) Verifying qownnotes ✓
 (2/2) Installing qownnotes ✓
-
-
-Installation Summary:
---------------------------------------------------
+:: Creating transaction summary...
 qownnotes                 ✓ 25.12.7
 ```
 

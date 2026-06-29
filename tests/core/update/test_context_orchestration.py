@@ -319,4 +319,5 @@ class TestPrepareUpdateContext:
 
         assert context is None
         assert error is not None
-        assert "AppImage not found" in error
+        msg = "appimage asset not found : appimage builds may still be processing, try again later. Some developers may not provide appimage builds, so this might be external to my-unicorn's control."
+        assert msg in error

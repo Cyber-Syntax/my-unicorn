@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -37,13 +38,18 @@ from my_unicorn.core.post_download import (
     PostDownloadContext,
     PostDownloadProcessor,
 )
+from my_unicorn.core.progress.progress_types import PHASE_SECTION_LABELS, Phase
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,
     ProgressReporter,
 )
 from my_unicorn.core.verify import VerificationService
 from my_unicorn.exceptions import (
+    ERROR_MESSAGES,
     ConfigurationError,
+    ErrorCode,
+    ErrorSeverity,
+    TaskError,
     UpdateError,
     VerificationError,
 )
@@ -58,6 +64,186 @@ if TYPE_CHECKING:
     from my_unicorn.types import GlobalConfig
 
 logger = get_logger(__name__)
+
+
+# helpers
+def _build_progress_task_error(
+    app_name: str,
+    phase: Phase,
+    error_code: ErrorCode,
+    details: str,
+    processing_phase: str | None = None,
+) -> TaskError:
+    """Build structured progress error context."""
+    phase_name = phase.name.lower()
+    return TaskError(
+        phase=phase_name,
+        processing_phase=processing_phase or phase_name,
+        app_name=app_name,
+        error_code=error_code,
+        error_severity=ErrorSeverity.ERROR,
+        details=details,
+        timestamp=datetime.now(UTC).isoformat(),
+    )
+
+
+async def _finish_api_progress_task_with_error(
+    progress_reporter: ProgressReporter | None,
+    task_id: str | None,
+    app_name: str,
+    asset_result: AssetSelectionResult,
+    error_message: str,
+) -> None:
+    """Attach an error to an existing progress task when available."""
+    if progress_reporter is None or task_id is None:
+        return
+
+    await progress_reporter.finish_task(
+        task_id,
+        success=False,
+        description=error_message,
+        errors=[
+            _build_progress_task_error(
+                app_name=app_name,
+                phase=Phase.API_FETCHING,
+                error_code=asset_result.error or ErrorCode.UPDATE_FAILED,
+                details=error_message,
+            )
+        ],
+    )
+
+
+def _find_update_info(
+    app_name: str,
+    update_infos: list[UpdateInfo],
+) -> UpdateInfo:
+    """Find UpdateInfo for a specific app.
+
+    Args:
+        app_name: Name of the app to find.
+        update_infos: List of UpdateInfo objects.
+
+    Returns:
+        UpdateInfo for the app with default error if not found.
+
+    """
+    for info in update_infos:
+        if info.app_name == app_name:
+            return info
+    # Return default error UpdateInfo if not found
+    return UpdateInfo(
+        app_name=app_name,
+        error_reason="Update info not found",
+    )
+
+
+def display_update_error(message: str) -> None:
+    """Display an error message.
+
+    Args:
+        message: Error message to display.
+
+    """
+    logger.error("× %s", message)
+
+
+def display_check_results(results: dict) -> None:
+    """Display check-only results from update service.
+
+    Args:
+        results: Results dictionary with 'available_updates' key
+
+    """
+    if results["available_updates"]:
+        logger.info("Updates available:")
+        for info in results["available_updates"]:
+            logger.info(
+                "  %s: %s → %s",
+                info["app_name"],
+                info["current_version"],
+                info["latest_version"],
+            )
+        logger.info("\nRun 'my-unicorn update' to install updates")
+    else:
+        logger.info("✓ All apps are up to date")
+
+
+def display_update_results(results: dict) -> None:
+    """Display update operation results from update service.
+
+    Args:
+        results: Results dictionary with 'updated', 'failed', 'up_to_date',
+            and 'update_infos' keys
+
+    """
+    updated = results.get("updated", [])
+    failed = results.get("failed", [])
+    up_to_date = results.get("up_to_date", [])
+    update_infos = results.get("update_infos", [])
+
+    # If we have detailed info, use formatted summary
+    if update_infos:
+        header = PHASE_SECTION_LABELS.get(Phase.SUMMARY)
+        logger.info(header)
+
+        # Show updated apps with version info
+        for app_name in updated:
+            app_info = _find_update_info(app_name, update_infos)
+            if app_info.is_success:
+                version_info = (
+                    f"{app_info.current_version} → {app_info.latest_version}"
+                )
+                logger.info("%-25s ✓ %s", app_name, version_info)
+            else:
+                logger.info("%-25s ✓ Updated", app_name)
+
+        # Show failed apps with error info
+        for app_name in failed:
+            app_info = _find_update_info(app_name, update_infos)
+            logger.info("FAILED %s", app_name)
+            # Keep error reason indented under the app name
+            # app name is already shown in the log line above
+            if app_info and app_info.error_reason:
+                logger.info("%s %s", app_name, app_info.error_reason)
+
+        # Show up-to-date apps
+        for app_name in up_to_date:
+            app_info = _find_update_info(app_name, update_infos)
+            if app_info.is_success:
+                version = app_info.current_version
+                logger.info(
+                    "UPTODATE %-20s  %s",
+                    app_name,
+                    version,
+                )
+            else:
+                logger.info("UPTODATE %-20s  %s", app_name)
+
+    else:
+        # Fallback to simple logger output
+        if updated:
+            logger.info("✓ Successfully updated: %s", ", ".join(updated))
+        if failed:
+            logger.error("× Failed to update: %s", ", ".join(failed))
+        if up_to_date:
+            logger.info("Already up to date: %s", ", ".join(up_to_date))
+
+
+def display_invalid_apps(
+    invalid_apps: list[str], config_manager: ConfigManager
+) -> None:
+    """Display warning about invalid app names.
+
+    Args:
+        invalid_apps: List of app names not found
+        config_manager: ConfigManager instance for listing installed apps
+
+    """
+    if invalid_apps:
+        logger.warning("! Apps not found: %s", ", ".join(invalid_apps))
+        installed = config_manager.list_installed_apps()
+        if installed:
+            logger.info("   Installed apps: %s", ", ".join(installed))
 
 
 class UpdateManager:
@@ -236,6 +422,7 @@ class UpdateManager:
             cache_manager=self.cache_manager,
             auth_manager=self.auth_manager,
         )
+        # TODO: find a good warning message and error exceptions for these
         if should_use_prerelease:
             logger.debug("Fetching latest prerelease for %s/%s", owner, repo)
             try:
@@ -302,6 +489,35 @@ class UpdateManager:
             app_config=app_config,
         )
 
+    async def _report_api_error(self, app_name: str, error_msg: str) -> None:
+        """Helper to report API errors to progress reporter."""
+        from datetime import UTC, datetime
+
+        from my_unicorn.core.progress.progress_types import Phase
+        from my_unicorn.exceptions import ErrorCode, ErrorSeverity, TaskError
+
+        err_id = await self.progress_reporter.add_task(
+            name=f"GitHub {app_name}",
+            progress_type=Phase.API_FETCHING,
+        )
+        await self.progress_reporter.finish_task(
+            err_id,
+            success=False,
+            errors=[
+                TaskError(
+                    phase="api_fetching",
+                    processing_phase="api_fetching",
+                    app_name=app_name,
+                    error_code=ErrorCode.UPDATE_FAILED,
+                    error_severity=ErrorSeverity.ERROR,
+                    details=ERROR_MESSAGES.get(
+                        ErrorCode.APPIMAGE_ASSET_NOT_FOUND
+                    ),
+                    timestamp=datetime.now(UTC).isoformat(),
+                )
+            ],
+        )
+
     async def check_single_update(
         self,
         app_name: str,
@@ -346,11 +562,21 @@ class UpdateManager:
                 owner, repo, should_use_prerelease, session, refresh_cache
             )
 
+            if self.progress_reporter and self._shared_api_task_id:
+                info = self.progress_reporter.get_task_info(
+                    self._shared_api_task_id
+                )
+                await self.progress_reporter.update_task(
+                    self._shared_api_task_id,
+                    completed=info["completed"] + 1,
+                )
+
             # Build and return update info
             return await self._build_update_info(
                 app_name, app_config, release_data
             )
 
+        # FIXME: Object of type `object` has no attribute `ClientResponseError`
         except aiohttp.client_exceptions.ClientResponseError as e:
             # Handle HTTP errors (401, 403, 404, etc.)
             if e.status == 401:
@@ -370,19 +596,26 @@ class UpdateManager:
                     e.status,
                     e.message,
                 )
+            # Report error by creating a finished task
+            if self.progress_reporter:
+                await self._report_api_error(app_name, error_msg)
             return UpdateInfo.create_error(app_name, error_msg)
 
         except (ConfigurationError, ValueError) as e:
             # Handle config and validation errors
             logger.exception("Failed to check updates for %s", app_name)
+            if self.progress_reporter:
+                await self._report_api_error(app_name, str(e))
             return UpdateInfo.create_error(app_name, str(e))
 
+        # TODO: use exceptions not constants for unexpected
         except Exception as e:
             # Catch-all for unexpected errors
             logger.exception("Failed to check updates for %s", app_name)
-            return UpdateInfo.create_error(
-                app_name, ERROR_UNEXPECTED.format(error=e)
-            )
+            error_msg = ERROR_UNEXPECTED.format(error=e)
+            if self.progress_reporter:
+                await self._report_api_error(app_name, error_msg)
+            return UpdateInfo.create_error(app_name, error_msg)
 
     async def check_updates(
         self,
@@ -418,14 +651,22 @@ class UpdateManager:
 
         logger.info("🔄 Checking %d app(s) for updates...", len(app_names))
 
-        async with aiohttp.ClientSession() as session:
-            tasks = [
-                self.check_single_update(
-                    app, session, refresh_cache=refresh_cache
-                )
-                for app in app_names
-            ]
-            return await asyncio.gather(*tasks)
+        from my_unicorn.core.protocols.progress import github_api_progress_task
+
+        async with github_api_progress_task(
+            self.progress_reporter,
+            task_name="GitHub Releases",
+            total=len(app_names),
+        ) as api_task_id:
+            self._shared_api_task_id = api_task_id
+            async with aiohttp.ClientSession() as session:
+                tasks = [
+                    self.check_single_update(
+                        app, session, refresh_cache=refresh_cache
+                    )
+                    for app in app_names
+                ]
+                return await asyncio.gather(*tasks)
 
     def _load_app_config_or_fail(
         self, app_name: str, context: str = ""
@@ -509,6 +750,8 @@ class UpdateManager:
                 self.check_single_update,
                 self._load_app_config_or_fail,
                 self._catalog_cache.load_catalog,
+                self.progress_reporter,
+                self._shared_api_task_id,
             )
 
         return await update_single_app(
@@ -594,9 +837,6 @@ async def update_cached_progress(
 
     try:
         task_info = progress_reporter.get_task_info(shared_api_task_id)
-        if not task_info:
-            return
-
         completed = task_info.get("completed", 0)
         total_value = task_info.get("total")
         new_completed = int(completed) + 1
@@ -756,7 +996,7 @@ async def update_single_app(
 
     except (UpdateError, VerificationError) as e:
         # Re-raise domain exceptions as they already have context
-        logger.exception("Failed to update %s", app_name)
+        logger.error(str(e))
         return False, str(e)
     except Exception as e:
         # Wrap unexpected exceptions in UpdateError with context
@@ -919,7 +1159,7 @@ async def resolve_update_info(
 
     # Check if update is needed (skip if up to date and not forced)
     if not update_info.has_update and not force:
-        logger.info("%s is already up to date", app_name)
+        logger.info("UPTODATE  %s", app_name)
         return update_info, None  # Return info for skip handling
 
     return update_info, None
@@ -957,7 +1197,9 @@ def load_update_config(
 async def load_catalog_for_update(
     app_name: str,
     app_config: dict[str, Any],
-    load_catalog_cached_func: Callable,
+    load_catalog_cached_func: Callable[
+        [str], Awaitable[dict[str, Any] | None]
+    ],
 ) -> dict[str, Any] | None:
     """Load catalog entry if referenced in app config.
 
@@ -990,11 +1232,35 @@ async def load_catalog_for_update(
         ) from e
 
 
+# TODO: use Result class  with unified pattern
+# T for success, E for error typevar, learn for warnings (maybe W work?)
+# so you can use all of the returns
+# and would be better design
+# also you can share with install result
+@dataclass
+class AssetSelectionResult:
+    asset: Asset | None
+    error: ErrorCode | None
+    message: str | None = None
+
+    def ok(self) -> bool:
+        return self.asset is not None and self.error is None
+
+
+# TODO: why we don't use api to handle errors for us?
+# we also have install, so we share api for both
+# also update is just still install the appimage...
+# for specific errors like update fail or install fail
+# might good but we don't need to worry about it so much.
+# my main issue is that I must show errors directly
+# after the api fails, not after in the update or install
+# which both actually send api request
+# so it seems like my architecture wrong?
 def select_asset_for_update(
     app_name: str,
     update_info: UpdateInfo,
     catalog_entry: dict[str, Any] | None,
-) -> tuple[Asset | None, str | None]:
+) -> AssetSelectionResult:
     """Select AppImage asset from release data.
 
     Args:
@@ -1007,32 +1273,64 @@ def select_asset_for_update(
 
     """
     if not update_info.release_data:
-        logger.error("No release data available for %s", app_name)
-        return None, "No release data available"
+        logger.debug("No release data available for %s", app_name)
+        return AssetSelectionResult(
+            asset=None,
+            error=ErrorCode.UPDATE_FAILED,
+            message="No release data available",
+        )
 
     # Convert catalog_entry to dict if needed
     catalog_dict = dict(catalog_entry) if catalog_entry else None
+
     appimage_asset = select_best_appimage_asset(
         update_info.release_data,
+        app_name=app_name,
         catalog_entry=catalog_dict,
         installation_source="catalog" if catalog_entry else "url",
         raise_on_not_found=False,
     )
 
+    # TODO: we must show error here on the api section without duplicate Querying text
+    # because we migrate new pacman style cli design
+    # we are going to remove summary section error showcase completely,and only show failed, success
+    # NOTE: if we make logger.debug to logger.error
+    # it make it this error like #294
+    # ➜ my-unicorn update
+    # :: Querying upstream releases...
+    # :::: Querying upstream releases...
+    # GitHub Releases      2/2 Retrieved from cache
+    # :: Retrieving appimages...
+    # zen-x86_64                                                                                                         117.0 MiB   10.6 MB/s      5s [=============>                ]  48%
+    # Total (0/1)                                                                                                        117.0 MiB   10.6 MB/s      5s [=============>                ]  48%
+    # CLI cancelled by user
+    # TODO: might be solveable via making it exception instead of if?
+    # this probably happen because of async maybe, which it isn't even show error which it is show the error
+    # when I only update the ytmdesktop:
+    # ➜ my-unicorn update ytmdesktop
+    # :: Querying upstream releases...
+    # GitHub Releases      1/1 Retrieved from cache
+    # 13:36:55 - my_unicorn.core.update - ERROR - No AppImage found for ytmdesktop, may still be building
+    # :: Creating transaction summary...
+    # FAILED  ytmdesktop
+    # ytmdesktop appimage asset not found : appimage builds may still be processing, try again later. Some developers may not provide appimage builds, so this might be external to my-unicorn's control.
     if not appimage_asset:
-        # use debug level to avoid duplicate `Fetching from API:` log messages.
-        # see #294
-        #
-        # user can still see the no appimage error in the summary section.
         logger.debug(
             "No AppImage found for %s, may still be building", app_name
         )
-        return None, "AppImage not found in release - may still be building"
+        raise UpdateError(
+            error_code=ErrorCode.APPIMAGE_ASSET_NOT_FOUND,
+            context={"app_name": app_name},
+        )
 
-    return appimage_asset, None
+    return AssetSelectionResult(
+        asset=appimage_asset,
+        error=None,
+        message=None,
+    )
 
 
-async def prepare_update_context(
+async def prepare_update_context(  # noqa: PLR0913
     app_name: str,
     session: aiohttp.ClientSession,
     force: bool,
@@ -1044,6 +1342,8 @@ async def prepare_update_context(
     load_catalog_cached_func: Callable[
         [str], Awaitable[dict[str, Any] | None]
     ],
+    progress_reporter: ProgressReporter | None = None,
+    api_task_id: str | None = None,
 ) -> tuple[dict[str, Any] | None, str | None]:
     """Prepare context for update operation.
 
@@ -1055,6 +1355,8 @@ async def prepare_update_context(
         check_single_update_func: Function to check single update
         load_app_config_func: Function to load app config
         load_catalog_cached_func: Function to load cached catalog
+        progress_reporter: Optional progress reporter for inline errors
+        api_task_id: Optional API progress task ID for inline errors
 
     Returns:
         Tuple of (context dict, error message). Context is None on error.
@@ -1093,11 +1395,25 @@ async def prepare_update_context(
     )
 
     # Select AppImage asset
-    appimage_asset, error = select_asset_for_update(
+    asset_result = select_asset_for_update(
         app_name, update_info, catalog_entry
     )
-    if error:
-        return None, error
+
+    # TODO: add ErrorCode exception msg in exceptions.py when you figure out
+    # what type of errors might happen here with correct good text
+    # e.g ErrorCode.APPIMAGE_SELECTION_FAILED
+    if not asset_result.ok():
+        error_message = asset_result.message or "Asset selection failed"
+        await _finish_api_progress_task_with_error(
+            progress_reporter=progress_reporter,
+            task_id=api_task_id,
+            app_name=app_name,
+            asset_result=asset_result,
+            error_message=error_message,
+        )
+        return None, error_message
+
+    appimage_asset = asset_result.asset
 
     return {
         "app_config": app_config,
@@ -1194,139 +1510,6 @@ class CatalogCache:
     def clear(self) -> None:
         """Clear the catalog cache."""
         self._cache.clear()
-
-
-def _find_update_info(
-    app_name: str,
-    update_infos: list[UpdateInfo],
-) -> UpdateInfo:
-    """Find UpdateInfo for a specific app.
-
-    Args:
-        app_name: Name of the app to find.
-        update_infos: List of UpdateInfo objects.
-
-    Returns:
-        UpdateInfo for the app with default error if not found.
-
-    """
-    for info in update_infos:
-        if info.app_name == app_name:
-            return info
-    # Return default error UpdateInfo if not found
-    return UpdateInfo(
-        app_name=app_name,
-        error_reason="Update info not found",
-    )
-
-
-def display_update_error(message: str) -> None:
-    """Display an error message.
-
-    Args:
-        message: Error message to display.
-
-    """
-    logger.error("× %s", message)
-
-
-def display_check_results(results: dict) -> None:
-    """Display check-only results from update service.
-
-    Args:
-        results: Results dictionary with 'available_updates' key
-
-    """
-    if results["available_updates"]:
-        logger.info("Updates available:")
-        for info in results["available_updates"]:
-            logger.info(
-                "  %s: %s → %s",
-                info["app_name"],
-                info["current_version"],
-                info["latest_version"],
-            )
-        logger.info("\nRun 'my-unicorn update' to install updates")
-    else:
-        logger.info("✓ All apps are up to date")
-
-
-def display_update_results(results: dict) -> None:
-    """Display update operation results from update service.
-
-    Args:
-        results: Results dictionary with 'updated', 'failed', 'up_to_date',
-            and 'update_infos' keys
-
-    """
-    updated = results.get("updated", [])
-    failed = results.get("failed", [])
-    up_to_date = results.get("up_to_date", [])
-    update_infos = results.get("update_infos", [])
-
-    # If we have detailed info, use formatted summary
-    if update_infos:
-        logger.info("Update Summary:")
-        logger.info("-" * 50)
-
-        # Show updated apps with version info
-        for app_name in updated:
-            app_info = _find_update_info(app_name, update_infos)
-            if app_info.is_success:
-                version_info = (
-                    f"{app_info.current_version} → {app_info.latest_version}"
-                )
-                logger.info("%-25s ✓ %s", app_name, version_info)
-            else:
-                logger.info("%-25s ✓ Updated", app_name)
-
-        # Show failed apps with error info
-        for app_name in failed:
-            app_info = _find_update_info(app_name, update_infos)
-            logger.info("%-25s × Update failed", app_name)
-            # Keep error reason indented under the app name
-            # app name is already shown in the log line above
-            if app_info and app_info.error_reason:
-                logger.info("%-25s    → %s", "", app_info.error_reason)
-
-        # Show up-to-date apps
-        for app_name in up_to_date:
-            app_info = _find_update_info(app_name, update_infos)
-            if app_info.is_success:
-                version = app_info.current_version
-                logger.info(
-                    "%-25s Already up to date (%s)",
-                    app_name,
-                    version,
-                )
-            else:
-                logger.info("%-25s Already up to date", app_name)
-
-    else:
-        # Fallback to simple logger output
-        if updated:
-            logger.info("✓ Successfully updated: %s", ", ".join(updated))
-        if failed:
-            logger.error("× Failed to update: %s", ", ".join(failed))
-        if up_to_date:
-            logger.info("Already up to date: %s", ", ".join(up_to_date))
-
-
-def display_invalid_apps(
-    invalid_apps: list[str], config_manager: ConfigManager
-) -> None:
-    """Display warning about invalid app names.
-
-    Args:
-        invalid_apps: List of app names not found
-        config_manager: ConfigManager instance for listing installed apps
-
-    """
-    if invalid_apps:
-        logger.warning("! Apps not found: %s", ", ".join(invalid_apps))
-        installed = config_manager.list_installed_apps()
-        if installed:
-            logger.info("   Installed apps: %s", ", ".join(installed))
 
 
 @dataclass

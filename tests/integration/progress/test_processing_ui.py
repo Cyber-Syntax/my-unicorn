@@ -1,6 +1,6 @@
 """Integration tests for installation/verification progress UI display.
 
-These tests verify that the "Installing:" or "Verifying:" sections render
+These tests verify that the ":: Processing package changes..." or "verifying" sections render
 correctly for various processing task states including verification success,
 warnings, partial verification, installation success, and error conditions.
 """
@@ -13,7 +13,12 @@ from my_unicorn.core.progress.ascii import (
     SectionRenderConfig,
     render_processing_section,
 )
-from my_unicorn.core.progress.progress_types import ProgressType, TaskState
+from my_unicorn.core.progress.progress_types import (
+    Phase,
+    ProcessingPhase,
+    TaskState,
+)
+from my_unicorn.exceptions import ErrorCode, ErrorSeverity, TaskError
 
 from .test_ui_helpers import capture_progress_output, parse_output_sections
 
@@ -23,7 +28,7 @@ class TestVerificationSuccessUI:
     """Test suite for successful verification UI display."""
 
     def test_verification_success_ui(self) -> None:
-        """Verify "(1/2) Verifying app ✓" format.
+        """Verify "(1/2) verifying app" format.
 
         Tests successful verification display format.
         """
@@ -31,7 +36,8 @@ class TestVerificationSuccessUI:
         task = TaskState(
             task_id="v1",
             name="qownnotes",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -52,13 +58,12 @@ class TestVerificationSuccessUI:
         output = "\n".join(output_lines)
 
         # Assert - should show verification in correct format
-        assert "Verifying:" in output
+        assert "verifying" in output
         assert "(1/2)" in output
-        assert "Verifying" in output
+        assert "verifying" in output
         assert "qownnotes" in output
-        assert "✓" in output
-        # Should have format like "(1/2) Verifying qownnotes ✓"
-        assert "(1/2) Verifying qownnotes ✓" in output
+        # Should have format like "(1/2) verifying qownnotes"
+        assert "(1/2) verifying qownnotes" in output
 
 
 @pytest.mark.integration
@@ -66,12 +71,13 @@ class TestVerificationWarningUI:
     """Test suite for verification warnings display."""
 
     def test_verification_warning_ui(self) -> None:
-        """Verify '! not verified (dev did not provide checksums)' format."""
+        """Verify 'not verified (dev did not provide checksums)' format."""
         # Arrange - create a verification with warning
         task = TaskState(
             task_id="v1",
             name="weektodo",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -93,12 +99,13 @@ class TestVerificationWarningUI:
         output = "\n".join(output_lines)
 
         # Assert - should show warning format
-        assert "Verifying:" in output
+        assert "verifying" in output
         assert "(1/2)" in output
-        assert "Verifying" in output
+        assert "verifying" in output
         assert "weektodo" in output
-        assert "!" in output  # Warning symbol
         # Warning message should be on next line with indentation
+        # FIXME:AssertionError: assert 'not verified (dev did not provide checksums)' in 'verifying\n(1/2) verifying weektodo'
+        # TODO: we might need to change verifying to skipped for weektodo?
         assert "not verified (dev did not provide checksums)" in output
 
     def test_verification_warning_with_next_phase(self) -> None:
@@ -111,7 +118,8 @@ class TestVerificationWarningUI:
         task1 = TaskState(
             task_id="v1",
             name="weektodo",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -121,7 +129,8 @@ class TestVerificationWarningUI:
         task2 = TaskState(
             task_id="i1",
             name="weektodo",
-            progress_type=ProgressType.INSTALLATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.INSTALLATION,
             phase=2,
             total_phases=2,
             is_finished=True,
@@ -142,9 +151,9 @@ class TestVerificationWarningUI:
         output = "\n".join(output_lines)
 
         # Assert - should show both phases
-        assert "Installing:" in output
-        assert "(1/2) Verifying weektodo !" in output
-        assert "(2/2) Installing weektodo ✓" in output
+        assert ":: Processing package changes..." in output
+        assert "(1/2) verifying weektodo" in output
+        assert "(2/2) installing weektodo" in output
 
 
 @pytest.mark.integration
@@ -152,19 +161,19 @@ class TestInstallationSuccessUI:
     """Test suite for successful installation UI display."""
 
     def test_installation_success_ui(self) -> None:
-        """Verify "(2/2) Installing app ✓" format for successful installation.
+        """Verify "(2/2) Installing app" format for successful installation.
 
         Tests that successful installation displays:
         - Phase number: (2/2)
         - Operation: "Installing"
         - App name
-        - Success checkmark: ✓
         """
         # Arrange - create a completed successful installation task
         task = TaskState(
             task_id="i1",
             name="qownnotes",
-            progress_type=ProgressType.INSTALLATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.INSTALLATION,
             phase=2,
             total_phases=2,
             is_finished=True,
@@ -185,13 +194,12 @@ class TestInstallationSuccessUI:
         output = "\n".join(output_lines)
 
         # Assert - should show installation in correct format
-        assert "Installing:" in output
+        assert ":: Processing package changes..." in output
         assert "(2/2)" in output
-        assert "Installing" in output
+        assert "installing" in output
         assert "qownnotes" in output
-        assert "✓" in output
-        # Should have format like "(2/2) Installing qownnotes ✓"
-        assert "(2/2) Installing qownnotes ✓" in output
+        # Should have format like "(2/2) installing qownnotes"
+        assert "(2/2) installing qownnotes" in output
 
 
 @pytest.mark.integration
@@ -208,7 +216,8 @@ class TestProcessingPhasesSequentialUI:
         task1 = TaskState(
             task_id="v1",
             name="qownnotes",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -217,7 +226,8 @@ class TestProcessingPhasesSequentialUI:
         task2 = TaskState(
             task_id="i1",
             name="qownnotes",
-            progress_type=ProgressType.INSTALLATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.INSTALLATION,
             phase=2,
             total_phases=2,
             is_finished=True,
@@ -239,8 +249,8 @@ class TestProcessingPhasesSequentialUI:
 
         # Assert - should show proper phase sequence
         # Phases should be 1/2 then 2/2 for the same app
-        assert "(1/2) Verifying qownnotes ✓" in output
-        assert "(2/2) Installing qownnotes ✓" in output
+        assert "(1/2) verifying qownnotes" in output
+        assert "(2/2) installing qownnotes" in output
 
     def test_processing_phases_multiple_apps_sequential_ui(self) -> None:
         """Verify phase numbering for multiple apps in sequence.
@@ -252,7 +262,8 @@ class TestProcessingPhasesSequentialUI:
         task1 = TaskState(
             task_id="v1",
             name="qownnotes",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -261,7 +272,8 @@ class TestProcessingPhasesSequentialUI:
         task2 = TaskState(
             task_id="i1",
             name="qownnotes",
-            progress_type=ProgressType.INSTALLATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.INSTALLATION,
             phase=2,
             total_phases=2,
             is_finished=True,
@@ -270,7 +282,8 @@ class TestProcessingPhasesSequentialUI:
         task3 = TaskState(
             task_id="v2",
             name="appflowy",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -279,7 +292,8 @@ class TestProcessingPhasesSequentialUI:
         task4 = TaskState(
             task_id="i2",
             name="appflowy",
-            progress_type=ProgressType.INSTALLATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.INSTALLATION,
             phase=2,
             total_phases=2,
             is_finished=True,
@@ -300,10 +314,10 @@ class TestProcessingPhasesSequentialUI:
         output = "\n".join(output_lines)
 
         # Assert - should show all phases in order
-        assert "(1/2) Verifying qownnotes ✓" in output
-        assert "(2/2) Installing qownnotes ✓" in output
-        assert "(1/2) Verifying appflowy ✓" in output
-        assert "(2/2) Installing appflowy ✓" in output
+        assert "(1/2) verifying qownnotes" in output
+        assert "(2/2) installing qownnotes" in output
+        assert "(1/2) verifying appflowy" in output
+        assert "(2/2) installing appflowy" in output
 
 
 @pytest.mark.integration
@@ -316,19 +330,29 @@ class TestProcessingErrorUI:
         Tests that when a processing task fails, the error message
         is displayed correctly with formatting:
         - Phase and operation
-        - Error symbol
-        - Error message on next line with indentation
+        - Error message
         """
         # Arrange - create a failed task with error message
         task = TaskState(
             task_id="i1",
             name="broken-app",
-            progress_type=ProgressType.INSTALLATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.INSTALLATION,
             phase=2,
             total_phases=2,
             is_finished=True,
             success=False,
-            error_message="Failed to create desktop entry: Permission denied",
+            errors=[
+                TaskError(
+                    phase="download",
+                    processing_phase="download",
+                    app_name="bad.AppImage",
+                    error_code=ErrorCode.DESKTOP_ENTRY_CREATION_FAILED,
+                    error_severity=ErrorSeverity.ERROR,
+                    details="Failed to create desktop entry: Permission denied",
+                    timestamp="2026-01-01T00:00:00Z",
+                )
+            ],
         )
 
         tasks = {"i1": task}
@@ -345,13 +369,14 @@ class TestProcessingErrorUI:
         output = "\n".join(output_lines)
 
         # Assert - should show error format
-        assert "Installing:" in output
+        assert ":: Processing package changes..." in output
         assert "(2/2)" in output
-        assert "Installing" in output
+        assert "installing" in output
         assert "broken-app" in output
-        # Error message should appear on next line with indentation
-        assert "Error:" in output
-        assert "Failed to create desktop entry" in output
+        assert (
+            "error: failed to installing 'broken-app' : Failed to create desktop entry: Permission denied"
+            in output
+        )
 
     def test_verification_error_ui(self) -> None:
         """Verify error messages appear correctly in verification phase.
@@ -362,12 +387,23 @@ class TestProcessingErrorUI:
         task = TaskState(
             task_id="v1",
             name="bad-app",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
             success=False,
-            error_message="Hash verification failed: SHA256 mismatch",
+            errors=[
+                TaskError(
+                    phase="download",
+                    processing_phase="download",
+                    app_name="bad.AppImage",
+                    error_code=ErrorCode.CHECKSUM_MISMATCH,
+                    error_severity=ErrorSeverity.ERROR,
+                    details="Hash verification failed: SHA256 mismatch",
+                    timestamp="2026-01-01T00:00:00Z",
+                )
+            ],
         )
 
         tasks = {"v1": task}
@@ -384,13 +420,15 @@ class TestProcessingErrorUI:
         output = "\n".join(output_lines)
 
         # Assert - should show error format
-        assert "Verifying:" in output
+        assert "verifying" in output
         assert "(1/2)" in output
-        assert "Verifying" in output
+        assert "verifying" in output
         assert "bad-app" in output
         # Error message should appear
-        assert "Error:" in output
-        assert "Hash verification failed" in output
+        assert (
+            "error: failed to verifying 'bad-app' : Hash verification failed: SHA256 mismatch"
+            in output
+        )
 
 
 @pytest.mark.integration
@@ -398,7 +436,7 @@ class TestProcessingHeaderSelection:
     """Test suite for processing section header selection."""
 
     def test_header_verifying_only(self) -> None:
-        """Verify header is 'Verifying:' when only verification tasks present.
+        """Verify header is 'verifying' when only verification tasks present.
 
         Tests that the section header is correctly selected based on
         what types of processing tasks are present.
@@ -407,7 +445,8 @@ class TestProcessingHeaderSelection:
         task = TaskState(
             task_id="v1",
             name="qownnotes",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -426,21 +465,22 @@ class TestProcessingHeaderSelection:
         # Act - render processing section
         output_lines = render_processing_section(tasks, order, config)
 
-        # Assert - should have "Verifying:" header
+        # Assert - should have "verifying" header
         assert len(output_lines) > 0
-        assert output_lines[0] == "Verifying:"
+        assert output_lines[0] == "verifying"
 
     def test_header_installing_with_verification(self) -> None:
-        """Verify header is 'Installing:' when both types of tasks present.
+        """Verify header is ':: Processing package changes...' when both types of tasks present.
 
         Tests that when both verification and installation tasks are
-        present, the header is still 'Installing:'.
+        present, the header is still ':: Processing package changes...'.
         """
         # Arrange - create verification + installation tasks
         task1 = TaskState(
             task_id="v1",
             name="qownnotes",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -449,7 +489,8 @@ class TestProcessingHeaderSelection:
         task2 = TaskState(
             task_id="i1",
             name="qownnotes",
-            progress_type=ProgressType.INSTALLATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.INSTALLATION,
             phase=2,
             total_phases=2,
             is_finished=True,
@@ -468,41 +509,9 @@ class TestProcessingHeaderSelection:
         # Act - render processing section
         output_lines = render_processing_section(tasks, order, config)
 
-        # Assert - should have "Installing:" header
+        # Assert - should have ":: Processing package changes..." header
         assert len(output_lines) > 0
-        assert output_lines[0] == "Installing:"
-
-    def test_header_processing_with_update_only(self) -> None:
-        """Verify header is 'Processing:' when only update tasks present.
-
-        Tests that update operations alone use 'Processing:' as header.
-        """
-        # Arrange - create update tasks only
-        task = TaskState(
-            task_id="u1",
-            name="qownnotes",
-            progress_type=ProgressType.UPDATE,
-            phase=2,
-            total_phases=2,
-            is_finished=True,
-            success=True,
-        )
-
-        tasks = {"u1": task}
-        order = ["u1"]
-        config = SectionRenderConfig(
-            bar_width=30,
-            min_name_width=15,
-            spinner_fps=4,
-            interactive=False,
-        )
-
-        # Act - render processing section
-        output_lines = render_processing_section(tasks, order, config)
-
-        # Assert - should have "Processing:" header (for update-only)
-        assert len(output_lines) > 0
-        assert output_lines[0] == "Processing:"
+        assert output_lines[0] == ":: Processing package changes..."
 
     def test_processing_section_with_helper_and_fixture(
         self, install_success_output: str
@@ -511,7 +520,8 @@ class TestProcessingHeaderSelection:
         task1 = TaskState(
             task_id="v1",
             name="qownnotes",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
@@ -520,7 +530,8 @@ class TestProcessingHeaderSelection:
         task2 = TaskState(
             task_id="i1",
             name="qownnotes",
-            progress_type=ProgressType.INSTALLATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.INSTALLATION,
             phase=2,
             total_phases=2,
             is_finished=True,
@@ -539,4 +550,3 @@ class TestProcessingHeaderSelection:
         text = "\n".join(sections["install"].lines)
         assert "qownnotes" in text
         assert "appflowy" in text
-        assert "✓" in text

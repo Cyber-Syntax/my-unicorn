@@ -114,26 +114,11 @@ LOG_BACKUP_COUNT: Final[int] = 5
 # Timestamp format for rotated log filenames
 LOG_ROTATION_TIMESTAMP_FORMAT: Final[str] = "%Y%m%d_%H%M%S"
 
-# Console and file format strings used by the logger
-LOG_CONSOLE_FORMAT: Final[str] = (
-    "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-LOG_CONSOLE_DATE_FORMAT: Final[str] = "%H:%M:%S"
 LOG_FILE_FORMAT: Final[str] = (
     "%(asctime)s - %(name)s - %(levelname)s - "
     "%(funcName)s:%(lineno)d - %(message)s"
 )
 LOG_FILE_DATE_FORMAT: Final[str] = "%Y-%m-%d %H:%M:%S"
-
-# Color mapping for console output levels
-LOG_COLORS: Final[dict[str, str]] = {
-    "DEBUG": "\033[36m",  # Cyan
-    "INFO": "\033[32m",  # Green
-    "WARNING": "\033[33m",  # Yellow
-    "ERROR": "\033[31m",  # Red
-    "CRITICAL": "\033[35m",  # Magenta
-    "RESET": "\033[0m",
-}
 
 # =============================================================================
 # Desktop (.desktop) file related constants
@@ -324,6 +309,8 @@ VERSION_UNKNOWN: Final[str] = "unknown"
 # Common Error Message Patterns
 # =============================================================================
 
+# TODO: remove all these and move them to exceptions.py module if they're differ
+# than our current messages
 # Error message templates for consistency
 ERROR_NO_APPIMAGE_ASSET: Final[str] = "No suitable AppImage asset found"
 ERROR_NO_RELEASE_FOUND: Final[str] = "No release found for {owner}/{repo}"

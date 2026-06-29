@@ -39,11 +39,15 @@ from .progress_types import (
     DEFAULT_BAR_WIDTH,
     DEFAULT_MIN_NAME_WIDTH,
     DEFAULT_SPINNER_FPS,
-    OPERATION_NAMES,
+    PHASE_SECTION_LABELS,
+    PROCESSING_LABELS,
     SPINNER_FRAMES,
+    Phase,
+    ProcessingPhase,
     ProgressConfig,
-    ProgressType,
+    TaskError,
     TaskState,
+    TaskStatusInfo,
 )
 
 logger = get_logger(__name__)
@@ -77,20 +81,6 @@ def compute_spinner(fps: int) -> str:
     current_time = time.monotonic()
     spinner_idx = int(current_time * fps) % len(SPINNER_FRAMES)
     return SPINNER_FRAMES[spinner_idx]
-
-
-def compute_download_header(download_count: int) -> str:
-    """Return the downloads section header string.
-
-    Args:
-        download_count: The total number of downloads.
-
-    Returns:
-        A formatted header string for the downloads section.
-    """
-    if download_count > 1:
-        return f"Downloading ({download_count}):"
-    return "Downloading:"
 
 
 class AsciiProgressBackend:
@@ -166,7 +156,8 @@ class AsciiProgressBackend:
         self,
         task_id: str,
         name: str,
-        progress_type: ProgressType,
+        progress_type: Phase,
+        sub_type: ProcessingPhase | None = None,
         total: float = 0.0,
         parent_task_id: str | None = None,
         phase: int = 1,
@@ -178,6 +169,7 @@ class AsciiProgressBackend:
             task_id: Unique task identifier
             name: Task name
             progress_type: Type of progress operation
+            sub_type: Type of sub-progress operation
             total: Total units for the task
             parent_task_id: Parent task ID for multi-phase operations
             phase: Current phase number
@@ -188,6 +180,7 @@ class AsciiProgressBackend:
             task_id=task_id,
             name=name,
             progress_type=progress_type,
+            sub_type=sub_type,
             total=total,
             created_at=time.time(),
             last_update=time.monotonic(),
@@ -243,6 +236,8 @@ class AsciiProgressBackend:
         task_id: str,
         success: bool = True,  # noqa: FBT001, FBT002
         description: str | None = None,
+        errors: list[TaskError] | None = None,
+        warnings: list[TaskError] | None = None,
     ) -> None:
         """Mark a task as finished.
 
@@ -250,6 +245,8 @@ class AsciiProgressBackend:
             task_id: Task identifier
             success: Whether the task succeeded
             description: Final description (error message if failed)
+            errors: Structured errors to render with the task.
+            warnings: Structured warnings to render with the task.
 
         """
         # Protect read/modify of shared state
@@ -263,11 +260,15 @@ class AsciiProgressBackend:
             task = self.tasks[task_id]
             task.is_finished = True
             task.success = success
+
             if description is not None:
-                if not success and "Error:" not in description:
-                    # Extract error message for cleaner display
-                    task.error_message = description
                 task.description = description
+
+            if errors:
+                task.errors.extend(errors)
+            if warnings:
+                task.warnings.extend(warnings)
+
             task.last_update = time.monotonic()
 
     def _build_output(self) -> str:
@@ -358,19 +359,31 @@ class AsciiProgressBackend:
             Complete output string with all sections
 
         """
-        lines: list[str] = []
-        lines.extend(render_api_section(tasks_snapshot, order_snapshot))
-        lines.extend(
-            render_downloads_section(
-                tasks_snapshot, order_snapshot, self._section_config
-            )
+        sections: list[str] = []
+
+        api_lines = render_api_section(
+            tasks_snapshot, order_snapshot, self._section_config
         )
-        lines.extend(
-            render_processing_section(
-                tasks_snapshot, order_snapshot, self._section_config
+        if api_lines:
+            sections.append(
+                PHASE_SECTION_LABELS[Phase.API_FETCHING]
+                + "\n"
+                + "\n".join(api_lines)
             )
+
+        download_lines = render_downloads_section(
+            tasks_snapshot, order_snapshot, self._section_config
         )
-        return "\n".join(lines)
+        if download_lines:
+            sections.append("\n".join(download_lines))
+
+        processing_lines = render_processing_section(
+            tasks_snapshot, order_snapshot, self._section_config
+        )
+        if processing_lines:
+            sections.append("\n".join(processing_lines))
+
+        return "\n\n".join(sections)
 
 
 class TerminalWriter:
@@ -430,6 +443,15 @@ class TerminalWriter:
             logger.debug("Failed to write output: %s", exc)
 
     @staticmethod
+    def _section_signatures(section: str) -> tuple[str, str]:
+        """Return stable and exact signatures for a rendered section."""
+        stripped = section.strip()
+        first_line = stripped.splitlines()[0] if stripped else ""
+        if first_line.startswith(":: "):
+            return first_line, stripped
+        return stripped, stripped
+
+    @staticmethod
     def _find_new_sections(
         output: str, known_sections: set[str]
     ) -> tuple[list[str], set[str]]:
@@ -449,9 +471,25 @@ class TerminalWriter:
 
         for section in sections:
             section_sig = section.strip()
-            if section_sig and section_sig not in known_sections:
+            if not section_sig:
+                continue
+
+            stable_sig, exact_sig = TerminalWriter._section_signatures(section)
+            if stable_sig in known_sections and exact_sig in known_sections:
+                continue
+
+            if stable_sig in known_sections:
+                lines = section_sig.splitlines()
+                section_body = "\n".join(lines[1:]).strip()
+                if section_body and exact_sig not in known_sections:
+                    new_sections.append(section_body)
+                    new_signatures.add(exact_sig)
+                continue
+
+            if exact_sig not in known_sections:
                 new_sections.append(section)
-                new_signatures.add(section_sig)
+                new_signatures.add(stable_sig)
+                new_signatures.add(exact_sig)
 
         return new_sections, new_signatures
 
@@ -531,8 +569,8 @@ class TerminalWriter:
 
 # ASCII section rendering module.
 # Pure functions for rendering progress sections (API, downloads, processing).
-# These functions were extracted from AsciiProgressBackend to improve separation
-# of concerns and testability.
+# These functions were extracted from AsciiProgressBackend for better
+# separation of concerns and testability.
 
 
 @dataclass(frozen=True, slots=True)
@@ -547,16 +585,6 @@ class SectionRenderConfig:
     min_name_width: int = DEFAULT_MIN_NAME_WIDTH
     spinner_fps: int = DEFAULT_SPINNER_FPS
     interactive: bool = False
-
-
-@dataclass(frozen=True, slots=True)
-class TaskStatusInfo:
-    """Information for determining task status."""
-
-    is_finished: bool
-    success: bool | None
-    description: str
-    error_message: str
 
 
 def determine_task_status_symbol(
@@ -610,10 +638,8 @@ def should_show_warning_message(status_info: TaskStatusInfo) -> bool:
 
     """
     return bool(
-        status_info.is_finished
-        and status_info.success
-        and status_info.description
-        and "not verified" in status_info.description.lower()
+        status_info.warnings
+        or ("not verified" in status_info.description.lower())
     )
 
 
@@ -628,9 +654,8 @@ def should_show_error_message(status_info: TaskStatusInfo) -> bool:
 
     """
     return bool(
-        status_info.is_finished
-        and not status_info.success
-        and status_info.error_message
+        status_info.errors
+        or (status_info.success is False and status_info.description)
     )
 
 
@@ -648,8 +673,9 @@ def calculate_dynamic_name_width(
         Width to use for name (either full length or truncated)
 
     """
-    # Fixed width for: size + speed + eta + bar + pct + status
-    fixed_width = 10 + 10 + 5 + 32 + 6 + 1 + 6
+    # Width of right-aligned section: size + speed + eta + bar + pct
+    # Formatted as: "    10.5 MiB    2.3 MB/s 2m 30s [======>     ] 100%"
+    right_section_width = 10 + 1 + 10 + 1 + 7 + 1 + 32 + 1 + 4
 
     if interactive:
         try:
@@ -662,7 +688,7 @@ def calculate_dynamic_name_width(
         terminal_width = 80
 
     # Calculate available space for name
-    available_width = terminal_width - fixed_width
+    available_width = terminal_width - right_section_width
 
     # Use the smaller of: available width or actual name length
     # But ensure a minimum for readability
@@ -694,10 +720,35 @@ def compute_max_name_width(
     return max_name_width
 
 
+def _format_right_section(
+    size: str,
+    speed: str,
+    eta: str,
+    bar: str,
+    pct: str,
+) -> str:
+    """Format the right-aligned section with size, speed, ETA, bar, percentage.
+
+    Args:
+        size: Formatted size string
+        speed: Formatted speed string
+        eta: Formatted ETA string
+        bar: Progress bar string
+        pct: Formatted percentage string
+
+    Returns:
+        Formatted right-aligned section
+
+    """
+    # Build the right section string
+    return f"{size:>10}  {speed:>10} {eta:>7} {bar} {pct:>4}"
+
+
 def format_download_lines(
     task: TaskState,
     max_name_width: int,
     bar_width: int,
+    terminal_width: int | None = None,
 ) -> list[str]:
     """Format lines for a single download task (main + optional error).
 
@@ -705,6 +756,7 @@ def format_download_lines(
         task: TaskState to format
         max_name_width: Maximum width for task name
         bar_width: Width of progress bar
+        terminal_width: Terminal width (auto-detect if None)
 
     Returns:
         List of formatted output lines
@@ -714,56 +766,51 @@ def format_download_lines(
     display_name = compute_display_name(task)
     name = truncate_text(display_name, max_name_width)
 
-    if task.total > 0:
-        size_str = f"{human_mib(task.total):>10}"
-    else:
-        size_str = "    --    "
+    if terminal_width is None:
+        try:
+            terminal_width = shutil.get_terminal_size().columns
+        except (AttributeError, ValueError, OSError):
+            terminal_width = 80
 
-    if task.speed > 0:
-        speed_str = f"{human_speed_bps(task.speed):>10}"
-    else:
-        speed_str = "   --     "
+    size_str = human_mib(task.total) if task.total > 0 else "--"
+    speed_str = human_speed_bps(task.speed) if task.speed > 0 else "--"
 
     if task.speed > 0 and task.total > task.completed:
         remaining_bytes = task.total - task.completed
         eta_seconds = remaining_bytes / task.speed
         eta_str = format_eta(eta_seconds)
     else:
-        eta_str = "00:00"
+        eta_str = "--:--"
 
     bar = render_bar(task.completed, task.total, bar_width)
     pct = format_percentage(task.completed, task.total)
 
-    # Create status info for status determination
-    status_info = TaskStatusInfo(
-        is_finished=task.is_finished,
-        success=task.success,
-        description=task.description,
-        error_message=task.error_message,
+    # Format the right-aligned section
+    right_section = _format_right_section(
+        size_str, speed_str, eta_str, bar, pct
     )
 
-    # Use status symbol, but show empty space for in-progress downloads
-    if status_info.is_finished:
-        if status_info.success:
-            status = "✓"
-        elif status_info.success is False:
-            status = "✖"
-        else:
-            # success is None: finished but outcome not recorded
-            status = "?"
+    # Format: name on left, right section on right with padding
+    name_section = f"{name:<{max_name_width}}"
+    total_length = len(name_section) + len(right_section)
+
+    if total_length < terminal_width:
+        # Add padding to push right section to the right
+        padding = terminal_width - total_length
+        line = f"{name_section}{' ' * padding}{right_section}"
     else:
-        # In-progress: show empty space
-        status = " "
+        # Not enough space, just concatenate with single space
+        line = f"{name_section} {right_section}"
 
-    lines.append(
-        f"{name:<{max_name_width}} {size_str} {speed_str} "
-        f"{eta_str:>5} {bar} {pct:>6} {status}"
-    )
+    lines.append(line)
 
-    # Show error message if applicable
-    if should_show_error_message(status_info):
-        error_msg = truncate_text(task.error_message, 60)
-        lines.append(f"    Error: {error_msg}")
+    # process errors via TaskError
+    if task.errors:
+        for err in task.errors:
+            msg = err.details or ""
+            lines.append(
+                f"error: network error while downloading {task.name} : {msg}"
+            )
 
     return lines
 
@@ -786,30 +833,35 @@ def format_processing_task_lines(
     """
     lines: list[str] = []
     phase_str = f"({task.phase}/{task.total_phases})"
-    operation = OPERATION_NAMES.get(task.progress_type, "Processing")
 
-    # Create status info for status determination
-    status_info = TaskStatusInfo(
-        is_finished=task.is_finished,
-        success=task.success,
-        description=task.description,
-        error_message=task.error_message,
+    operation = (
+        PROCESSING_LABELS.get(task.sub_type)
+        if task.sub_type is not None
+        else None
     )
+    if operation is None:
+        operation = "processing"
 
-    # Determine status symbol using helper function
-    status = determine_task_status_symbol(status_info, spinner)
+    operation_label = f"{operation[:1]}{operation[1:]}"
 
+    # match ui design e.g "installing"
     name = truncate_text(task.name, name_width)
-    lines.append(f"{phase_str} {operation} {name} {status}")
 
-    # Show warning message if applicable
-    if should_show_warning_message(status_info):
-        msg = truncate_text(task.description, 60)
-        lines.append(f"    {msg}")
-    # Show error message if applicable
-    elif should_show_error_message(status_info):
-        error_msg = truncate_text(task.error_message, 60)
-        lines.append(f"    Error: {error_msg}")
+    # clean output without symbols
+    lines.append(f"{phase_str} {operation_label} {name}")
+
+    # Display Warnings/Errors
+    if task.warnings:
+        for warning in task.warnings:
+            # example: "warning: checksum asset not found"
+            msg = warning.details or ""
+            lines.append(f"warning: {msg}")
+
+    if task.errors:
+        for err in task.errors:
+            # Example: "error: failed to install 'appflowy' : Permission denied"
+            msg = err.details or ""
+            lines.append(f"error: failed to {operation} '{task.name}' : {msg}")
 
     return lines
 
@@ -817,54 +869,57 @@ def format_processing_task_lines(
 def render_api_section(
     tasks: dict[str, TaskState],
     order: list[str],
+    config: SectionRenderConfig,
 ) -> list[str]:
-    """Render API fetching section.
+    """Render API fetching section as a consolidated progress bar.
 
     Args:
         tasks: Dictionary of all tasks
         order: List of task IDs in order
+        config: SectionRenderConfig with rendering options
 
     Returns:
         List of formatted output lines for API section
-
     """
     api_tasks = [
         t
         for t in order
-        # using .get() prevents crashes if task state changes during rendering.
-        if (task := tasks.get(t))
-        and task.progress_type == ProgressType.API_FETCHING
+        if (task := tasks.get(t)) and task.progress_type == Phase.API_FETCHING
     ]
 
     if not api_tasks:
         return []
 
-    lines = ["Fetching from API:"]
+    lines = []
+
+    # Calculate aggregate progress
+    total_completed = sum(tasks[t].completed for t in api_tasks)
+    total_units = sum(tasks[t].total for t in api_tasks)
+
+    # Render progress bar
+    bar = render_bar(total_completed, total_units, config.bar_width)
+    pct = format_percentage(total_completed, total_units)
+
+    # Static label for the API bar
+    label = "GitHub Releases"
+
+    # Right-aligned metrics (similar to download bar)
+    right_section = f"{bar} {pct:>4}"
+
+    # Format line: label on left, right section on right
+    line = f"{label:<20} {right_section}"
+    lines.append(line)
+
+    # Collect all errors from all API tasks
     for task_id in api_tasks:
         task = tasks[task_id]
-        name = truncate_text(task.name, 18)
+        if task.errors:
+            for err in task.errors:
+                details = err.details or ""
+                if details:
+                    # Use the task's name to identify which app had the error
+                    lines.append(f"error: {task.name}: {details}")
 
-        if task.total > 0:
-            completed = int(task.completed)
-            total = int(task.total)
-            if task.is_finished or completed >= total:
-                if "cached" in task.description.lower():
-                    status = f"{total}/{total} Retrieved from cache"
-                else:
-                    status = f"{total}/{total} Retrieved"
-            else:
-                status = f"{completed}/{total} Fetching..."
-        elif task.is_finished:
-            if "cached" in task.description.lower():
-                status = "Retrieved from cache"
-            else:
-                status = "Retrieved"
-        else:
-            status = "Fetching..."
-
-        lines.append(f"{name:20} {status}")
-
-    lines.append("")
     return lines
 
 
@@ -888,8 +943,7 @@ def render_downloads_section(
         t
         for t in order
         # Use .get() to guard against order/tasks snapshot divergence,
-        if (task := tasks.get(t))
-        and task.progress_type == ProgressType.DOWNLOAD
+        if (task := tasks.get(t)) and task.progress_type == Phase.DOWNLOAD
     ]
 
     if not download_tasks:
@@ -903,18 +957,66 @@ def render_downloads_section(
         config.min_name_width,
     )
 
+    # Get terminal width for right-alignment
+    try:
+        terminal_width = shutil.get_terminal_size().columns
+    except (AttributeError, ValueError, OSError):
+        terminal_width = 80
+
     total_downloads = len(download_tasks)
 
-    header = compute_download_header(total_downloads)
+    header = PHASE_SECTION_LABELS[Phase.DOWNLOAD]
 
     lines = [header]
     for task_id in download_tasks:
         task = tasks[task_id]
         lines.extend(
-            format_download_lines(task, max_name_width, config.bar_width)
+            format_download_lines(
+                task, max_name_width, config.bar_width, terminal_width
+            )
         )
 
-    lines.append("")
+    # Add total summary line
+    total_completed = sum(tasks[t].completed for t in download_tasks)
+    total_size = sum(tasks[t].total for t in download_tasks)
+    completed_count = sum(
+        1 for t in download_tasks if tasks[t].is_finished and tasks[t].success
+    )
+    total_speed = (
+        sum(tasks[t].speed for t in download_tasks) / len(download_tasks)
+        if download_tasks
+        else 0.0
+    )
+
+    if total_size > total_completed:
+        remaining_bytes = total_size - total_completed
+        eta_seconds = remaining_bytes / total_speed if total_speed > 0 else 0
+        eta_str = format_eta(eta_seconds)
+    else:
+        eta_str = "--:--"
+
+    size_str = human_mib(total_size)
+    speed_str = human_speed_bps(total_speed)
+    bar = render_bar(total_completed, total_size, config.bar_width)
+    pct = format_percentage(total_completed, total_size)
+
+    # Format the right-aligned section for total line
+    right_section = _format_right_section(
+        size_str, speed_str, eta_str, bar, pct
+    )
+
+    # Format total line with left-aligned label and right-aligned metrics
+    total_label = f"Total ({completed_count}/{total_downloads})"
+    name_section = f"{total_label:<{max_name_width}}"
+    total_length = len(name_section) + len(right_section)
+
+    if total_length < terminal_width:
+        padding = terminal_width - total_length
+        total_line = f"{name_section}{' ' * padding}{right_section}"
+    else:
+        total_line = f"{name_section} {right_section}"
+
+    lines.append(total_line)
     return lines
 
 
@@ -934,36 +1036,32 @@ def render_processing_section(
         List of formatted output lines for processing section
 
     """
+    installing_header = PHASE_SECTION_LABELS[Phase.PROCESSING]
+    verifying_header = PROCESSING_LABELS[ProcessingPhase.VERIFICATION]
+
     post_tasks = [
         t
         for t in order
         # Use .get() to guard against order/tasks snapshot divergence,
-        if (task := tasks.get(t))
-        and task.progress_type
-        in (
-            ProgressType.VERIFICATION,
-            ProgressType.ICON_EXTRACTION,
-            ProgressType.INSTALLATION,
-            ProgressType.UPDATE,
-        )
+        if (task := tasks.get(t)) and task.progress_type == Phase.PROCESSING
     ]
 
     if not post_tasks:
         return []
 
-    has_verification = any(
-        tasks[t].progress_type == ProgressType.VERIFICATION for t in post_tasks
-    )
-    has_installation = any(
-        tasks[t].progress_type == ProgressType.INSTALLATION for t in post_tasks
-    )
+    sub_types = {
+        tasks[t].sub_type for t in post_tasks if tasks[t].sub_type is not None
+    }
+
+    has_installation = ProcessingPhase.INSTALLATION in sub_types
+    has_verification = ProcessingPhase.VERIFICATION in sub_types
 
     if has_verification and not has_installation:
-        section_header = "Verifying:"
+        section_header = verifying_header
     elif has_installation:
-        section_header = "Installing:"
+        section_header = installing_header
     else:
-        section_header = "Processing:"
+        section_header = "processing"
 
     lines = [section_header]
 
@@ -987,5 +1085,4 @@ def render_processing_section(
                 format_processing_task_lines(task, name_width, spinner)
             )
 
-    lines.append("")
     return lines

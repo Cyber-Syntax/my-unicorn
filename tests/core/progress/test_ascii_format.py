@@ -5,7 +5,7 @@ Tests the pure formatting functions extracted from AsciiProgressBackend.
 
 from unittest.mock import patch
 
-from my_unicorn.core.progress.progress_types import ProgressType, TaskState
+from my_unicorn.core.progress.progress_types import Phase, TaskState
 
 
 class TestComputeDisplayName:
@@ -16,7 +16,7 @@ class TestComputeDisplayName:
         task = TaskState(
             task_id="test_1",
             name="qownnotes.AppImage",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
         )
         # Import will fail until we create the function
         from my_unicorn.core.progress.ascii import compute_display_name
@@ -29,7 +29,7 @@ class TestComputeDisplayName:
         task = TaskState(
             task_id="test_2",
             name="plainname",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
         )
         from my_unicorn.core.progress.ascii import compute_display_name
 
@@ -62,28 +62,3 @@ class TestComputeSpinner:
             # Frames should potentially differ (depends on FPS and time delta)
             assert frame1 in ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
             assert frame2 in ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
-
-
-class TestComputeDownloadHeader:
-    """Test cases for compute_download_header function."""
-
-    def test_compute_download_header_single(self) -> None:
-        """Test header text for single download."""
-        from my_unicorn.core.progress.ascii import compute_download_header
-
-        result = compute_download_header(download_count=1)
-        assert result == "Downloading:"
-
-    def test_compute_download_header_multiple(self) -> None:
-        """Test header text for multiple downloads."""
-        from my_unicorn.core.progress.ascii import compute_download_header
-
-        result = compute_download_header(download_count=3)
-        assert result == "Downloading (3):"
-
-    def test_compute_download_header_zero(self) -> None:
-        """Test header text for zero downloads."""
-        from my_unicorn.core.progress.ascii import compute_download_header
-
-        result = compute_download_header(download_count=0)
-        assert result == "Downloading:"

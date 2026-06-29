@@ -37,10 +37,10 @@ from my_unicorn.core.checksum_parser import (
     parse_all_checksums,
     parse_checksum_file,
 )
+from my_unicorn.core.progress.progress_types import Phase, ProcessingPhase
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,
     ProgressReporter,
-    ProgressType,
 )
 from my_unicorn.exceptions import VerificationError
 from my_unicorn.logger import get_logger
@@ -386,6 +386,7 @@ class VerificationService:
             len(context.assets) if context.assets else 0,
         )
 
+        header_verification = ProcessingPhase.VERIFICATION
         # Create a progress task when the reporter is active and no task was
         # injected by the caller.
         if (
@@ -393,8 +394,9 @@ class VerificationService:
             and self.progress_reporter.is_active()
         ):
             context.progress_task_id = await self.progress_reporter.add_task(
-                f"Verifying {context.app_name}",
-                ProgressType.VERIFICATION,
+                f"{header_verification} {context.app_name}",
+                progress_type=Phase.PROCESSING,
+                sub_type=header_verification,
             )
 
         context.has_digest, context.checksum_files = detect_available_methods(
@@ -760,9 +762,13 @@ class Verifier:
         logger.debug("   Expected hash: %s", hash_value)
         logger.debug("🧮 Computing %s hash…", algo.upper())
 
-        actual_hash = self.compute_hash(algo)  # type: ignore[arg-type]
+        # FIXME: Argument to bound method `Verifier.compute_hash` is incorrect: Expected `Literal["sha256", "sha512"]`, found `str`
+        actual_hash = self.compute_hash(algo)
         logger.debug("   Computed hash: %s", actual_hash)
 
+        # TODO: use new exception modules for it:
+        # details can have the expected and actual
+        # so machine can be able to see the differences on hash mismatch
         if actual_hash.lower() != hash_value.lower():
             msg = (
                 "Digest mismatch!\n"

@@ -1,8 +1,9 @@
 import pytest
 
-from my_unicorn.core.progress.progress import (
+from my_unicorn.core.progress import (
+    Phase,
+    ProcessingPhase,
     ProgressConfig,
-    ProgressType,
     TaskInfo,
     TaskState,
 )
@@ -16,12 +17,12 @@ class TestTaskState:
         state = TaskState(
             task_id="task_1",
             name="Test Task",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
         )
 
         assert state.task_id == "task_1"
         assert state.name == "Test Task"
-        assert state.progress_type == ProgressType.DOWNLOAD
+        assert state.progress_type == Phase.DOWNLOAD
         assert state.total == 0.0
         assert state.completed == 0.0
         assert state.success is None
@@ -32,7 +33,8 @@ class TestTaskState:
         state = TaskState(
             task_id="task_1",
             name="Multi-phase Task",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             parent_task_id="parent_task",
             phase=1,
             total_phases=2,
@@ -44,20 +46,33 @@ class TestTaskState:
 
 
 class TestProgressType:
-    """Test cases for ProgressType enum."""
+    """Test cases for Phase enum."""
 
     def test_all_progress_types_exist(self) -> None:
         """Test that all expected progress types are defined."""
         expected_types = {
             "API_FETCHING",
             "DOWNLOAD",
+            "PROCESSING",
+            "SUMMARY",
+        }
+
+        actual_types = {pt.name for pt in Phase}
+
+        assert actual_types == expected_types
+
+    def test_all_sub_progress_types_exist(self) -> None:
+        """Test that all expected sub-progress types are defined."""
+        expected_types = {
             "VERIFICATION",
             "ICON_EXTRACTION",
             "INSTALLATION",
             "UPDATE",
+            "DESKTOP_ENTRY_CREATION",
+            "MOVE_APPIMAGE",
         }
 
-        actual_types = {pt.name for pt in ProgressType}
+        actual_types = {pt.name for pt in ProcessingPhase}
 
         assert actual_types == expected_types
 
@@ -72,13 +87,13 @@ class TestTaskInfo:
             task_id=task_id,
             namespaced_id="test_1_task",
             name="Test Task",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
         )
 
         assert task.task_id == task_id
         assert task.namespaced_id == "test_1_task"
         assert task.name == "Test Task"
-        assert task.progress_type == ProgressType.DOWNLOAD
+        assert task.progress_type == Phase.DOWNLOAD
         assert task.total == 0.0
         assert task.completed == 0.0
         assert task.success is None
@@ -90,7 +105,7 @@ class TestTaskInfo:
             task_id="dl_1",
             namespaced_id="dl_1_file",
             name="test.AppImage",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
         )
 
         # Speed history should be initialized in __post_init__
@@ -103,7 +118,8 @@ class TestTaskInfo:
             task_id="vf_1",
             namespaced_id="vf_1_app",
             name="MyApp",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             parent_task_id="parent_1",
             phase=1,
             total_phases=2,

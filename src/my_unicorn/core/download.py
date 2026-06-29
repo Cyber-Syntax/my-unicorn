@@ -23,11 +23,8 @@ import aiohttp
 from my_unicorn.config import ConfigManager
 from my_unicorn.core.api import Asset
 from my_unicorn.core.auth import GitHubAuthManager
-from my_unicorn.core.protocols import (
-    NullProgressReporter,
-    ProgressReporter,
-    ProgressType,
-)
+from my_unicorn.core.progress.progress_types import Phase
+from my_unicorn.core.protocols import NullProgressReporter, ProgressReporter
 from my_unicorn.logger import get_logger
 
 T = TypeVar("T")
@@ -78,7 +75,7 @@ class DownloadService:
         self,
         url: str,
         dest: Path,
-        progress_type: ProgressType = ProgressType.DOWNLOAD,
+        progress_type: Phase = Phase.DOWNLOAD,
     ) -> None:
         """Download a file from URL to destination with retry logic.
 
@@ -162,7 +159,7 @@ class DownloadService:
         response: aiohttp.ClientResponse,
         dest: Path,
         total: int,
-        progress_type: ProgressType,
+        progress_type: Phase,
     ) -> None:
         """Download file with progress tracking via ProgressReporter.
 
@@ -260,7 +257,7 @@ class DownloadService:
         await self.download_file(
             asset.browser_download_url,
             dest,
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
         )
         return dest
 
