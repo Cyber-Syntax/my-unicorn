@@ -5,12 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.6.3-alpha] - 2026-08-23
 
 ### Changed
 
-- Consolidated logger to one module for better maintenance and consistency.
-- Consolidate progress modules to two modules as progress/ascii.py and progress/progress.py for better organization and maintainability.
+- Updated dependencies:
+
+```
+Updated aiohappyeyeballs v2.6.2 -> v2.7.1
+Updated aiohttp v3.14.1 -> v3.14.3
+Updated aioresponses v0.7.8 -> v0.7.9
+Updated ast-serialize v0.5.0 -> v0.8.0
+Updated certifi v2026.5.20 -> v2026.7.22
+Updated cffi v2.0.0 -> v2.1.1
+Updated charset-normalizer v3.4.7 -> v3.5.1
+Updated coverage v7.14.1 -> v7.15.4
+Updated cryptography v48.0.1 -> v50.0.0
+Updated cyclonedx-python-lib v11.10.0 -> v11.12.0
+Updated filelock v3.29.3 -> v3.32.3
+Updated jaraco-functools v4.5.0 -> v4.6.0
+Updated librt v0.11.0 -> v0.15.0
+Updated msgpack v1.2.0 -> v1.2.1
+Updated mypy v2.1.0 -> v2.3.1
+Updated orjson v3.11.9 -> v3.12.0
+Updated packaging v26.2 -> v26.3
+Updated pip v26.1.2 -> v26.2.1
+Updated platformdirs v4.10.0 -> v4.11.3
+Updated pytest v9.0.3 -> v9.1.1
+Updated rpds-py v2026.5.1 -> v2026.6.3
+Updated ruff v0.15.17 -> v0.16.3
+Updated typing-extensions v4.15.0 -> v4.16.0
+Updated yarl v1.24.2 -> v1.24.5
+```
+
+- For developers:
+  - Consolidated logger to one module for better maintenance and consistency.
+  - Consolidate progress modules to two modules as progress/ascii.py and progress/progress.py for better organization and maintainability.
 
 ## [2.6.2-alpha] - 2026-06-02
 
