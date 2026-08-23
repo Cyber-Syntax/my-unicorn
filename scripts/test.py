@@ -35,6 +35,9 @@ TEST_VERSION = "0.1.0"
 
 # ======== Logging Setup ========
 
+# TODO: setup a new command to lower version with naming the appimage
+# so I can test specific app so much faster and easy
+
 
 def setup_logging(*, debug: bool = False) -> logging.Logger:
     """Set up logging configuration with console and file handlers.
@@ -442,14 +445,14 @@ def test_all(tracker: TestTracker) -> None:
     logger.info("")
     logger.info(
         "--- Testing catalog installs "
-        "(legcord + flameshot + appflowy + standard-notes) ---"
+        "(legcord + flameshot + neovim + standard-notes) ---"
     )
     logger.info("Step 1/2: Removing apps for clean catalog install test")
     remove_apps("legcord", "flameshot")
 
     logger.info("Step 2/2: Testing multiple catalog install")
     success = test_catalog_install(
-        "legcord", "flameshot", "appflowy", "standard-notes"
+        "legcord", "flameshot", "neovim", "standard-notes"
     )
     tracker.record("Catalog installs (multiple apps)", success=success)
 
@@ -457,7 +460,7 @@ def test_all(tracker: TestTracker) -> None:
     logger.info("")
     logger.info("--- Testing updates for multiple apps ---")
     success = test_update(
-        "legcord", "flameshot", "keepassxc", "appflowy", "standard-notes"
+        "legcord", "flameshot", "keepassxc", "neovim", "standard-notes"
     )
     tracker.record("Updates (multiple apps)", success=success)
 
@@ -465,8 +468,9 @@ def test_all(tracker: TestTracker) -> None:
     logger.info("All comprehensive tests completed")
 
 
+# TODO: remove neovim and find more low size app
 def test_update_all(tracker: TestTracker) -> None:
-    """Test 'update' (update all) focused on qownnotes and appflowy.
+    """Test 'update' (update all) focused on qownnotes and neovim.
 
     Args:
         tracker: Test result tracker
@@ -474,37 +478,37 @@ def test_update_all(tracker: TestTracker) -> None:
     logger.info("")
     logger.info("=" * 60)
     logger.info(
-        "Testing 'update' (update all) Focused on QOwnNotes and AppFlowy"
+        "Testing 'update' (update all) Focused on QOwnNotes and neovim"
     )
     logger.info("=" * 60)
     logger.info("")
 
-    # Step 1: Ensure qownnotes and appflowy are installed
-    logger.info("Step 1/4: Installing qownnotes and appflowy for update test")
-    remove_apps("qownnotes", "appflowy")  # Clean start
-    result = test_catalog_install("qownnotes", "appflowy")
+    # Step 1: Ensure qownnotes and neovim are installed
+    logger.info("Step 1/4: Installing qownnotes and neovim for update test")
+    remove_apps("qownnotes", "neovim")  # Clean start
+    result = test_catalog_install("qownnotes", "neovim")
     if not result:
         tracker.record(
-            "'update' (qownnotes and appflowy focus) - install failed",
+            "'update' (qownnotes and neovim focus) - install failed",
             success=False,
         )
         return
 
-    # Step 2: Set old version for qownnotes and appflowy
-    logger.info("Step 2/4: Setting old version for qownnotes and appflowy")
+    # Step 2: Set old version for qownnotes and neovim
+    logger.info("Step 2/4: Setting old version for qownnotes and neovim")
     set_version("qownnotes", TEST_VERSION)
-    set_version("appflowy", TEST_VERSION)
+    set_version("neovim", TEST_VERSION)
 
     # Step 3: Run update (all)
     logger.info("Step 3/4: Running 'update' (update all)")
     success = test_update_all_cmd()
 
-    # Step 4: Verify qownnotes and appflowy were updated
+    # Step 4: Verify qownnotes and neovim were updated
     if success:
         logger.info(
-            "Step 4/4: Verifying qownnotes and appflowy versions changed"
+            "Step 4/4: Verifying qownnotes and neovim versions changed"
         )
-        apps_to_check = ["qownnotes", "appflowy"]
+        apps_to_check = ["qownnotes", "neovim"]
         for app in apps_to_check:
             config_file = CONFIG_DIR / f"{app}.json"
             if config_file.exists():
@@ -530,10 +534,10 @@ def test_update_all(tracker: TestTracker) -> None:
                 logger.error("%s config file not found", app.capitalize())
                 success = False
 
-    tracker.record("'update' (qownnotes and appflowy focus)", success=success)
+    tracker.record("'update' (qownnotes and neovim focus)", success=success)
 
     logger.info("")
-    logger.info("'update' qownnotes and appflowy test completed")
+    logger.info("'update' qownnotes and neovim test completed")
 
 
 # ======== Main Function ========
@@ -567,7 +571,7 @@ def main() -> int:
 examples:
   %(prog)s --quick                Run quick tests (qownnotes only)
   %(prog)s --all                  Run all comprehensive tests
-  %(prog)s --update-all           Test update all (qownnotes & appflowy)
+  %(prog)s --update-all           Test update all (qownnotes & neovim)
   %(prog)s --debug --quick        Run quick tests with debug logging
         """,
     )
@@ -591,7 +595,7 @@ examples:
     parser.add_argument(
         "--update-all",
         action="store_true",
-        help="Test 'update' (update all) focusing on qownnotes & appflowy",
+        help="Test 'update' (update all) focusing on qownnotes & neovim",
     )
 
     args = parser.parse_args()

@@ -13,7 +13,7 @@ from pathlib import (
 )
 from typing import IO, TYPE_CHECKING, Self
 
-from my_unicorn.exceptions import LockError
+from my_unicorn.exceptions import ERROR_MESSAGES, ErrorCode, LockError
 
 if TYPE_CHECKING:
     import types
@@ -77,12 +77,12 @@ class LockManager:
             except BlockingIOError as e:
                 if lock_file is not None:
                     lock_file.close()
-                msg = "Another my-unicorn instance is already running"
+                msg = ERROR_MESSAGES.get(ErrorCode.LOCK_INSTANCE_FAILED)
                 raise LockError(msg, cause=e) from e
             except OSError as e:
                 if lock_file is not None:
                     lock_file.close()
-                msg = f"Failed to acquire lock: {e}"
+                msg = ERROR_MESSAGES.get(ErrorCode.LOCK_ACQUIRE_FAILED)
                 raise LockError(msg, cause=e) from e
 
         await loop.run_in_executor(None, _acquire_lock)

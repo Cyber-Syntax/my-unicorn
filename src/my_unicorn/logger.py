@@ -83,14 +83,15 @@ from my_unicorn.constants import (
     DEFAULT_CONSOLE_LOG_LEVEL,
     DEFAULT_LOG_LEVEL,
     LOG_BACKUP_COUNT,
-    LOG_COLORS,
-    LOG_CONSOLE_DATE_FORMAT,
-    LOG_CONSOLE_FORMAT,
     LOG_FILE_DATE_FORMAT,
     LOG_FILE_FORMAT,
     LOG_ROTATION_THRESHOLD_BYTES,
 )
 from my_unicorn.exceptions import ConfigurationError
+
+RED = "\033[31m"
+RESET = "\033[0m"
+YELLOW = "\033[33m"
 
 
 class _LoggerState:
@@ -372,154 +373,33 @@ def clear_logger_state() -> None:
                     del logging.Logger.manager.loggerDict[logger_name]
 
 
-class ColoredConsoleFormatter(logging.Formatter):
-    """Console formatter with ANSI color support for different log levels.
-
-    This formatter adds color codes to log level names while preserving
-    the original log record for proper formatting. Colors are applied
-    temporarily during format() and then reverted.
-
-    Colors:
-        DEBUG: Cyan
-        INFO: Green
-        WARNING: Yellow
-        ERROR: Red
-        CRITICAL: Magenta
-
-    Thread Safety:
-        Safe for multi-threaded use as each format() call works on
-        a separate log record instance.
-
-    """
+class ConsoleFormatter(logging.Formatter):
+    """Console formatter for Pacman-style logging."""
 
     def format(self, record: logging.LogRecord) -> str:
-        r"""Format log record with colors for console output.
+        """Format log record for console with Pacman-style formatting.
 
-        Temporarily modifies the record's levelname with ANSI color codes,
-        calls the parent formatter, then restores the original levelname.
-        This ensures colors are applied without mutating the shared record.
+        ERROR: 'error: {message}' in red
+        WARNING: 'warning: {message}' in yellow
+        OTHERS: '{message}' (plain)
 
         Args:
             record: The log record to format
 
         Returns:
-            Formatted log message with ANSI color codes for the level name
-
-        Example:
-            Input record with levelname="ERROR" produces:
-            "\033[31mERROR\033[0m - my_unicorn - Error message"
-
+            Formatted log message
         """
-        if record.levelname in LOG_COLORS:
-            color = LOG_COLORS[record.levelname]
-            reset = LOG_COLORS["RESET"]
-            colored_level = f"{color}{record.levelname}{reset}"
+        msg = record.getMessage()
 
-            original_levelname = record.levelname
-            record.levelname = colored_level
-            try:
-                return super().format(record)
-            finally:
-                record.levelname = original_levelname
-
-        return super().format(record)
-
-
-class SimpleConsoleFormatter(logging.Formatter):
-    """Minimal console formatter that only shows the message content.
-
-    This formatter is designed for temporary user-facing output where
-    timestamp, module name, and log level information would be redundant.
-    It outputs only the message content, making it ideal for commands
-    that use logger.info() as a replacement for print().
-
-    Usage:
-        Used by HybridConsoleFormatter for INFO level messages to show only
-        the message content. Not normally instantiated directly.
-
-    Example Output:
-        Standard formatter: "21:30:08 - my_unicorn.update - INFO - Message"
-        Simple formatter:   "Message"
-
-    Thread Safety:
-        Safe for multi-threaded use as each format() call works on
-        a separate log record instance.
-
-    """
-
-    def format(self, record: logging.LogRecord) -> str:
-        """Format log record showing only the message.
-
-        Args:
-            record: The log record to format
-
-        Returns:
-            The message content only, without metadata
-
-        """
-        return record.getMessage()
-
-
-class HybridConsoleFormatter(logging.Formatter):
-    """Console formatter with simple format for INFO, structured for others.
-
-    This formatter provides clean output for user-facing INFO messages while
-    maintaining detailed context for warnings and errors. INFO level messages
-    show only the message content, while WARNING and above show timestamp,
-    module, level, and message with color coding.
-
-    Format Selection:
-        - INFO: Simple format (message only)
-        - WARNING/ERROR/CRITICAL: Structured format with colors and metadata
-        - DEBUG: Structured format with colors and metadata
-
-    Example Output:
-        INFO:     "🚀 Starting installation"
-        WARNING:  "12:30:45 - my_unicorn - WARNING - Cache outdated"
-        ERROR:    "12:30:45 - my_unicorn - ERROR - Connection failed"
-
-    Thread Safety:
-        Safe for multi-threaded use as each format() call works on
-        a separate log record instance.
-
-    """
-
-    def __init__(
-        self,
-        fmt: str | None = None,
-        datefmt: str | None = None,
-    ) -> None:
-        """Initialize hybrid formatter with structured format template.
-
-        Args:
-            fmt: Format string for structured messages (WARNING and above)
-            datefmt: Date format string for timestamps
-
-        """
-        super().__init__(fmt, datefmt)
-        self._simple_formatter = SimpleConsoleFormatter()
-        self._colored_formatter = ColoredConsoleFormatter(fmt, datefmt)
-
-    def format(self, record: logging.LogRecord) -> str:
-        """Format log record using simple or structured format by level.
-
-        Args:
-            record: The log record to format
-
-        Returns:
-            Formatted message (simple for INFO, structured for others)
-
-        """
-        if record.levelno == logging.INFO:
-            return self._simple_formatter.format(record)
-        return self._colored_formatter.format(record)
+        if record.levelno == logging.ERROR:
+            return f"{RED}error: {msg}{RESET}"
+        if record.levelno == logging.WARNING:
+            return f"{YELLOW}warning: {msg}{RESET}"
+        return msg
 
 
 def _create_console_handler(console_level: str) -> logging.StreamHandler:
-    """Create and configure console handler with hybrid formatting.
-
-    Uses HybridConsoleFormatter which shows simple format (message only)
-    for INFO level and structured format with colors for WARNING and above.
+    """Create and configure console handler with Pacman-style formatting.
 
     Args:
         console_level: Log level for console (e.g., "DEBUG", "INFO", "WARNING")
@@ -529,12 +409,7 @@ def _create_console_handler(console_level: str) -> logging.StreamHandler:
 
     """
     console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(
-        HybridConsoleFormatter(
-            LOG_CONSOLE_FORMAT,
-            datefmt=LOG_CONSOLE_DATE_FORMAT,
-        )
-    )
+    console_handler.setFormatter(ConsoleFormatter())
     console_handler.setLevel(getattr(logging, console_level, logging.WARNING))
     return console_handler
 
@@ -625,12 +500,16 @@ def setup_root_logger(
     # Get root logger
     root_logger = logging.getLogger("my_unicorn")
     root_logger.setLevel(logging.DEBUG)  # Capture all, filter at handlers
-    root_logger.propagate = False  # Terminal node
+    root_logger.propagate = (
+        False  # Prevent propagation to the Python root logger
+    )
 
-    # Remove any existing handlers (for test isolation)
+    # Remove any existing handlers
     for handler in root_logger.handlers[:]:
         handler.close()
         root_logger.removeHandler(handler)
+
+    # ... (rest of setup_root_logger, using root_logger for addHandler) ...
 
     # Create handlers that will process records from queue
     handlers = []

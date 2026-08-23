@@ -231,7 +231,7 @@ Protocol methods:
 | `finish_task(task_id, success, description)` | Mark task complete |
 | `get_task_info(task_id)` | Get task state for testing |
 
-`ProgressType` enum categorizes operations: `DOWNLOAD`, `VERIFICATION`, `EXTRACTION`, `API`, `PROCESSING`, `INSTALLATION`, `UPDATE`.
+`Phase` enum categorizes operations: `DOWNLOAD`, `VERIFICATION`, `EXTRACTION`, `API`, `PROCESSING`, `INSTALLATION`, `UPDATE`.
 
 ### Usage Examples
 
@@ -297,7 +297,7 @@ def create_my_handler(self) -> MyHandler:
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,
     ProgressReporter,
-    ProgressType,
+    Phase,
 )
 
 class MyService:
@@ -311,7 +311,7 @@ class MyService:
     async def do_work(self, items: list[str]) -> None:
         task_id = self.progress.add_task(
             "Processing items",
-            ProgressType.PROCESSING,
+            Phase.PROCESSING,
             total=len(items),
         )
 

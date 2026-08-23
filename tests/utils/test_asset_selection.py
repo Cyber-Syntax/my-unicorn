@@ -159,7 +159,7 @@ class TestSelectBestAppimageAsset:
 
         with pytest.raises(
             InstallationError,
-            match="AppImage not found in release",
+            match="appimage asset not found : appimage builds may still be processing, try again later. Some developers may not provide appimage builds, so this might be external to my-unicorn's control.",
         ):
             select_best_appimage_asset(release)
 

@@ -29,18 +29,19 @@ from my_unicorn.core.post_download import (
     PostDownloadContext,
     PostDownloadProcessor,
 )
+from my_unicorn.core.progress.progress_types import PHASE_SECTION_LABELS, Phase
 from my_unicorn.core.protocols.progress import (
     NullProgressReporter,
     ProgressReporter,
 )
 from my_unicorn.exceptions import (
+    ERROR_MESSAGES,
     InstallationError,
     InstallError,
     VerificationError,
 )
 from my_unicorn.logger import get_logger
 from my_unicorn.utils.appimage_utils import select_best_appimage_asset
-from my_unicorn.utils.error_formatters import build_install_error_result
 from my_unicorn.utils.github_utils import parse_github_url
 
 if TYPE_CHECKING:
@@ -89,6 +90,22 @@ def _print_all_already_installed(results: list[dict[str, Any]]) -> None:
         logger.info("   - %s", result.get("name", "Unknown"))
 
 
+##FIXME:
+#
+# this happens when url install
+# 13:11:01 - my_unicorn.core.install - ERROR - Failed to install from URL https://github.com/ytmdesktop/ytmdesktop: Install failed: Installation failed: No assets found in release (url=https://github.com/ytmdesktop/ytmdesktop, source=url)
+# :: Creating transaction summary...
+# FAILED  https://github.com/ytmdesktop/ytmdesktop
+# 13:11:01 - my_unicorn.core.install - ERROR - Install failed: Installation failed: No assets found in release (url=https://github.com/ytmdesktop/ytmdesktop, source=url)
+# this happens catalog install
+# ➜ my-unicorn install flameshot
+# :: Querying upstream releases...
+# GitHub Releases      1/1 Retrieved
+# 13:11:51 - my_unicorn.core.install - ERROR - Failed to install flameshot: Installation failed: No assets found in release
+# :: Creating transaction summary...
+# FAILED  flameshot
+# 13:11:51 - my_unicorn.core.install - ERROR - No assets found in release - may still be building
+#
 def _print_result_line(result: dict[str, Any]) -> None:
     """Print a single installation result line.
 
@@ -106,8 +123,8 @@ def _print_result_line(result: dict[str, Any]) -> None:
     app_name = result.get("name", "Unknown")
 
     if not result.get("success", False):
-        logger.error("%-25s × Installation failed", app_name)
-        logger.error("%-25s    → %s", "", result.get("error", "Unknown error"))
+        logger.info("FAILED  %s", app_name)
+        logger.info("%s", result.get("error", "Unknown error"))
         return
 
     if result.get("status") == "already_installed":
@@ -134,13 +151,14 @@ def print_install_summary(results: list[dict[str, Any]]) -> None:
         _print_all_already_installed(results)
         return
 
-    logger.info("Installation Summary:")
-    logger.info("-" * 50)
+    header = PHASE_SECTION_LABELS.get(Phase.SUMMARY)
+    logger.info(header)
 
     for result in results:
         _print_result_line(result)
 
 
+# TODO: use warning message exceptions for these
 def display_no_targets_error() -> None:
     """Display error when no installation targets are specified."""
     logger.error("× No targets specified.")
@@ -173,6 +191,7 @@ async def fetch_release(
     """
     try:
         release = await github_client.get_latest_release(owner, repo)
+        # TODO: change it to exceptions.py not constant
         if not release:
             msg = ERROR_NO_RELEASE_FOUND.format(owner=owner, repo=repo)
             raise InstallError(
@@ -263,6 +282,7 @@ async def install_workflow(
 
         result = await post_download_processor.process(context)
 
+        # TODO: add exceptions
         if not result.success:
             msg = result.error or "Post-download processing failed"
             raise InstallationError(msg)
@@ -383,6 +403,7 @@ async def install_from_catalog(
 
     """
 
+    # TODO: change it to exceptions.py instead of constants.py
     def _raise_no_asset() -> None:
         raise InstallError(
             ERROR_NO_APPIMAGE_ASSET,
@@ -413,6 +434,7 @@ async def install_from_catalog(
 
         asset = select_best_appimage_asset(
             release,
+            app_name=app_name,
             preferred_suffixes=characteristic_suffix,
             installation_source=InstallSource.CATALOG,
         )
@@ -430,12 +452,26 @@ async def install_from_catalog(
             **options,
         )
 
+    # TODO: add exceptions special variables
+    # remove build_install_error_result from error_formatters.py
     except InstallationError as error:
         logger.error("Failed to install %s: %s", app_name, error)
-        return build_install_error_result(error, app_name, is_url=False)
+        return {
+            "success": False,
+            "target": app_name,
+            "name": app_name,
+            "error": str(error),
+            "source": InstallSource.CATALOG,
+        }
     except (InstallError, VerificationError) as error:
         logger.error("Failed to install %s: %s", app_name, error)
-        return build_install_error_result(error, app_name, is_url=False)
+        return {
+            "success": False,
+            "target": app_name,
+            "name": app_name,
+            "error": str(error),
+            "source": InstallSource.CATALOG,
+        }
     except Exception as error:
         install_error = InstallError(
             str(error),
@@ -443,9 +479,13 @@ async def install_from_catalog(
             cause=error,
         )
         logger.error("Failed to install %s: %s", app_name, install_error)
-        return build_install_error_result(
-            install_error, app_name, is_url=False
-        )
+        return {
+            "success": False,
+            "target": app_name,
+            "name": app_name,
+            "error": str(install_error),
+            "source": InstallSource.CATALOG,
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -480,6 +520,7 @@ def validate_github_identifiers(owner: str, repo: str) -> None:
 async def validate_and_fetch_release(
     owner: str,
     repo: str,
+    app_name: str,
     *,
     fetch_release_fn: Callable[..., Any],
 ) -> tuple[Release, Asset]:
@@ -488,6 +529,7 @@ async def validate_and_fetch_release(
     Args:
         owner: Repository owner (validated for security before use).
         repo: Repository name.
+        app_name: App name.
         fetch_release_fn: Async callable ``(owner, repo) -> Release``.
 
     Returns:
@@ -503,12 +545,13 @@ async def validate_and_fetch_release(
     release = await fetch_release_fn(owner, repo)
 
     asset = select_best_appimage_asset(
-        release, installation_source=InstallSource.URL
+        release, app_name=app_name, installation_source=InstallSource.URL
     )
     if asset is None:
         raise InstallError(
             ERROR_NO_APPIMAGE_ASSET,
             context={
+                "app_name": app_name,
                 "owner": owner,
                 "repo": repo,
                 "source": InstallSource.URL,
@@ -559,7 +602,7 @@ async def install_from_url(
         )
 
         release, asset = await validate_and_fetch_release(
-            owner, repo, fetch_release_fn=fetch_release_fn
+            owner, repo, app_name, fetch_release_fn=fetch_release_fn
         )
 
         app_config = build_url_install_config(
@@ -579,7 +622,13 @@ async def install_from_url(
 
     except (InstallError, VerificationError) as error:
         logger.error("Failed to install from URL %s: %s", github_url, error)
-        return build_install_error_result(error, github_url, is_url=True)
+        return {
+            "success": False,
+            "target": github_url,
+            "name": github_url,
+            "error": str(error),
+            "source": InstallSource.URL,
+        }
     except Exception as error:
         install_error = InstallError(
             str(error),
@@ -589,9 +638,13 @@ async def install_from_url(
         logger.error(
             "Failed to install from URL %s: %s", github_url, install_error
         )
-        return build_install_error_result(
-            install_error, github_url, is_url=True
-        )
+        return {
+            "success": False,
+            "target": github_url,
+            "name": github_url,
+            "error": str(install_error),
+            "source": InstallSource.URL,
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -772,27 +825,83 @@ class InstallHandler:
         async def install_one(app_or_url: str, is_url: bool) -> dict[str, Any]:
             async with semaphore:
                 try:
-                    if is_url:
-                        return await self.install_from_url(
-                            app_or_url, **options
-                        )
-                    return await self.install_from_catalog(
-                        app_or_url, **options
+                    result = await (
+                        self.install_from_url(app_or_url, **options)
+                        if is_url
+                        else self.install_from_catalog(app_or_url, **options)
                     )
+
+                    if self.progress_reporter and api_task_id:
+                        info = self.progress_reporter.get_task_info(
+                            api_task_id
+                        )
+                        await self.progress_reporter.update_task(
+                            api_task_id,
+                            completed=info["completed"] + 1,
+                        )
+
+                    return result
+                # TODO: add exceptions variables
                 except InstallationError as error:
+                    # Report error
+                    if self.progress_reporter and api_task_id:
+                        from datetime import UTC, datetime
+
+                        from my_unicorn.core.progress.progress_types import (
+                            ErrorSeverity,
+                            Phase,
+                            TaskError,
+                        )
+                        from my_unicorn.exceptions import ErrorCode
+
+                        err_id = await self.progress_reporter.add_task(
+                            name=f"GitHub {app_or_url}",
+                            progress_type=Phase.API_FETCHING,
+                        )
+                        await self.progress_reporter.finish_task(
+                            err_id,
+                            success=False,
+                            errors=[
+                                TaskError(
+                                    phase="api_fetching",
+                                    processing_phase="api_fetching",
+                                    app_name=app_or_url,
+                                    error_code=ErrorCode.INSTALL_FAILED,
+                                    error_severity=ErrorSeverity.ERROR,
+                                    details=ERROR_MESSAGES.get(
+                                        ErrorCode.INSTALL_FAILED
+                                    ),
+                                    timestamp=datetime.now(UTC).isoformat(),
+                                )
+                            ],
+                        )
                     logger.error(
                         "Installation error for %s: %s", app_or_url, error
                     )
-                    return build_install_error_result(
-                        error, app_or_url, is_url
+                    source = (
+                        InstallSource.URL if is_url else InstallSource.CATALOG
                     )
+                    return {
+                        "success": False,
+                        "target": app_or_url,
+                        "name": app_or_url,
+                        "error": str(error),
+                        "source": source,
+                    }
                 except (InstallError, VerificationError) as error:
                     logger.error(
                         "Domain error installing %s: %s", app_or_url, error
                     )
-                    return build_install_error_result(
-                        error, app_or_url, is_url
+                    source = (
+                        InstallSource.URL if is_url else InstallSource.CATALOG
                     )
+                    return {
+                        "success": False,
+                        "target": app_or_url,
+                        "name": app_or_url,
+                        "error": str(error),
+                        "source": source,
+                    }
                 except Exception as error:
                     source = (
                         InstallSource.URL if is_url else InstallSource.CATALOG
@@ -815,9 +924,17 @@ class InstallHandler:
                         "source": source,
                     }
 
-        tasks = [install_one(app, is_url=False) for app in catalog_apps]
-        tasks += [install_one(url, is_url=True) for url in url_apps]
-        return await asyncio.gather(*tasks)
+        # Create one shared API task
+        from my_unicorn.core.protocols.progress import github_api_progress_task
+
+        async with github_api_progress_task(
+            self.progress_reporter,
+            task_name="GitHub Releases",
+            total=len(catalog_apps) + len(url_apps),
+        ) as api_task_id:
+            tasks = [install_one(app, is_url=False) for app in catalog_apps]
+            tasks += [install_one(url, is_url=True) for url in url_apps]
+            return await asyncio.gather(*tasks)
 
     # ------------------------------------------------------------------
     # Private helpers (kept so tests can mock _fetch_release /

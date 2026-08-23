@@ -15,8 +15,9 @@ import pytest
 from my_unicorn.core.progress.ascii import TerminalWriter
 from my_unicorn.core.progress.progress import (
     AsciiProgressBackend,
+    Phase,
+    ProcessingPhase,
     ProgressDisplay,
-    ProgressType,
     TaskInfo,
     TaskState,
 )
@@ -250,14 +251,14 @@ class TestAsciiProgressBackendBuildOutput:
         api1 = TaskState(
             task_id="api1",
             name="r1",
-            progress_type=ProgressType.API_FETCHING,
+            progress_type=Phase.API_FETCHING,
             total=10.0,
             completed=3.0,
         )
         api2 = TaskState(
             task_id="api2",
             name="r2",
-            progress_type=ProgressType.API_FETCHING,
+            progress_type=Phase.API_FETCHING,
             total=5.0,
             completed=5.0,
             is_finished=True,
@@ -266,7 +267,7 @@ class TestAsciiProgressBackendBuildOutput:
         api3 = TaskState(
             task_id="api3",
             name="r3",
-            progress_type=ProgressType.API_FETCHING,
+            progress_type=Phase.API_FETCHING,
             is_finished=True,
             description="cached",
         )
@@ -275,7 +276,7 @@ class TestAsciiProgressBackendBuildOutput:
         dl = TaskState(
             task_id="dl1",
             name="file.AppImage",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=100.0,
             completed=50.0,
             speed=100.0,
@@ -285,14 +286,16 @@ class TestAsciiProgressBackendBuildOutput:
         vf = TaskState(
             task_id="vf1",
             name="MyApp",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             phase=1,
             total_phases=2,
         )
         inst = TaskState(
             task_id="in1",
             name="MyApp",
-            progress_type=ProgressType.INSTALLATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.INSTALLATION,
             phase=2,
             total_phases=2,
         )
@@ -312,11 +315,9 @@ class TestAsciiProgressBackendBuildOutput:
             tasks_snapshot, order_snapshot
         )
         # Check that all major section headers exist
-        assert "Fetching from API:" in out
-        assert "Downloading" in out
-        assert (
-            "Verifying:" in out or "Installing:" in out or "Processing:" in out
-        )
+        assert ":: Querying upstream releases..." in out
+        assert ":: Retrieving appimages..." in out
+        assert ":: Processing package changes..." in out
 
     def test_build_output_snapshot_api_retrieved_no_cached(self) -> None:
         """Snapshot builder shows 'Retrieved' for finished API tasks."""
@@ -325,7 +326,7 @@ class TestAsciiProgressBackendBuildOutput:
             "a": TaskState(
                 task_id="a",
                 name="app",
-                progress_type=ProgressType.API_FETCHING,
+                progress_type=Phase.API_FETCHING,
                 total=0,
                 completed=0,
                 is_finished=True,
@@ -335,20 +336,6 @@ class TestAsciiProgressBackendBuildOutput:
         out = backend._build_output_from_snapshot(ts, ["a"])
         assert "Retrieved" in out
 
-    def test_build_output_snapshot_processing_processing_header(self) -> None:
-        """Snapshot builder shows 'Processing:' for other post-task types."""
-        backend = AsciiProgressBackend(output=io.StringIO(), interactive=False)
-        ts = {
-            "p1": TaskState(
-                task_id="p1",
-                name="app",
-                progress_type=ProgressType.ICON_EXTRACTION,
-                is_finished=False,
-            )
-        }
-        out = backend._build_output_from_snapshot(ts, ["p1"])
-        assert "Processing:" in out
-
 
 class TestProgressDisplayIDGenerator:
     """Tests for ID generation and caching in ProgressDisplay."""
@@ -356,17 +343,11 @@ class TestProgressDisplayIDGenerator:
     def test_generate_namespaced_id_cache_hit_and_clear(self) -> None:
         """Verify ID caching and cache clearing in ProgressDisplay."""
         pd = ProgressDisplay()
-        id1 = pd._id_generator.generate_namespaced_id(
-            ProgressType.DOWNLOAD, "same"
-        )
-        id2 = pd._id_generator.generate_namespaced_id(
-            ProgressType.DOWNLOAD, "same"
-        )
+        id1 = pd._id_generator.generate_namespaced_id(Phase.DOWNLOAD, "same")
+        id2 = pd._id_generator.generate_namespaced_id(Phase.DOWNLOAD, "same")
         assert id1 == id2
         pd._id_generator.clear_cache()
-        id3 = pd._id_generator.generate_namespaced_id(
-            ProgressType.DOWNLOAD, "same"
-        )
+        id3 = pd._id_generator.generate_namespaced_id(Phase.DOWNLOAD, "same")
         assert id3 != id1
 
     def test_generate_namespaced_id_unnamed(
@@ -375,7 +356,7 @@ class TestProgressDisplayIDGenerator:
         """ID generator falls back to 'unnamed' for empty names."""
         # Use name with only non-allowed chars for empty sanitized result
         nid = progress_service._id_generator.generate_namespaced_id(
-            ProgressType.DOWNLOAD, "!!!   $$$"
+            Phase.DOWNLOAD, "!!!   $$$"
         )
         assert "unnamed" in nid
 
@@ -390,7 +371,7 @@ class TestProgressDisplaySpeedCalculation:
             task_id="t",
             namespaced_id="t",
             name="n",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
         )
         ti.current_speed_mbps = 2.0
         ti.last_speed_update = 100.0
@@ -406,7 +387,7 @@ class TestProgressDisplaySpeedCalculation:
         # Generate IDs and verify cache doesn't exceed limit
         for i in range(100):
             pd._id_generator.generate_namespaced_id(
-                ProgressType.DOWNLOAD, f"file_{i}"
+                Phase.DOWNLOAD, f"file_{i}"
             )
         # Cache should not exceed ID_CACHE_LIMIT
         assert len(pd._id_generator._id_cache) <= 1000
@@ -416,7 +397,7 @@ class TestProgressDisplaySpeedCalculation:
             task_id="t",
             namespaced_id="t",
             name="n",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
         )
         ti.current_speed_mbps = 0.0
         ti.last_speed_update = 100.0
@@ -434,7 +415,7 @@ class TestAsciiProgressBackendAsync:
         out = io.StringIO()
         backend = AsciiProgressBackend(output=out, interactive=True)
         # Add a finished task so _build_output has content
-        backend.add_task("t1", "app", ProgressType.DOWNLOAD, total=10.0)
+        backend.add_task("t1", "app", Phase.DOWNLOAD, total=10.0)
         backend.finish_task("t1", success=True)
         # Should write final output without error
         backend._writer._last_output_lines = 2
@@ -447,9 +428,7 @@ class TestAsciiProgressBackendAsync:
         out = io.StringIO()
         backend = AsciiProgressBackend(output=out, interactive=True)
         # Add a task so output is non-empty
-        backend.add_task(
-            "d1", "file.AppImage", ProgressType.DOWNLOAD, total=10.0
-        )
+        backend.add_task("d1", "file.AppImage", Phase.DOWNLOAD, total=10.0)
         backend.update_task("d1", completed=5.0)
         await backend.render_once()
         # Should have written something

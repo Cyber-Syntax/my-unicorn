@@ -16,7 +16,7 @@ from my_unicorn.core.progress.ascii import (
     render_downloads_section,
     render_processing_section,
 )
-from my_unicorn.core.progress.progress_types import ProgressType, TaskState
+from my_unicorn.core.progress.progress_types import Phase, TaskState
 
 
 @dataclass
@@ -66,9 +66,9 @@ def parse_output_sections(output: str) -> dict[str, OutputSection]:
     """Parse progress output into distinct sections.
 
     Identifies and extracts:
-    - Fetching from API: section
-    - Downloading: section (with optional count like "Downloading (2):")
-    - Installing/Verifying: section
+    - :: Querying upstream releases... section
+    - :: Retrieving appimages... section
+    - Installing/verifying section
 
     Args:
         output: Raw output string
@@ -83,11 +83,11 @@ def parse_output_sections(output: str) -> dict[str, OutputSection]:
 
     for line in output.split("\n"):
         # Check for section headers
-        is_api_section = line.startswith("Fetching from API:")
-        is_download_section = line.startswith(
-            ("Downloading:", "Downloading (")
+        is_api_section = line.startswith(":: Querying upstream releases...")
+        is_download_section = line.startswith(":: Retrieving appimages...")
+        is_install_section = line.startswith(
+            (":: Processing package changes...", "verifying")
         )
-        is_install_section = line.startswith(("Installing:", "Verifying:"))
 
         if is_api_section or is_download_section or is_install_section:
             # Save previous section if exists
@@ -142,7 +142,7 @@ class TestCaptureProgressOutput:
         task = TaskState(
             task_id="api_1",
             name="GitHub Releases",
-            progress_type=ProgressType.API_FETCHING,
+            progress_type=Phase.API_FETCHING,
             total=1,
             completed=1,
             is_finished=True,
@@ -155,7 +155,7 @@ class TestCaptureProgressOutput:
 
         output = capture_progress_output(tasks, order, interactive=False)
 
-        assert "Fetching from API:" in output
+        assert ":: Querying upstream releases..." in output
         assert "GitHub Releases" in output
 
     def test_capture_download_task_output(self) -> None:
@@ -163,7 +163,7 @@ class TestCaptureProgressOutput:
         task = TaskState(
             task_id="dl_1",
             name="test-app",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=1024.0,
             completed=512.0,
             is_finished=False,
@@ -175,7 +175,7 @@ class TestCaptureProgressOutput:
 
         output = capture_progress_output(tasks, order, interactive=False)
 
-        assert "Downloading:" in output
+        assert ":: Retrieving appimages..." in output
         assert "test-app" in output
 
     def test_capture_interactive_vs_non_interactive(self) -> None:
@@ -183,7 +183,7 @@ class TestCaptureProgressOutput:
         task = TaskState(
             task_id="dl_1",
             name="test.AppImage",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=1000.0,
             completed=500.0,
         )
@@ -202,8 +202,8 @@ class TestCaptureProgressOutput:
         assert len(output_interactive) > 0
         assert len(output_non_interactive) > 0
         # They should both have the downloading header
-        assert "Downloading:" in output_interactive
-        assert "Downloading:" in output_non_interactive
+        assert ":: Retrieving appimages..." in output_interactive
+        assert ":: Retrieving appimages..." in output_non_interactive
 
 
 @pytest.mark.integration
@@ -212,7 +212,7 @@ class TestParseOutputSections:
 
     def test_parse_single_api_section(self) -> None:
         """Test parsing output with only API section."""
-        output = """Fetching from API:
+        output = """:: Querying upstream releases...
 GitHub Releases      1/1 Retrieved
 
 """
@@ -226,13 +226,13 @@ GitHub Releases      1/1 Retrieved
 
     def test_parse_multiple_sections(self) -> None:
         """Test parsing output with multiple sections."""
-        output = """Fetching from API:
+        output = """:: Querying upstream releases...
 GitHub Releases      1/1 Retrieved
 
-Downloading:
+:: Retrieving appimages...
 test-app  1.0 MB  10.0 MB/s 00:00 [======] 100% ✓
 
-Installing:
+:: Processing package changes...
 (1/2) Installing test-app ✓
 
 """
@@ -253,7 +253,7 @@ Installing:
 
     def test_parse_preserves_section_lines(self) -> None:
         """Test that parsed lines are preserved correctly."""
-        output = """Downloading:
+        output = """:: Retrieving appimages...
 app-1  10 MB  5.0 MB/s 00:02 [====] 50%
 app-2  20 MB  8.0 MB/s 00:02 [========] 75%
 
@@ -270,17 +270,17 @@ app-2  20 MB  8.0 MB/s 00:02 [========] 75%
         """Test parsing download section with count in header."""
 
         output = (
-            "Fetching from API:\n"
+            ":: Querying upstream releases...\n"
             "GitHub Releases      2/2 Retrieved\n"
             "\n"
-            "Downloading (2):\n"
+            ":: Retrieving appimages... (2)\n"
             "AppFlowy-0.11.1-linux-x86_64   77.6 MiB  10.8 MB/s 00:00 "
             "[==============================]   100% ✓\n"
             "QOwnNotes-x86_64               41.6 MiB   3.6 MB/s 00:00 "
             "[==============================]   100% ✓\n"
             "\n"
-            "Installing:\n"
-            "(1/2) Installing qownnotes ✓\n"
+            ":: Processing package changes...\n"
+            "(1/2) installing qownnotes ✓\n"
             "\n"
         )
 
@@ -294,7 +294,7 @@ app-2  20 MB  8.0 MB/s 00:02 [========] 75%
 
     def test_parse_updating_operation_in_install_section(self) -> None:
         """Test parsing install section with 'Updating' operation."""
-        output = """Installing:
+        output = """:: Processing package changes...
 (1/2) Verifying appflowy ✓
 (2/2) Updating appflowy ✓
 (1/2) Verifying qownnotes ✓

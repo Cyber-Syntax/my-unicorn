@@ -8,7 +8,7 @@ with the backend.
 import pytest
 
 from my_unicorn.core.progress import ProgressDisplay
-from my_unicorn.core.progress.progress import ProgressType, progress_session
+from my_unicorn.core.progress.progress import Phase, progress_session
 
 
 class TestProgressSession:
@@ -58,7 +58,7 @@ class TestProgressSession:
 
             task_id = await progress.add_task(
                 "Test Task",
-                ProgressType.DOWNLOAD,
+                Phase.DOWNLOAD,
                 total=100,
             )
             assert task_id is not None

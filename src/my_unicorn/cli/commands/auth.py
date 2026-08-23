@@ -63,6 +63,7 @@ class AuthHandler(BaseCommandHandler):
         # Show rate limit information
         await self._display_rate_limit_info(rate_limit_data)
 
+    #TODO: why we use async? seems like this only used on auth command to show rate limit info
     async def _fetch_fresh_rate_limit(self) -> dict[str, object] | None:
         """Fetch fresh rate limit information from GitHub API.
 

@@ -246,7 +246,7 @@ Workflow → ReleaseFetcher → Cache Check → ReleaseAPIClient → GitHub API
 ```python
 class ProgressReporter(Protocol):
     """Abstract interface for progress reporting."""
-    def add_task(description: str, type: ProgressType) -> str: ...
+    def add_task(description: str, type: Phase) -> str: ...
     def update_task(task_id: str, completed: float, description: str): ...
     def finish_task(task_id: str): ...
 ```
@@ -915,7 +915,7 @@ from typing import Protocol, runtime_checkable
 
 @runtime_checkable
 class ProgressReporter(Protocol):
-    def add_task(self, description: str, type: ProgressType) -> str: ...
+    def add_task(self, description: str, type: Phase) -> str: ...
 ```
 
 **Benefits**:
@@ -1164,7 +1164,7 @@ async def install_from_url(github_url: str) -> InstallResult
 
 ```
 1. Workflow creates task
-   progress.add_task("Installing Firefox", ProgressType.INSTALLATION)
+   progress.add_task("Installing Firefox", Phase.PROCESSING)
    ↓ (returns task_id)
    
 2. Download service updates progress

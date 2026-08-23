@@ -9,7 +9,7 @@ from typing import Any
 
 from my_unicorn.core.api import Asset, AssetSelector, Release
 from my_unicorn.core.verify import VerificationService
-from my_unicorn.exceptions import InstallationError
+from my_unicorn.exceptions import ErrorCode, InstallationError
 from my_unicorn.logger import get_logger
 
 logger = get_logger(__name__)
@@ -17,6 +17,7 @@ logger = get_logger(__name__)
 
 def select_best_appimage_asset(
     release: Release,
+    app_name: str = "Unknown",
     preferred_suffixes: list[str] | None = None,
     catalog_entry: dict[str, Any] | None = None,
     installation_source: str = "catalog",
@@ -88,8 +89,10 @@ def select_best_appimage_asset(
 
     # Handle not found case
     if not asset and raise_on_not_found:
-        msg = "AppImage not found in release - may still be building"
-        raise InstallationError(msg)
+        raise InstallationError(
+            error_code=ErrorCode.APPIMAGE_ASSET_NOT_FOUND,
+            context={"app_name": app_name},
+        )
 
     return asset
 

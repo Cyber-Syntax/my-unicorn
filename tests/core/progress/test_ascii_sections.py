@@ -18,8 +18,15 @@ from my_unicorn.core.progress.ascii import (
 )
 from my_unicorn.core.progress.progress_types import (
     DEFAULT_MIN_NAME_WIDTH,
-    ProgressType,
+    Phase,
+    ProcessingPhase,
     TaskState,
+)
+from my_unicorn.exceptions import (
+    ERROR_MESSAGES,
+    ErrorCode,
+    ErrorSeverity,
+    TaskError,
 )
 
 
@@ -109,7 +116,7 @@ class TestFormatDownloadLines:
         task = TaskState(
             task_id="dl1",
             name="test.AppImage",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=1000.0,
             completed=500.0,
             speed=100.0,
@@ -127,26 +134,36 @@ class TestFormatDownloadLines:
         task = TaskState(
             task_id="dl1",
             name="test.AppImage",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=1000.0,
             completed=0.0,
             is_finished=True,
             success=False,
-            error_message="Network timeout",
+            errors=[
+                TaskError(
+                    phase="download",
+                    processing_phase="download",
+                    app_name="bad.AppImage",
+                    error_code=ErrorCode.NETWORK_TIMEOUT,
+                    error_severity=ErrorSeverity.ERROR,
+                    details=ERROR_MESSAGES.get(ErrorCode.NETWORK_TIMEOUT),
+                    timestamp="2026-01-01T00:00:00Z",
+                )
+            ],
         )
 
         lines = format_download_lines(task, max_name_width=20, bar_width=30)
 
         assert len(lines) >= 2
-        assert "Error:" in lines[1]
-        assert "Network timeout" in lines[1]
+        assert "error:" in lines[1]
+        assert "network timeout while downloading asset" in lines[1]
 
     def test_format_download_lines_completed_successfully(self) -> None:
         """Test formatting completed download."""
         task = TaskState(
             task_id="dl1",
             name="test.AppImage",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=1000.0,
             completed=1000.0,
             is_finished=True,
@@ -156,7 +173,10 @@ class TestFormatDownloadLines:
         lines = format_download_lines(task, max_name_width=20, bar_width=30)
 
         assert len(lines) >= 1
-        assert "✓" in lines[0]
+        # Check that the line has size, speed, ETA, progress bar, and percentage
+        assert "KiB" in lines[0] or "MiB" in lines[0] or "GiB" in lines[0]
+        assert "[" in lines[0] and "]" in lines[0]  # Progress bar
+        assert "100%" in lines[0]  # Percentage
 
 
 class TestFormatProcessingTaskLines:
@@ -167,7 +187,8 @@ class TestFormatProcessingTaskLines:
         task = TaskState(
             task_id="v1",
             name="test.AppImage",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=False,
@@ -180,19 +201,30 @@ class TestFormatProcessingTaskLines:
 
         assert len(lines) >= 1
         assert "(1/2)" in lines[0]
-        assert "Verifying" in lines[0]
+        assert "verifying" in lines[0]
 
     def test_format_processing_task_lines_with_error(self) -> None:
         """Test formatting processing task with error."""
         task = TaskState(
             task_id="v1",
             name="test.AppImage",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=True,
             success=False,
-            error_message="Hash mismatch",
+            errors=[
+                TaskError(
+                    phase="download",
+                    processing_phase="download",
+                    app_name="bad.AppImage",
+                    error_code=ErrorCode.NETWORK_DNS_FAILURE,
+                    error_severity=ErrorSeverity.ERROR,
+                    details=ERROR_MESSAGES.get(ErrorCode.CHECKSUM_MISMATCH),
+                    timestamp="2026-01-01T00:00:00Z",
+                )
+            ],
         )
         spinner = "⠋"
 
@@ -201,14 +233,18 @@ class TestFormatProcessingTaskLines:
         )
 
         assert len(lines) >= 2
-        assert "Error:" in lines[1]
+        assert (
+            "checksum verification failed because of hash mismatches"
+            in lines[1]
+        )
 
     def test_format_processing_task_lines_installation(self) -> None:
         """Test formatting installation task."""
         task = TaskState(
             task_id="i1",
             name="test.AppImage",
-            progress_type=ProgressType.INSTALLATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.INSTALLATION,
             phase=2,
             total_phases=2,
             is_finished=False,
@@ -221,7 +257,7 @@ class TestFormatProcessingTaskLines:
 
         assert len(lines) >= 1
         assert "(2/2)" in lines[0]
-        assert "Installing" in lines[0]
+        assert "installing" in lines[0]
 
 
 class TestRenderApiSection:
@@ -237,7 +273,7 @@ class TestRenderApiSection:
         task = TaskState(
             task_id="api1",
             name="AppFlowy",
-            progress_type=ProgressType.API_FETCHING,
+            progress_type=Phase.API_FETCHING,
             total=1.0,
             completed=1.0,
             is_finished=True,
@@ -251,14 +287,14 @@ class TestRenderApiSection:
         result = render_api_section(tasks=tasks, order=order)
 
         assert len(result) > 0
-        assert "Fetching from API:" in result[0]
+        assert ":: Querying upstream releases..." in result[0]
 
     def test_render_api_section_with_cached_response(self) -> None:
         """Test rendering API section with cached response."""
         task = TaskState(
             task_id="api1",
             name="ZenBrowser",
-            progress_type=ProgressType.API_FETCHING,
+            progress_type=Phase.API_FETCHING,
             total=1.0,
             completed=1.0,
             is_finished=True,
@@ -296,7 +332,7 @@ class TestRenderDownloadsSection:
         task = TaskState(
             task_id="dl1",
             name="test.AppImage",
-            progress_type=ProgressType.DOWNLOAD,
+            progress_type=Phase.DOWNLOAD,
             total=1000.0,
             completed=500.0,
             speed=100.0,
@@ -317,7 +353,10 @@ class TestRenderDownloadsSection:
         )
 
         assert len(result) > 0
-        assert "Downloads" in result[0] or "Download" in result[0]
+        assert (
+            ":: Retrieving appimages..." in result[0]
+            or ":: Retrieving appimages..." in result[0]
+        )
 
 
 class TestRenderProcessingSection:
@@ -341,7 +380,8 @@ class TestRenderProcessingSection:
         task = TaskState(
             task_id="v1",
             name="test.AppImage",
-            progress_type=ProgressType.VERIFICATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.VERIFICATION,
             phase=1,
             total_phases=2,
             is_finished=False,
@@ -362,14 +402,15 @@ class TestRenderProcessingSection:
         )
 
         assert len(result) > 0
-        assert "Verifying:" in result[0]
+        assert "verifying" in result[0]
 
     def test_render_processing_section_installing(self) -> None:
         """Test rendering processing section with installation tasks."""
         task = TaskState(
             task_id="i1",
             name="test.AppImage",
-            progress_type=ProgressType.INSTALLATION,
+            progress_type=Phase.PROCESSING,
+            sub_type=ProcessingPhase.INSTALLATION,
             phase=2,
             total_phases=2,
             is_finished=False,
@@ -390,4 +431,4 @@ class TestRenderProcessingSection:
         )
 
         assert len(result) > 0
-        assert "Installing:" in result[0]
+        assert ":: Processing package changes..." in result[0]

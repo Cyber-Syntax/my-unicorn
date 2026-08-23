@@ -1,32 +1,68 @@
-"""Shared types and constants for progress UI components."""
+"""Shared types and constants for progress tracking and display."""
 
 from __future__ import annotations
 
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum, auto
+
+from my_unicorn.exceptions import ErrorDisplayState, TaskError
 
 # caps the size of cached generated IDs to avoid unbounded growth.
 ID_CACHE_LIMIT = 1000
 
 
-class ProgressType(Enum):
-    """Types of progress operations."""
+class Phase(Enum):
+    """Main operation types for progress tracking.
+
+    Example:
+    - API_FETCHING: Querying upstream releases for all apps.
+    - DOWNLOAD: Downloading appimages for all apps.
+    - PROCESSING: Verifying, installing, and performing post-processing for all apps.
+    """
 
     API_FETCHING = auto()
     DOWNLOAD = auto()
+    PROCESSING = auto()
+    SUMMARY = auto()
+
+
+class ProcessingPhase(Enum):
+    """Sub processing types for PROCESSING phase.
+
+    Example:
+    - VERIFICATION: Verifying the integrity of a downloaded appimage.
+    - INSTALLATION: Installing an appimage to the system.
+    - UPDATE: Updating an already installed appimage to a new version.
+    - ICON_EXTRACTION: Extracting the app icon from the appimage.
+    - DESKTOP_ENTRY_CREATION: Creating a .desktop entry for the installed app.
+    - MOVE_APPIMAGE: Moving appimage to user selected (default:~/Applications/) dir.
+    """
+
     VERIFICATION = auto()
-    ICON_EXTRACTION = auto()
     INSTALLATION = auto()
     UPDATE = auto()
+    ICON_EXTRACTION = auto()
+    DESKTOP_ENTRY_CREATION = auto()
+    MOVE_APPIMAGE = auto()
 
 
-# Mapping from progress type to human-friendly operation name
-OPERATION_NAMES: dict[ProgressType, str] = {
-    ProgressType.VERIFICATION: "Verifying",
-    ProgressType.INSTALLATION: "Installing",
-    ProgressType.ICON_EXTRACTION: "Extracting icon",
-    ProgressType.UPDATE: "Updating",
+# Section headers for each main operation type
+PHASE_SECTION_LABELS: dict[Phase, str] = {
+    Phase.API_FETCHING: ":: Querying upstream releases...",
+    Phase.DOWNLOAD: ":: Retrieving appimages...",
+    Phase.PROCESSING: ":: Processing package changes...",
+    Phase.SUMMARY: ":: Creating transaction summary...",
+}
+
+# Per-task verbs
+PROCESSING_LABELS: dict[ProcessingPhase, str] = {
+    ProcessingPhase.VERIFICATION: "verifying",
+    ProcessingPhase.INSTALLATION: "installing",
+    ProcessingPhase.UPDATE: "upgrading",
+    ProcessingPhase.ICON_EXTRACTION: "extracting icon",
+    ProcessingPhase.DESKTOP_ENTRY_CREATION: "creating desktop entry",
+    ProcessingPhase.MOVE_APPIMAGE: "moving appimage",
 }
 
 # Small tunables exposed for easier testing
@@ -56,7 +92,8 @@ class TaskState:
 
     task_id: str
     name: str
-    progress_type: ProgressType
+    progress_type: Phase
+    sub_type: ProcessingPhase | None = None
     total: float = 0.0
     completed: float = 0.0
     description: str = ""
@@ -65,11 +102,13 @@ class TaskState:
     is_finished: bool = False
     created_at: float = 0.0
     last_update: float = 0.0
-    error_message: str = ""
     # Multi-phase task tracking
     parent_task_id: str | None = None  # For tracking related tasks
     phase: int = 1  # Current phase (1 for verify, 2 for install)
     total_phases: int = 1  # Total number of phases
+    errors: list[TaskError] = field(default_factory=list)
+    warnings: list[TaskError] = field(default_factory=list)
+    error_display_state: ErrorDisplayState | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,7 +116,8 @@ class TaskConfig:
     """Configuration for creating a new progress task."""
 
     name: str
-    progress_type: ProgressType
+    progress_type: Phase
+    sub_type: ProcessingPhase | None = None
     total: float = 0.0
     description: str | None = None
     parent_task_id: str | None = None
@@ -131,7 +171,8 @@ class TaskInfo:
     task_id: str
     namespaced_id: str
     name: str
-    progress_type: ProgressType
+    progress_type: Phase
+    sub_type: ProcessingPhase | None = None
     total: float = 0.0
     completed: float = 0.0
     description: str = ""
@@ -167,3 +208,20 @@ class TaskInfo:
             # use the instance-level value so ProgressConfig.max_speed_history
             # is actually respected at runtime.
             self.speed_history = deque(maxlen=self.max_speed_history)
+
+
+# WARN: no raise, return error
+# TODO: add return codes like 0 success, 1 partial, 2 operation failed
+# 3, internal/unhandled fail, 130 interrupted ctrl+c
+
+
+@dataclass(frozen=True, slots=True)
+class TaskStatusInfo:
+    """Information for determining task status."""
+
+    is_finished: bool
+    success: bool | None
+    description: str
+    error_display_state: ErrorDisplayState | None
+    errors: list[TaskError] = field(default_factory=list)
+    warnings: list[TaskError] = field(default_factory=list)
