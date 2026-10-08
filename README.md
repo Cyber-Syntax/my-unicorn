@@ -1,5 +1,10 @@
 # **My Unicorn 🦄 - AppImage Manager for Linux**
 
+> [!NOTE]
+> New rewrite for my-unicorn written in new repo [appman](https://github.com/Cyber-Syntax/appimage-manager) with a focus on better maintainable codebase with functional programming and a more robust testing suite. Now this project is in deprecated state and will not receive any further updates. Please check out the new repo for future updates.
+
+---
+
 > [!CAUTION]
 >
 > - This project is in a **alpha phase** due to limited testing at this time but it is functional. Please report any issues you encounter.
@@ -17,12 +22,12 @@ Turkish: [README.tr.md](README.tr.md)
 > - Detailed information: [wiki.md](docs/wiki.md)
 
 - **Supported Applications:**
-    - Super-Productivity, Siyuan, Joplin, Standard-notes, Logseq, QOwnNotes, Tagspaces, Zen-Browser, Zettlr, HeroicGamesLauncher, KDiskMark, AppFlowy, Obsidian, FreeTube
-    - Applications without verification (developer doesn't provide hash):
-        - WeekToDo
-    - More can be found in the [catalog](src/my_unicorn/catalog) folder.
+  - Super-Productivity, Siyuan, Joplin, Standard-notes, Logseq, QOwnNotes, Tagspaces, Zen-Browser, Zettlr, HeroicGamesLauncher, KDiskMark, AppFlowy, Obsidian, FreeTube
+  - Applications without verification (developer doesn't provide hash):
+    - WeekToDo
+  - More can be found in the [catalog](src/my_unicorn/catalog) folder.
 - **Supported hash types:**
-    - sha256, sha512
+  - sha256, sha512
 
 ## 🚀 Quick Start Example
 
@@ -176,10 +181,10 @@ Changes to the source code will be reflected immediately without reinstalling.
 
 - **GitHub URL:** The repository URL of the app (e.g., `https://github.com/johannesjo/super-productivity`).
 - Hash type and Hash file name are automatically detected. You need to provide below informations, if the app compatibility is not available or error occurs:
-    - **Hash type:** Specify the hash type (e.g., sha512 for super-productivity).
-    - **Hash verification issues:** If the hash verification fails, you can manually add the hash to the JSON file:
-        - Look for the latest hash in the GitHub release page (e.g., [super-productivity releases](https://github.com/johannesjo/super-productivity/releases)).
-        - Check the [catalog](src/my_unicorn/catalog) folder for examples.
+  - **Hash type:** Specify the hash type (e.g., sha512 for super-productivity).
+  - **Hash verification issues:** If the hash verification fails, you can manually add the hash to the JSON file:
+    - Look for the latest hash in the GitHub release page (e.g., [super-productivity releases](https://github.com/johannesjo/super-productivity/releases)).
+    - Check the [catalog](src/my_unicorn/catalog) folder for examples.
 
 ## 📚 Documentation
 
@@ -191,4 +196,4 @@ Changes to the source code will be reflected immediately without reinstalling.
 - **Consider giving it a star ⭐** on GitHub to show your support and keep me motivated on my coding journey!
 - **Testing:** It would be great if you could test the script and provide feedback on any issues you encounter.
 - **💖 Sponsor me:** If you'd like to support my work and help me continue learning and building projects, consider sponsoring me:
-    - [![Sponsor Me](https://img.shields.io/badge/Sponsor-💖-brightgreen)](https://github.com/sponsors/Cyber-Syntax)
+  - [![Sponsor Me](https://img.shields.io/badge/Sponsor-💖-brightgreen)](https://github.com/sponsors/Cyber-Syntax)
