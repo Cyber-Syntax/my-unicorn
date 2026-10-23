@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0-alpha] - 2026-10-23
+
+### Changed
+
+- Updated dependencies:
+
+```
+Updated aiohttp v3.14.3 -> v3.14.5
+Updated ast-serialize v0.8.0 -> v0.13.0
+Updated charset-normalizer v3.5.1 -> v3.5.2
+Updated coverage v7.15.4 -> v7.16.2
+Updated cryptography v50.0.0 -> v50.0.2
+Updated filelock v3.32.3 -> v4.2.0
+Updated idna v3.18 -> v3.20
+Updated iniconfig v2.3.0 -> v2.3.1
+Updated librt v0.15.0 -> v0.16.0
+Updated more-itertools v11.1.0 -> v11.2.1
+Updated msgpack v1.2.1 -> v1.2.3
+Updated multidict v6.7.1 -> v7.1.0
+Updated mypy v2.3.1 -> v2.4.0
+Updated orjson v3.12.0 -> v3.13.0
+Updated pip-api v0.0.34 -> v0.0.35
+Updated platformdirs v4.11.3 -> v4.13.3
+Updated pluggy v1.6.0 -> v1.7.0
+Updated propcache v0.5.2 -> v0.5.4
+Updated pycparser v3.0 -> v3.11
+Updated pygments v2.20.0 -> v2.21.0
+Updated pyparsing v3.3.2 -> v3.3.3
+Updated pytest-mock v3.15.1 -> v3.16.0
+Updated rpds-py v2026.6.3 -> v2026.9.1
+Updated ruff v0.16.3 -> v0.17.1
+Updated tomli v2.4.1 -> v2.5.0
+Updated urllib3 v2.7.0 -> v2.8.0
+Updated uvloop v0.22.1 -> v0.23.0
+Updated yarl v1.24.5 -> v1.25.1
+```
+
 ## [2.6.3-alpha] - 2026-08-23
 
 ### Changed
