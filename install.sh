@@ -407,6 +407,7 @@ install_with_uv_tool() {
 
   check_local_bin_in_path
   setup_autocomplete_from_src "$src_dir"
+  setup_fish_completions
   copy_update_script
 
   print_info "✓ Installation complete using uv tool."
@@ -442,32 +443,13 @@ install_with_uv_editable() {
 
   check_local_bin_in_path
   setup_autocomplete_from_src "$src_dir"
+  setup_fish_completions
   copy_update_script
 
   print_info "✓ Editable installation complete."
   print_info "Changes to source code will be reflected immediately."
 }
 
-# -----------------------------------------------------------------------------
-# Uninstall support
-# -----------------------------------------------------------------------------
-
-# Remove everything installed by my-unicorn at user level.
-#
-# This includes:
-#   - uv tool installation
-#   - local update script
-#   - autocomplete install directory (optional cleanup)
-#
-# Safe behavior:
-#   - Only affects user-local files
-#   - Requires explicit confirmation
-#   - Never modifies system files
-uninstall_my_unicorn() {
-  local src_dir
-  local confirm
-
-  if ! src_dir="$(script_dir)"; then
     return 1
   fi
 
@@ -480,36 +462,12 @@ uninstall_my_unicorn() {
     print_info "❎ Uninstall cancelled."
     return 0
   fi
-
-  # 1. Remove uv tool install
-  if check_dependency "uv"; then
-    if uv tool list 2>/dev/null | grep -q "$CLI_NAME"; then
-      if ! uv tool uninstall "$CLI_NAME"; then
-        print_error "Failed to uninstall via uv tool."
-        return 1
       fi
       print_info "🗑️  Removed uv tool installation"
     else
       print_info "uv tool installation not found"
     fi
   fi
-
-  # 2. Remove update script
-  if [[ -f "$UPDATE_SCRIPT_PATH" ]]; then
-    if ! rm -f "$UPDATE_SCRIPT_PATH"; then
-      print_error "Failed to remove update script."
-      return 1
-    fi
-    print_info "🗑️  Removed update script: $UPDATE_SCRIPT_PATH"
-  fi
-
-  # 3. Remove install directory (autocomplete + assets)
-  if [[ -d "$INSTALL_DIR" ]]; then
-    if ! rm -rf "$INSTALL_DIR"; then
-      print_error "Failed to remove install directory: $INSTALL_DIR"
-      return 1
-    fi
-    print_info "🗑️  Removed install directory: $INSTALL_DIR"
   fi
 
   cat <<EOF
