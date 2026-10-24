@@ -209,7 +209,7 @@ def _is_candidate_newer(current_version: str, candidate_version: str) -> bool:
 async def _fetch_latest_prerelease_version() -> str | None:
     """Fetch the latest prerelease version from GitHub (cache disabled)."""
 
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(max_field_size=16380) as session:
         fetcher = ReleaseFetcher(
             owner=GITHUB_OWNER,
             repo=GITHUB_REPO,

@@ -187,7 +187,7 @@ class ServiceContainer:
 
         """
         if self._session is None:
-            self._session = aiohttp.ClientSession()
+            self._session = aiohttp.ClientSession(max_field_size=16380)
             logger.debug("Created new HTTP session")
         return self._session
 

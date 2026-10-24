@@ -418,7 +418,7 @@ class UpdateManager:
 
         logger.info("🔄 Checking %d app(s) for updates...", len(app_names))
 
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(max_field_size=16380) as session:
             tasks = [
                 self.check_single_update(
                     app, session, refresh_cache=refresh_cache
@@ -827,7 +827,7 @@ async def update_multiple_apps(
             len(update_info_map),
         )
 
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(max_field_size=16380) as session:
 
         async def update_with_semaphore(
             app_name: str,
