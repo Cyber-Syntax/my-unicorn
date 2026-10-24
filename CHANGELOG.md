@@ -5,7 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.7.0-alpha] - 2026-10-23
+## [2.7.1-alpha] - 2026-10-24
+
+### Fixed
+
+- Fixed a basic bug that uv.lock file wasn't updated to the latest version.
+- Fixed aiohttp v3.14.5 error by increasing the max_field_size for aiohttp.ClientSession to 16380 bytes for connections.
+
+### Changed
+
+- Updated dependencies:
+
+```
+Updated ast-serialize v0.13.0 -> v0.13.1
+```
+
+## [2.7.0-alpha] - 2026-10-23 [YANKED]
 
 ### Changed
 
